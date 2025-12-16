@@ -1,0 +1,3 @@
+MACRO PRINTC %char
+    OUTB 0x00, %char
+END MACRO
