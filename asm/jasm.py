@@ -1,12 +1,13 @@
 import argparse
 import os
 
-from util import Logger, GRAMMAR
 from lark import Lark
-from assembler import resolve_labels, generate_binary
+
+from asm.assembler import generate_binary, resolve_labels
+from asm.util import GRAMMAR, Logger
 
 # JASM assembler written in Python.
-# Usage: python jasm.py <file> [-o <output file>] [-d <debug>] 
+# Usage: python jasm.py <file> [-o <output file>] [-d <debug>]
 
 logger = None
 
@@ -24,31 +25,33 @@ def parse(file):
 
 
 def assemble(file, output):
-
     logger.info(f"Assembling {file}...")
 
     # Parse the source file
     tree = parse(file)
-    
+
     # Pass 1: Resolve labels
     labels = resolve_labels(tree, logger)
-    
+
     # Pass 2: Generate binary
     binary = generate_binary(tree, labels, logger)
-    
+
     # Write binary to output file
-    with open(output, 'wb') as f:
+    with open(output, "wb") as f:
         f.write(binary)
-    
+
     logger.debug(f"Generated {len(binary)} bytes of binary code.")
 
     return len(binary)
+
 
 def main():
     argparser = argparse.ArgumentParser(description="JASM assembler")
     argparser.add_argument("file", nargs="?", default="", help="The file to assemble")
     argparser.add_argument("-o", "--output", default="a.bin", help="The output file")
-    argparser.add_argument("-v", "--verbosity", help="Verbosity level", default=Logger.Level.INFO, type=int)
+    argparser.add_argument(
+        "-v", "--verbosity", help="Verbosity level", default=Logger.Level.INFO, type=int
+    )
     args = argparser.parse_args()
 
     # initialize logger
@@ -71,7 +74,7 @@ def main():
     if not args.file.endswith(".jasm"):
         logger.error(f"File {args.file} is not a JASM file. Exiting...")
         exit(1)
-    
+
     logger.debug("Init looks good. Starting assembly...")
 
     # the magic
@@ -85,6 +88,7 @@ def main():
     logger.info("")
 
     exit(0)
+
 
 if __name__ == "__main__":
     main()

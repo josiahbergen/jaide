@@ -1,3 +1,3 @@
 ### Jaide8
 
-See the [spec](doc/spec.md) for more information.
+See the [spec](doc/spec.md) and [language documentation](doc/lang.md) for more information.

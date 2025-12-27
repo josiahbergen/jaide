@@ -1,5 +1,10 @@
 ; Simple JASM program to calculate the 10th Fibonacci number
 
+MACRO LDA %address
+    MOVE X, (%address & 0x0FF)
+    MOVE Y, (%address >> 4)
+END MACRO
+
 start:
     MOVE A, 0
     MOVE B, 1
@@ -13,10 +18,9 @@ loop:
     DEC C ; decrement counter
     JZ end ; if counter is 0, we're done
 
-    JMP loop ; otherwise, continue the loop
+    JUMP loop ; otherwise, continue the loop
 
 end:
-    MOVE X, 0x00 ; low address
-    MOVE Y, 0xC0 ; high address
+    LDA 0xC000
     STORE A, X:Y ; store the result to memory
     HALT

@@ -1,0 +1,55 @@
+(* core *)
+start       = { line } ;
+line        = [ w , (instruction | label | macro | data | macro_call) ] , [ comment ] , "\n" ;
+label       = label_name , ":" ;
+
+(* macros *)
+macro       = "MACRO" , w , label_name , w , macro_args , "\n" , { macro_line } , "END MACRO" ;
+macro_args  = macro_arg , { "," , w , macro_arg } ;
+macro_line  = [ w , (instruction | data | macro_call) ] , [ comment ] , "\n" ;
+macro_call  = label_name , w , [ op_list ] ;
+
+(* instructions *)
+instruction = mnemonic , w , [ op_list ] ;
+op_list     = generic_op , { "," , [ w ] , generic_op } ;
+
+(* operands *)
+generic_op  = operand | macro_arg | expression ;
+operand     = register_pair | register | number | label_name ;
+macro_arg   = "%" , label_name ;
+
+(* expressions *)
+expression  = "(" , [ w , operator ] , w , exp_term, { w , operator , w , exp_term } , w , ")" ;
+exp_term    = number | macro_arg | expression ;
+operator    = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~" ;
+
+(* data *)
+data        = "DATA" , w , constant , { "," , w , constant } ;
+constant    = number | string ;
+
+(* instructions and registers *)
+mnemonic    = "LOAD" | "STORE" | "MOVE" | "PUSH" | "POP" | "ADD" | "ADDC"
+            | "SUB" | "SUBB" | "INC" | "DEC" | "LSHF" | "RSHF" | "AND"
+            | "OR" | "NOR" | "NOT" | "XOR" | "INB" | "OUTB" | "CMP"
+            | "SETC" | "CLRC" | "CLRZ" | "JUMP" | "JZ" | "JNZ" | "JC"
+            | "JNC" | "INT" | "HALT" | "NOP" ;
+
+register_pair = register , ":" , register ;
+register    = "A" | "B" | "C" | "D" | "X" | "Y" | "SP" | "PC" | "Z" | "F" | "MB" | "STS" ;
+
+(* base terminals *)
+number      = "0x" , hex_digit , { hex_digit }
+            | "b" , bin_digit , { bin_digit }
+            | digit , { digit } ;
+
+string      = '"' , { char } , '"' ;
+label_name  = letter , { letter | digit | "_" } ;
+comment     = ( ";" ) , { char | w } ;
+w           = { " " | "\t" } ;
+char        = letter | digit | symbol ;
+letter      = "A"..."Z" | "a"..."z" ;
+digit       = "0"..."9" ;
+hex_digit   = digit | "A"..."F" | "a"..."f" ;
+bin_digit   = "0" | "1" ;
+symbol      = "[" | "]" | "{" | "}" | "(" | ")" | "<" | ">" | "'" | '"' | "=" | "|"
+            | "." | "," | ";" | "-" | "+" | "*" | "?" | "!" | "/" | "\\" ;

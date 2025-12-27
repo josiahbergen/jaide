@@ -1,6 +1,7 @@
 MACRO LDA %address
     MOVE X, %address & 0x0FF
-    MOVE Y, %address >> 4
+    MOVE Y, %address
+    RSHF Y, 4
 END MACRO
 
 MACRO LDRR %reg_low % reg_high

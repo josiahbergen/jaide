@@ -16,7 +16,7 @@ JAIDE8 is programmed with `JASM`. JASM is a custom assembly language.
 
 It has a custom assembler that produces binaries unique to JAIDE8's architecture.
 
-At this time, JASM does not support macros or imports, although it is planned to. However, all basic assembly functions are available, including labels, comments, and support for all 31 instructions.
+See the [language specification](lang.md) for more information.
 
 The full Lark grammar used for lexical analysis is contained in [asm/util.py](../asm/util.py).
 

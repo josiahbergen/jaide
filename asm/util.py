@@ -56,11 +56,11 @@ class Logger:
     def __init__(self, level: int):
         colorama.init()
         self.level: int = level
-        self.debug_buffer: = []
+        self.debug_buffer: list[str] = []
         self.debug_count: int = 0
-        self.flush_interval = 0
+        self.flush_interval: int = 0
 
-    def verbose(self, message):
+    def verbose(self, message: str):
         if self.level >= self.Level.VERBOSE:
             formatted_message = (
                 colorama.Fore.YELLOW + "[DEBUG] " + colorama.Fore.RESET + message
@@ -71,7 +71,7 @@ class Logger:
             if self.debug_count >= self.flush_interval:
                 self.flush_debug()
 
-    def debug(self, message):
+    def debug(self, message: str):
         if self.level >= self.Level.DEBUG:
             formatted_message = (
                 colorama.Fore.YELLOW + "[DEBUG] " + colorama.Fore.RESET + message
@@ -86,23 +86,23 @@ class Logger:
         if self.debug_buffer:
             for msg in self.debug_buffer:
                 print(msg, flush=False)
-            sys.stdout.flush()  # Flush stdout after all buffered messages
+            _ = sys.stdout.flush()  # Flush stdout after all buffered messages
             self.debug_buffer.clear()
             self.debug_count = 0
 
-    def small(self, message):
+    def small(self, message: str):
         if self.level >= self.Level.INFO:
             print(colorama.Fore.BLACK + message + colorama.Fore.RESET)
 
-    def info(self, message):
+    def info(self, message: str):
         if self.level >= self.Level.INFO:
             print(colorama.Fore.RESET + message + colorama.Fore.RESET)
 
-    def error(self, message):
+    def error(self, message: str):
         self.flush_debug()
         print(colorama.Fore.RED + "ERROR: " + message + colorama.Fore.RESET)
 
-    def success(self, message):
+    def success(self, message: str):
         if self.level >= self.Level.INFO:
             print(
                 colorama.Back.GREEN
@@ -112,7 +112,7 @@ class Logger:
                 + colorama.Back.RESET
             )
 
-    def title(self, message):
+    def title(self, message: str):
         if self.level >= self.Level.INFO:
             print(
                 colorama.Back.BLUE

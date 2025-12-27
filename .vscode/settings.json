@@ -1,7 +1,13 @@
 {
     "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
         "uv.lock": true,
-        ".gitignore": false,
+        ".gitignore": true,
         ".vscode": true
-    }
+    },
+    "hide-files.files": []
 }

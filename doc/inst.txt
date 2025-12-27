@@ -7,9 +7,9 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 0       LOAD        reg                 [imm16 | reg:reg]   load 8-bit value from memory    reg <- [imm16 | reg:reg]
 1       STORE       reg                 [imm16 | reg:reg]   store 8-bit value to memory     [imm16 | reg:reg] <- reg
 2       MOVE        reg                 reg | imm8          move 8-bit value                reg <- reg | imm8
-3       PUSH        reg | imm8                              push to stack                   [SP--] <- imm8/reg 
+3       PUSH        reg | imm8                              push to stack                   [SP--] <- imm8/reg
 4       POP         reg                                     pop from stack                  reg <- [++SP] *note that the stack grows downwards
-5       ADD^        reg                 reg | imm8          add                             reg <- reg + (imm8 | reg) 
+5       ADD^        reg                 reg | imm8          add                             reg <- reg + (imm8 | reg)
 6       ADDC^       reg                 reg | imm8          add with carry                  reg <- reg + (imm8 | reg)
 7       SUB^        reg                 reg | imm8          subtract                        reg <- reg - (imm8 | reg)
 8       SUBB^       reg                 reg | imm8          subract with borrow             reg <- reg - (imm8 | reg)
@@ -21,10 +21,10 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 14      OR          reg                 reg | imm8          bitwise or                      reg <- reg OR  (reg | imm8)
 15      NOR         reg                 reg | imm8          bitwise nor                     reg <- reg NOR (reg | imm8)
 16      NOT         reg                                     bitwise not                     reg <- reg NOR (reg | imm8)
-17      XOR         reg                 reg | imm8          bitwise xor                     reg <- reg XOR (reg | imm8)  
+17      XOR         reg                 reg | imm8          bitwise xor                     reg <- reg XOR (reg | imm8)
 18      INB         reg                 port(reg | imm8)    get byte from I/O port          reg <- port(reg | imm8)
 19      OUTB        reg                 port(reg | imm8)    send byte through I/O port      port(reg | imm8) <- reg
-20      CMP^        reg                 reg | imm8          compare                         UNDEFINED FOR NOW
+20      CMP^        reg                 reg | imm8          compare                         Z, C, B <- reg - reg/imm8
 21      SEC                                                 set carry flag                  carry flag <- 1
 22      CLC                                                 clear carry flag                carry flag <- 0
 23      CLZ                                                 clear zero flag                 zero flag  <- 0
@@ -33,7 +33,7 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 26      JNZ         [imm16 | reg:reg]                       jump of not zero                PC <- [imm16 | reg:reg] if zero flag is 0 else NOP
 27      JC          [imm16 | reg:reg]                       jump if carry                   PC <- [imm16 | reg:reg] if carry flag is 1 else NOP
 28      JNC         [imm16 | reg:reg]                       jump if not carry               PC <- [imm16 | reg:reg] if carry flag is 0 else NOP
-29      INT*        imm8                                    call an interrupt               UNDEFINED FOR NOW
+29      INT*        imm8                                    call an interrupt               NOP (to be implemented later)
 30      HALT*                                               halt                            halted flag <- 1
 31      NOP                                                 no operation                    n/a
 
