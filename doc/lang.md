@@ -38,7 +38,7 @@ Macros are supported, as well as inline expressions.
 ```jasm
 ; a macro to load a 16-bit address into register pair X:Y
 MACRO load_address %addr
-    MOVE X, (%addr & 0x00FF)
+    MOVE X, (%addr & 0x00FF) ; inline expressions are notated with parentheses
     MOVE Y, (%addr >> 4)
 END MACRO
 
