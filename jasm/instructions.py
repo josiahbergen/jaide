@@ -14,8 +14,8 @@ OPCODES = {
     "SUBB": 0x8,
     "INC": 0x9,
     "DEC": 0xA,
-    "SHL": 0xB,
-    "SHR": 0xC,
+    "LSH": 0xB,
+    "RSH": 0xC,
     "AND": 0xD,
     "OR": 0xE,
     "NOR": 0xF,
@@ -27,7 +27,7 @@ OPCODES = {
     "SEC": 0x15,
     "CLC": 0x16,
     "CLZ": 0x17,
-    "JMP": 0x18,
+    "JUMP": 0x18,
     "JZ": 0x19,
     "JNZ": 0x1A,
     "JC": 0x1B,
@@ -109,7 +109,6 @@ def validate_instruction_semantics(node, logger):
             logger.error(
                 f"{mnemonic} instruction requires {required_num} operands. Got {actual_num} on line {current_line}."
             )
-            exit(1)
 
     def validate_operand_type(
         operand_type, operand_index, expected_types, mnemonic, current_line
@@ -121,7 +120,6 @@ def validate_instruction_semantics(node, logger):
                 + f"as operand {operand_index + 1}. Got {OPERAND_TYPE_TO_STRING[operand_type]} "
                 + f"on line {current_line}."
             )
-            exit(1)
 
     mnemonic = node.children[0].value.upper()
     line = node.children[0].line
@@ -230,7 +228,6 @@ def validate_instruction_semantics(node, logger):
             )
         case _:
             logger.error(f"Unknown instruction: {mnemonic} on line {line}")
-            exit(1)
 
 
 def get_addressing_mode(mnemonic, operands):

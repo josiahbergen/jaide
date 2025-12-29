@@ -1,7 +1,12 @@
 (* core *)
 start       = { line } ;
-line        = [ w , (instruction | label | macro | data | macro_call) ] , [ comment ] , "\n" ;
+line        = [ w , (instruction | directive | label | macro | data | macro_call) ] , [ comment ] , "\n" ;
 label       = label_name , ":" ;
+
+(* directives *)
+directive   = data | import ;
+data        = "DATA" , w , constant , { "," , w , constant } ;
+import      = "IMPORT" , w , string ;
 
 (* macros *)
 macro       = "MACRO" , w , label_name , w , macro_args , "\n" , { macro_line } , "END MACRO" ;
@@ -23,10 +28,6 @@ expression  = "(" , [ w , operator ] , w , exp_term, { w , operator , w , exp_te
 exp_term    = number | macro_arg | expression ;
 operator    = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~" ;
 
-(* data *)
-data        = "DATA" , w , constant , { "," , w , constant } ;
-constant    = number | string ;
-
 (* instructions and registers *)
 mnemonic    = "LOAD" | "STORE" | "MOVE" | "PUSH" | "POP" | "ADD" | "ADDC"
             | "SUB" | "SUBB" | "INC" | "DEC" | "LSHF" | "RSHF" | "AND"
@@ -38,6 +39,7 @@ register_pair = register , ":" , register ;
 register    = "A" | "B" | "C" | "D" | "X" | "Y" | "SP" | "PC" | "Z" | "F" | "MB" | "STS" ;
 
 (* base terminals *)
+constant    = number | string ;
 number      = "0x" , hex_digit , { hex_digit }
             | "b" , bin_digit , { bin_digit }
             | digit , { digit } ;

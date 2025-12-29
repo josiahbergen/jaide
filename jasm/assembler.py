@@ -13,7 +13,6 @@ from .instructions import (
     validate_instruction_semantics,
 )
 
-
 def resolve_labels(tree, logger):
     """
     Pass 1: Resolve all labels and calculate their addresses.
@@ -32,14 +31,12 @@ def resolve_labels(tree, logger):
             logger.error(
                 f"Node has no data: {node}. Perhaps you have an empty start label?"
             )
-            exit(1)
 
         if node.data == "label":
             label_name = node.children[0].value
 
             if labels.get(label_name):
                 logger.error(f"Label {label_name} already defined. Exiting...")
-                exit(1)
 
             labels[label_name] = pc
             logger.debug(f"Found label: {label_name} (at {pc})")
@@ -56,7 +53,6 @@ def resolve_labels(tree, logger):
                 logger.error(
                     f"Bad instruction: {mnemonic} on line {node.children[0].line}"
                 )
-                exit(1)
             pc += size
             logger.verbose(
                 f"    Finished processing instruction {mnemonic} at PC={pc - size}, size={size} bytes"
@@ -89,7 +85,6 @@ def get_operand_value(operand, labels, logger):
         reg_val = REGISTERS.get(reg_name.upper())
         if reg_val is None:
             logger.error(f"Unknown register: {reg_name}")
-            exit(1)
         return reg_val
 
     def get_register_pair_value(pair_str, logger):
@@ -97,7 +92,6 @@ def get_operand_value(operand, labels, logger):
         parts = pair_str.split(":")
         if len(parts) != 2:
             logger.error(f"Invalid register pair: {pair_str}")
-            exit(1)
         # encode each register
         reg1 = get_register_value(parts[0].strip(), logger)
         reg2 = get_register_value(parts[1].strip(), logger)
@@ -107,7 +101,6 @@ def get_operand_value(operand, labels, logger):
         # get label value (i.e. address) from label name
         if label_name not in labels:
             logger.error(f"Unknown label: {label_name}")
-            exit(1)
         return labels[label_name]
 
     value = None
@@ -125,7 +118,6 @@ def get_operand_value(operand, labels, logger):
 
     else:
         logger.error(f"Unknown operand: {operand.value.strip()}")
-        exit(1)
 
     logger.verbose(
         f"    Encoded {operand.type} value as {value} for operand {operand.value.strip()}"
@@ -149,14 +141,12 @@ def get_byte1_bits_string(byte):
 def assert_operand_count(expected, actual, logger):
     if expected != actual:
         logger.error(f"Expected {expected} operands, got {actual}")
-        exit(1)
     return
 
 
 def assert_immediate_size(expected, value, logger):
     if value >= (2**expected):
         logger.error(f"Immediate value {value} is too large for size {expected}")
-        exit(1)
     return
 
 

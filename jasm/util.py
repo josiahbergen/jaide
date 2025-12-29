@@ -101,6 +101,7 @@ class Logger:
     def error(self, message: str):
         self.flush_debug()
         print(colorama.Fore.RED + "ERROR: " + message + colorama.Fore.RESET)
+        sys.exit(1) # exit with error
 
     def success(self, message: str):
         if self.level >= self.Level.INFO:

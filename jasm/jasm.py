@@ -3,14 +3,17 @@ import os
 
 from lark import Lark
 
-from asm.assembler import generate_binary, resolve_labels
-from asm.util import GRAMMAR, Logger
+from .assembler import generate_binary, resolve_labels
+from .util import GRAMMAR, Logger
 
 # JASM assembler written in Python.
-# Usage: python jasm.py <file> [-o <output file>] [-d <debug>]
+# Usage: python -m jasm <file> [-o <output file>] [-d <debug>]
 
-logger = None
+# global logger object. used to log messages throughout the program.
+global logger
 
+# global manager object. used to manage the program's state.
+global manager
 
 def parse(file):
     logger.debug("Parsing...")
@@ -19,7 +22,6 @@ def parse(file):
         tree = parser.parse(open(file).read())
     except Exception as e:
         logger.error(f"Syntax error: {e}")
-        exit(1)
 
     return tree
 
@@ -63,17 +65,14 @@ def main():
     # check if file is provided
     if not args.file:
         logger.error("No file(s) provided. Exiting...")
-        exit(1)
 
     # check if file exists
     if not os.path.exists(args.file):
         logger.error(f"File {args.file} does not exist. Exiting...")
-        exit(1)
 
     # check if file is an assembly file
     if not args.file.endswith(".jasm"):
         logger.error(f"File {args.file} is not a JASM file. Exiting...")
-        exit(1)
 
     logger.debug("Init looks good. Starting assembly...")
 
@@ -90,5 +89,4 @@ def main():
     exit(0)
 
 
-if __name__ == "__main__":
-    main()
+
