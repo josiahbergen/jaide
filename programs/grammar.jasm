@@ -5,6 +5,8 @@ MACRO LDA %address
     MOVE Y, (%address >> 4)
 END MACRO
 
+IMPORT "programs/import.jasm"
+
 start:
     MOVE A, 0
     MOVE B, 1
@@ -16,12 +18,14 @@ loop:
     MOVE B, D      ; B = old A
 
     DEC C ; decrement counter
-    JZ end ; if counter is 0, we're done
+    JZ exit ; if counter is 0, we're done
 
     JUMP loop ; otherwise, continue the loop
 
-end:
-    LDA 0xC000
+exit:
+    ; LDA 0xC000
+    MOVE X, 0x00 ; low byte
+    MOVE Y, 0xC0 ; high byte
     STORE A, X:Y ; store the result to memory
     HALT
 

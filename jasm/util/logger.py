@@ -18,27 +18,33 @@ class Logger:
         ERROR: int = 0
 
 
-    def __init__(self, level: int):
+    def __init__(self, level: int, warnings: bool = True):
         cl.init()
         self.level: int = level
+        self.warnings: bool = warnings
 
 
     def set_level(self, level: int):
         self.level = level
 
 
+    def set_warnings(self, warnings: bool):
+        self.warnings = warnings
+
+
     def verbose(self, message: str):
         """ Print a verbose message. Only prints if level is VERBOSE or higher. """
         if self.level >= self.log_level.VERBOSE:
-            formatted = f"{f.BLACK}debug {message}{f.RESET}"
+            formatted = f"{f.BLACK}----- {message}{f.RESET}"
             print(formatted)
 
 
     def debug(self, message: str):
         """ Print a debug message. Only prints if level is DEBUG or higher. """
         if self.level >= self.log_level.DEBUG:
-            formatted = f"{f.BLACK}debug {f.RESET}{message}"
+            formatted = f"{f.BLACK}===== {f.RESET}{message}"
             print(formatted)
+
 
     def info(self, message: str):
         """ Print an info message. Only prints if level is INFO or higher. """
@@ -66,23 +72,27 @@ class Logger:
         print(formatted)
         sys.exit(0)  # exit with non-error
 
+
     def success(self, message: str):
-        """ Print a success message. Only prints if level is INFO or higher. """
-        if self.level >= self.log_level.INFO:
-            formatted = f"\n{b.GREEN}{f.BLACK}{message}{f.RESET}{b.RESET}"
+        """ Print a success message. Only prints if level is DEBUG or higher. """
+        if self.level >= self.log_level.DEBUG:
+            formatted = f"{f.GREEN}{message}{f.RESET}"
             # formatted = f"{f.GREEN}{message}{f.RESET}"
             print(formatted)
 
 
     def title(self, message: str):
-        """ Print a title. Only prints if level is INFO or higher. """
-        if self.level >= self.log_level.INFO:
+        """ Print a title. Only prints if level is DEBUG or higher. """
+        if self.level >= self.log_level.DEBUG:
             formatted = b.BLUE + f.BLACK + message + f.RESET + b.RESET
             print(formatted)
 
 
     def warning(self, message: str, scope: str | None = None, choice: bool = False) -> None:
         """ Print a warning message. Only prints if level is INFO or higher. """
+        if not self.warnings:
+            return
+        
         scope = scope or ""
 
         # formatted = f"{b.YELLOW} {b.RESET} {f.YELLOW}warn:{f.RESET}{f.BLACK} {scope}: {f.YELLOW}{message}{f.RESET}"
@@ -107,7 +117,7 @@ class Logger:
 
     def nl(self):
         """ Print a newline. """
-        if self.level >= self.log_level.INFO:
+        if self.level >= self.log_level.DEBUG:
             print("")
 
-logger = Logger(Logger.log_level.INFO)
+logger = Logger(Logger.log_level.ERROR, warnings=True)

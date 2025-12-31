@@ -15,7 +15,7 @@ def assemble(file: str, output: str):
     ir = generate_ir(file)
 
     # expand macros
-    ir = expand_macros(ir)
+    # ir = expand_macros(ir)
 
     # resolve labels
     ir = resolve_labels(ir)
@@ -26,7 +26,7 @@ def assemble(file: str, output: str):
     # write binary to output file
     with open(output, "wb") as f:
         f.write(binary)
-    logger.debug(f"wrote {len(binary)} bytes to {output}.")
+    logger.info(f"wrote {len(binary)} bytes to {output}.")
 
     logger.success("assembly complete! yay!")
     return

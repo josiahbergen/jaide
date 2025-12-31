@@ -5,14 +5,13 @@
 
 # this is ai generated (based off of my ebnf), so it probably sucks and is wrong
 GRAMMAR = r"""
-    ?start: line*
-
-    ?line: instruction COMMENT? _NL?
-           | directive COMMENT? _NL?
-           | macro_definition COMMENT? _NL?
-           | macro_call COMMENT? _NL?
-           | label COMMENT? _NL?
-           | COMMENT _NL?
+    start: (_NL | statement)*
+    
+    ?statement: instruction
+                | directive
+                | macro_definition
+                | macro_call
+                | label
 
     # Directives 
     directive: data_directive | import_directive
@@ -22,14 +21,17 @@ GRAMMAR = r"""
 
     # Macros 
     # Matches: MACRO name args \n body END MACRO
-    macro_definition: MACRO LABELNAME macro_def_args _NL macro_body END MACRO
+    macro_definition: MACRO LABELNAME macro_def_args? _NL macro_body END MACRO
 
     macro_def_args: macro_arg ("," macro_arg)*
     
     # A macro body contains lines, but valid lines inside a macro are restricted 
     # (instructions, data, or nested calls)
-    macro_body: macro_line*
-    macro_line: [instruction | data_directive | macro_call] COMMENT? _NL
+    macro_body: (_NL | macro_stmt)*
+    
+    ?macro_stmt: instruction
+               | data_directive
+               | macro_call
 
     # Macro call: name [args]
     macro_call: LABELNAME operand_list?
@@ -109,6 +111,7 @@ GRAMMAR = r"""
     WS_INLINE: /[ \t]+/
 
     %ignore WS_INLINE
+    %ignore COMMENT
 """
 
 GRAMMAR_OLD = r"""

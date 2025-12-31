@@ -39,22 +39,7 @@ def get_addressing_mode(mnemonic, operands):
                 return ADDRESSING_MODES["REGISTER"]
 
         # register + register or 8-bit immediate
-        case (
-            "MOVE"
-            | "ADD"
-            | "ADDC"
-            | "SUB"
-            | "SUBB"
-            | "SHL"
-            | "SHR"
-            | "AND"
-            | "OR"
-            | "NOR"
-            | "XOR"
-            | "CMP"
-            | "INB"
-            | "OUTB"
-        ):
+        case "MOVE" | "ADD" | "ADDC" | "SUB" | "SUBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
             if optypes[1] == OPERAND_TYPES["NUMBER"]:
                 return ADDRESSING_MODES["REGISTER_IMM8"]
             else:

@@ -23,8 +23,11 @@ def generate_ir(file: str) -> list[IRNode]:
     ir_nodes = flatten_imports(ir)
     logger.debug(f"parse: done! generated {len(ir_nodes)} nodes.")
 
+    logger.verbose("parse: all nodes:")
     for node in ir_nodes:
-        logger.verbose(f"parse: node: {str(node)}")
+        logger.verbose(f"parse: {str(node)}")
+
+    logger.info(f"parse: finished parsing {len(ir)} source file{"s" if len(ir) > 1 else ""}.")
 
     return ir_nodes
 
@@ -108,6 +111,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
         logger.verbose(f"parse: parsing info for {node_type} with {node_children} children")
 
         match node_type:
+
             case "instruction":
                 mnemonic = next(subtree.find_token("MNEMONIC"))
                 operand_list = next(subtree.find_data("operand_list"), None)
@@ -160,7 +164,17 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 
                 else:
                     logger.fatal(f"unknown directive: {str(subtree)}", scope)
-            
+
+            case "macro_definition":
+                name = next(subtree.find_token("LABELNAME"))
+                line = warn_if_no_line(name, scope)
+                logger.warning(f"macros are not yet supported; skipping definition of macro {name.value} on line {line}.", scope)
+
+            case "macro_call":
+                name = next(subtree.find_token("LABELNAME"))
+                line = warn_if_no_line(name, scope)
+                logger.fatal(f"macros are not yet supported; please remove call to macro {name.value} on line {line}", scope)
+
             case _:
                 logger.fatal(f"unknown node type: {node_type}", scope)
     
@@ -185,7 +199,7 @@ def append_ir_nodes(file: str, ir: dict[str, list[IRNode]], big_list: list[IRNod
                 # skip if already added
                 continue
 
-            logger.verbose(f"parse: adding {node.filename} to main list at index {len(big_list)}")
+            logger.debug(f"parse: adding {node.filename} to main list at index {len(big_list)}")
             added_files.add(node.filename)
             append_ir_nodes(node.filename, ir, big_list, added_files)
         else:

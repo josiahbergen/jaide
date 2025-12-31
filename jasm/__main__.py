@@ -13,11 +13,9 @@ def get_args():
     """
     arg_parser = argparse.ArgumentParser(description="JASM assembler")
     arg_parser.add_argument("file", nargs="?", default="", help="the file to assemble")
-    arg_parser.add_argument("-o", "--output", default="a.bin", help="name of the output file")
-    arg_parser.add_argument("-w", "--warn", action="store_true", help="enable warnings")
-    arg_parser.add_argument(
-        "-v", "--verbosity", help="verbosity level (0-3)", default=logger.log_level.INFO, type=int
-    )
+    arg_parser.add_argument("-o", default="a.bin", help="name of the output file")
+    arg_parser.add_argument("-nw", "--nowarn", action="store_true", help="suppress warnings")
+    arg_parser.add_argument("-v", help="verbosity level (0-3)", default=logger.log_level.INFO, type=int)
     return arg_parser.parse_args()
 
 def check_files(file: str, output: str):
@@ -45,12 +43,13 @@ def main():
     scope = "__main__.py:main()"
 
     # initialize logger
-    logger.set_level(args.verbosity)
+    logger.set_level(args.v)
+    logger.set_warnings(not args.nowarn)
     logger.title("welcome to the jasm assembler (v1.0.1)")
     logger.nl()
 
     file = args.file
-    output = args.output
+    output = args.o
 
     try:
         check_files(file, output)
