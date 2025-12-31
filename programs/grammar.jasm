@@ -24,3 +24,4 @@ end:
     LDA 0xC000
     STORE A, X:Y ; store the result to memory
     HALT
+

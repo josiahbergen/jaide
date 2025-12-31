@@ -1,13 +1,15 @@
 {
     "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "uv.lock": true,
         ".gitignore": true,
-        ".vscode": true
+        ".vscode": true,
+        "**/__init__.py": true,
+        "**/__pycache__": true,
+        "**/.DS_Store": true,
+        "**/.git": true,
+        "**/.hg": true,
+        "**/.svn": true,
+        "**/Thumbs.db": true,
+        "uv.lock": true
     },
     "hide-files.files": []
 }

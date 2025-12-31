@@ -1,92 +1,32 @@
-import argparse
-import os
+# jasm.py
+# main assembly logic and flow control.
+# josiah bergen, december 2025
 
-from lark import Lark
+from jasm.util.logger import logger
+from jasm.parse import generate_ir
+from jasm.macros import expand_macros
+from jasm.labels import resolve_labels
+from jasm.binary import generate_binary
 
-from .assembler import generate_binary, resolve_labels
-from .util import GRAMMAR, Logger
+def assemble(file: str, output: str):
+    """ Assemble a JASM file and return the binary. """
+ 
+    # generate the IR
+    ir = generate_ir(file)
 
-# JASM assembler written in Python.
-# Usage: python -m jasm <file> [-o <output file>] [-d <debug>]
+    # expand macros
+    ir = expand_macros(ir)
 
-# global logger object. used to log messages throughout the program.
-global logger
+    # resolve labels
+    ir = resolve_labels(ir)
 
-# global manager object. used to manage the program's state.
-global manager
+    # generate binary
+    binary = generate_binary(ir)
 
-def parse(file):
-    logger.debug("Parsing...")
-    try:
-        parser = Lark(GRAMMAR)
-        tree = parser.parse(open(file).read())
-    except Exception as e:
-        logger.error(f"Syntax error: {e}")
-
-    return tree
-
-
-def assemble(file, output):
-    logger.info(f"Assembling {file}...")
-
-    # Parse the source file
-    tree = parse(file)
-
-    # Pass 1: Resolve labels
-    labels = resolve_labels(tree, logger)
-
-    # Pass 2: Generate binary
-    binary = generate_binary(tree, labels, logger)
-
-    # Write binary to output file
+    # write binary to output file
     with open(output, "wb") as f:
         f.write(binary)
+    logger.debug(f"wrote {len(binary)} bytes to {output}.")
 
-    logger.debug(f"Generated {len(binary)} bytes of binary code.")
-
-    return len(binary)
-
-
-def main():
-    argparser = argparse.ArgumentParser(description="JASM assembler")
-    argparser.add_argument("file", nargs="?", default="", help="The file to assemble")
-    argparser.add_argument("-o", "--output", default="a.bin", help="The output file")
-    argparser.add_argument(
-        "-v", "--verbosity", help="Verbosity level", default=Logger.Level.INFO, type=int
-    )
-    args = argparser.parse_args()
-
-    # initialize logger
-    global logger
-    logger = Logger(args.verbosity)
-    logger.title("JASM Assembler v1.0")
-    logger.info("")
-
-    # check if file is provided
-    if not args.file:
-        logger.error("No file(s) provided. Exiting...")
-
-    # check if file exists
-    if not os.path.exists(args.file):
-        logger.error(f"File {args.file} does not exist. Exiting...")
-
-    # check if file is an assembly file
-    if not args.file.endswith(".jasm"):
-        logger.error(f"File {args.file} is not a JASM file. Exiting...")
-
-    logger.debug("Init looks good. Starting assembly...")
-
-    # the magic
-    size = assemble(args.file, args.output)
-
-    if logger.level == Logger.Level.DEBUG:
-        logger.flush_debug()
-        logger.info("")
-    logger.info(f"Wrote {size} bytes to {args.output}.")
-    logger.success("Assembly complete! Yay!")
-    logger.info("")
-
-    exit(0)
-
-
-
+    logger.success("assembly complete! yay!")
+    return

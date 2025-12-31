@@ -1,0 +1,4 @@
+imported_label:
+    MOVE A, 0xFF
+    OUTB 0x00, A
+    HALT

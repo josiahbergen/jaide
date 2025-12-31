@@ -5,18 +5,19 @@ Core assembly logic: label resolution and binary generation.
 from lark import Token
 
 from .instructions import (
-    OPCODES,
-    REGISTERS,
     get_addressing_mode,
     get_instruction_size,
     get_operands,
     validate_instruction_semantics,
 )
 
-def resolve_labels(tree, logger):
+from .language.constants import OPCODES, REGISTERS
+
+
+def resolve_labels(tree):
     """
-    Pass 1: Resolve all labels and calculate their addresses.
-    Returns a dictionary mapping label names to addresses.
+    pass 1: resolve all labels and calculate their addresses.
+    returns a dictionary mapping label names to addresses.
     """
     logger.debug("Resolving labels...")
     labels = {}
@@ -43,12 +44,12 @@ def resolve_labels(tree, logger):
             continue
 
         if node.data == "instr":
-            validate_instruction_semantics(node, logger)
+            validate_instruction_semantics(node)
             mnemonic = node.children[0].value.upper()
             operands = get_operands(node)
 
             # get instruction size
-            size = get_instruction_size(mnemonic, operands, logger)
+            size = get_instruction_size(mnemonic, operands)
             if size is None:
                 logger.error(
                     f"Bad instruction: {mnemonic} on line {node.children[0].line}"
@@ -65,7 +66,12 @@ def resolve_labels(tree, logger):
     return labels
 
 
-def get_operand_value(operand, labels, logger):
+def get_operand_value(operand, labels):
+    """
+    Gets the final integer value of an operand (from register, number, label, etc.).
+    """
+    global logger
+
     def get_number_value(value):
         # turn number string into an integer
         value = value.strip()
@@ -80,24 +86,24 @@ def get_operand_value(operand, labels, logger):
             # decimal
             return int(value, 10)
 
-    def get_register_value(reg_name, logger):
+    def get_register_value(reg_name):
         # get register value from register name
         reg_val = REGISTERS.get(reg_name.upper())
         if reg_val is None:
             logger.error(f"Unknown register: {reg_name}")
         return reg_val
 
-    def get_register_pair_value(pair_str, logger):
+    def get_register_pair_value(pair_str):
         # split register pair string into two register values
         parts = pair_str.split(":")
         if len(parts) != 2:
             logger.error(f"Invalid register pair: {pair_str}")
         # encode each register
-        reg1 = get_register_value(parts[0].strip(), logger)
-        reg2 = get_register_value(parts[1].strip(), logger)
+        reg1 = get_register_value(parts[0].strip())
+        reg2 = get_register_value(parts[1].strip())
         return reg1, reg2
 
-    def get_label_value(label_name, labels, logger):
+    def get_label_value(label_name, labels):
         # get label value (i.e. address) from label name
         if label_name not in labels:
             logger.error(f"Unknown label: {label_name}")
@@ -105,16 +111,16 @@ def get_operand_value(operand, labels, logger):
 
     value = None
     if operand.type == "REGISTER":
-        value = get_register_value(operand.value.strip(), logger)
+        value = get_register_value(operand.value.strip())
 
     elif operand.type == "REGISTER_PAIR":
-        value = get_register_pair_value(operand.value.strip(), logger)
+        value = get_register_pair_value(operand.value.strip())
 
     elif operand.type == "NUMBER":
         value = get_number_value(operand.value.strip())
 
     elif operand.type == "LABELNAME":
-        value = get_label_value(operand.value.strip(), labels, logger)
+        value = get_label_value(operand.value.strip(), labels)
 
     else:
         logger.error(f"Unknown operand: {operand.value.strip()}")
@@ -138,19 +144,23 @@ def get_byte1_bits_string(byte):
     return f"{opcode_bits:05b} {addressing_mode_bits:03b} | {opcode_bits:<5} {addressing_mode_bits:<3} |"
 
 
-def assert_operand_count(expected, actual, logger):
+def assert_operand_count(expected, actual):
     if expected != actual:
         logger.error(f"Expected {expected} operands, got {actual}")
     return
 
 
-def assert_immediate_size(expected, value, logger):
+def assert_immediate_size(expected, value):
     if value >= (2**expected):
         logger.error(f"Immediate value {value} is too large for size {expected}")
     return
 
 
-def generate_instruction_binary(opcode, operands, addressing_mode, line, logger):
+def generate_instruction_binary(opcode: int, operands: list[int], addressing_mode: int):
+    """
+    Generate the binary for a single full instruction. Takes opcode, operands, and addressing modes.
+    """
+
     # generate binary for an instruction, given the opcode, addressing mode, and list of operands
     binary = bytearray()
 
@@ -175,7 +185,7 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             pass
 
         case 1:  # single register operand
-            assert_operand_count(1, len(operands), logger)
+            assert_operand_count(1, len(operands))
             # the first register is encoded in the high 4 bits of the byte
             byte_2 = (operands[0] & 0b00001111) << 4
             logger.verbose(
@@ -184,8 +194,8 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_2)
 
         case 2:  # single 8-bit immediate operand
-            assert_operand_count(1, len(operands), logger)
-            assert_immediate_size(8, operands[0], logger)
+            assert_operand_count(1, len(operands))
+            assert_immediate_size(8, operands[0])
             # second byte is unused
             binary.append(0b00000000)
             logger.verbose(f"    Generated second byte: {0b00000000:08b}  (unused)")
@@ -196,7 +206,7 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_3)
 
         case 3:  # two register operands
-            assert_operand_count(2, len(operands), logger)
+            assert_operand_count(2, len(operands))
             byte_2 = (operands[0] & 0b00001111) << 4 | (operands[1] & 0b00001111)
             logger.verbose(
                 f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b}, register: {operands[1]:04b})"
@@ -204,8 +214,8 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_2)
 
         case 4:  # register and 8-bit immediate operand
-            assert_operand_count(2, len(operands), logger)
-            assert_immediate_size(8, operands[1], logger)
+            assert_operand_count(2, len(operands))
+            assert_immediate_size(8, operands[1])
             byte_2 = (
                 operands[0] & 0b00001111
             ) << 4  # register goes into the high 4 bits
@@ -220,8 +230,8 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_3)
 
         case 5:  # register and 16-bit immediate operand
-            assert_operand_count(2, len(operands), logger)
-            assert_immediate_size(16, operands[1], logger)
+            assert_operand_count(2, len(operands))
+            assert_immediate_size(16, operands[1])
             byte_2 = (operands[0] & 0b00001111) << 4
             logger.verbose(
                 f"    Generated second byte: {byte_2:08b}  (register: {(operands[0] & 0b00001111):04b})"
@@ -241,7 +251,7 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_4)
 
         case 6:  # register and register pair operand
-            assert_operand_count(2, len(operands), logger)
+            assert_operand_count(2, len(operands))
 
             # byte 2 is the lonely register (operand 0)
             byte_2 = (operands[0] & 0b00001111) << 4
@@ -258,8 +268,8 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             binary.append(byte_3)
 
         case 7:  # 16-bit immediate operand
-            assert_operand_count(1, len(operands), logger)
-            assert_immediate_size(16, operands[0], logger)
+            assert_operand_count(1, len(operands))
+            assert_immediate_size(16, operands[0])
 
             # byte 2 is unused
             binary.append(0b00000000)
@@ -281,30 +291,36 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             )
             binary.append(byte_4)
 
+        case _:
+            logger.error("generate_instruction_binary: unknown addressing mode")
+
     return binary
 
 
-def encode_instruction(node, labels, pc, logger):
+def encode_instruction(node, labels, pc):
+    """
+    Base function to encode a full instruction from node -> binary
+    """
     # encode the instruction into a binary
     mnemonic = node.children[0].value.upper()
     line = node.children[0].line
     opcode = OPCODES[mnemonic]
     tree_operands = get_operands(node)
     addressing_mode = get_addressing_mode(mnemonic, tree_operands)
-    expected_size = get_instruction_size(mnemonic, tree_operands, logger)
+    expected_size = get_instruction_size(mnemonic, tree_operands)
 
     logger.verbose(f"Generating binary for instruction {mnemonic} (line {line})...")
 
     operands = []
 
     for operand in tree_operands:
-        operands.append(get_operand_value(operand, labels, logger))
+        operands.append(get_operand_value(operand, labels))
 
     logger.verbose(
         f"    Got opcode={opcode}, operands={operands}, addressing_mode={addressing_mode}"
     )
     binary_instruction = generate_instruction_binary(
-        opcode, operands, addressing_mode, line, logger
+        opcode, operands, addressing_mode, line
     )
 
     logger.debug(
@@ -322,7 +338,7 @@ def encode_instruction(node, labels, pc, logger):
     return binary_instruction
 
 
-def generate_binary(tree, labels, logger):
+def generate_binary(tree, labels):
     logger.debug(f"Starting code generation for {len(tree.children)} instructions...")
     binary = bytearray()
 
@@ -334,6 +350,6 @@ def generate_binary(tree, labels, logger):
             continue
 
         if node.data == "instr":
-            binary.extend(encode_instruction(node, labels, len(binary), logger))
+            binary.extend(encode_instruction(node, labels, len(binary)))
 
     return binary

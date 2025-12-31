@@ -1,5 +1,14 @@
 start:
+    ; this is a comment
     MOVE A, 0x10
     MOVE B, 0x10
     ADD A, B
-    HALT
+end:
+    JUMP imported_label
+
+IMPORT "programs/import.jasm"
+
+strings:
+    DATA "hello, world!"
+    DATA 10
+    DATA 0x10, 0x11
