@@ -114,14 +114,22 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 operands = operand_list.children if operand_list else []
                 line = warn_if_no_line(mnemonic, scope)
                 
-                # fatal if we find non-token operands (for an instruction, at least)
-                if not all(isinstance(op, Token) for op in operands):
-                    logger.fatal(f"found non-token operands for instruction {mnemonic.value} on line {line}", scope)
-        
-                opstring = "operands "+ ", ".join([str(op) for op in operands]) if operands else "no operands"
-                logger.debug(f"parse: creating node for instr {mnemonic.value} with {opstring} (line {line})")
+                # logger.fatal(f"bad operands for instruction {mnemonic.value} on line {line}", scope)
+                operand_nodes = []
+                for op in operands:
+                    if isinstance(op, Tree) and op.data == "register_pair":
+                        registers = list(op.find_token("REGISTER"))
+                        pair_string = registers[0].value + ":" + registers[1].value
+                        logger.verbose(f"parse: register pair: {pair_string}")
+                        operand_nodes.append(OperandNode(line, "REGISTER_PAIR", pair_string))
 
-                operand_nodes = [OperandNode(line, op.type, op.value) for op in operands if isinstance(op, Token)]
+                    elif isinstance(op, Token):
+                        operand_nodes.append(OperandNode(line, op.type, op.value))
+                    else:
+                        logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)
+                
+                opstring = "operands "+ ", ".join([str(op) for op in operand_nodes]) if operand_nodes else "no operands"
+                logger.debug(f"parse: creating node for instr {mnemonic.value} with {opstring} (line {line})")
                 ir_nodes.append(InstructionNode(line, mnemonic.value, operand_nodes))
 
             case "label":
@@ -139,15 +147,15 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 logger.verbose(f"parse: tried data directive: {str(data_directive)}")
 
                 if import_directive:
-                    logger.debug("parse: creating node for import directive...")
                     string = next(import_directive.find_token("STRING"))
                     line = warn_if_no_line(string, scope)
+                    logger.debug(f"parse: creating node for import directive: {str(string.value)} (line {line})")
                     ir_nodes.append(ImportDirectiveNode(line, string.value))
 
                 elif data_directive:
-                    logger.debug("parse: creating node for data directive...")
                     line = warn_if_no_line(next(data_directive.find_token("DATA")), scope)
                     data = list[Token](data_directive.scan_values(lambda v: isinstance(v, Token) and v.type in {"NUMBER", "STRING"}))
+                    logger.debug(f"parse: creating node for data directive: {", ".join([str(token) for token in data])} (line {line})")
                     ir_nodes.append(DataDirectiveNode(line, [(token.type, token.value) for token in data]))
                 
                 else:

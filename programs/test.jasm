@@ -73,7 +73,6 @@ INT 1
 INT 42
 INT 0xFF
 INT 0x10
-INT b1010
 INT b11111111
 
 ; Instructions with 1 operand (register or number)
@@ -101,9 +100,9 @@ PUSH b11111111
 
 ; Instructions with 1 operand (labelname, number, or register pair)
 
-JMP test_label
-JMP 0x1000
-JMP 0xFFFF
+JUMP test_label
+JUMP 0x1000
+JUMP 0xFFFF
 
 JZ test_label
 JZ 0x1000

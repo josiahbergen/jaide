@@ -76,6 +76,9 @@ class InstructionNode(IRNode):
             case "JUMP" | "JZ" | "JNZ" | "JC" | "JNC":
                 self.assert_num_operands(1)
                 self.assert_operand_types([OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]])
+            case "LOAD" | "STORE":
+                self.assert_num_operands(2)
+                self.assert_operand_types([OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]])
             case _:
                 logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
 

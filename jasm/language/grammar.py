@@ -72,7 +72,7 @@ GRAMMAR = r"""
 
     # Mnemonics
     # Priority 100 ensures these are matched before generic LABELNAMEs
-    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|LSHF|RSHF|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SETC|CLRC|CLRZ|JUMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JUMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
 
     # Directives (priority 95 ensures these are matched before LABELNAME)
     DATA.95: /DATA\b/i
@@ -88,7 +88,8 @@ GRAMMAR = r"""
 
     # Numbers
     # Hex (0x...), Bin (b...), Dec (0-9...)
-    NUMBER: /0x[0-9a-fA-F]+/
+    # Priority 20 ensures numbers are matched before LABELNAME (priority 10)
+    NUMBER.20: /0x[0-9a-fA-F]+/
           | /b[01]+/
           | /[0-9]+/
 
