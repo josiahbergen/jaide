@@ -12,3 +12,4 @@ strings:
     DATA "hello, world!"
     DATA 10
     DATA 0x10, 0x11
+    DATA b010, b00001111100

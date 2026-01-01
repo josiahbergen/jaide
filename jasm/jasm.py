@@ -4,21 +4,23 @@
 
 from jasm.util.logger import logger
 from jasm.parse import generate_ir
-from jasm.macros import expand_macros
+# from jasm.macros import expand_macros
 from jasm.labels import resolve_labels
 from jasm.binary import generate_binary
 
 def assemble(file: str, output: str):
     """ Assemble a JASM file and return the binary. """
+
+    logger.info("JASM assembler v1.0.1 (copyright 2025 Josiah Bergen)")
  
     # generate the IR
     ir = generate_ir(file)
 
-    # expand macros
+    # expand macros (to be added in a later release)
     # ir = expand_macros(ir)
 
     # resolve labels
-    ir = resolve_labels(ir)
+    resolve_labels(ir)
 
     # generate binary
     binary = generate_binary(ir)

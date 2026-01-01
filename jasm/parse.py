@@ -27,7 +27,7 @@ def generate_ir(file: str) -> list[IRNode]:
     for node in ir_nodes:
         logger.verbose(f"parse: {str(node)}")
 
-    logger.info(f"parse: finished parsing {len(ir)} source file{"s" if len(ir) > 1 else ""}.")
+    logger.info(f"parsed {len(ir)} source file{"s" if len(ir) > 1 else ""}...")
 
     return ir_nodes
 
@@ -78,10 +78,13 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
         
         # skip if already parsed
         if import_node.filename in ir:
+            # TODO: if the file is the same but the path string is different, this will let the same file be parsed multiple times.
+            # ex. IMPORT "programs/import.jasm" and IMPORT ".\programs\import.jasm" will both be parsed as "separate" files,
+            # even though they are actually the same
             logger.warning(f"circular or double import detected: {import_node.filename} already parsed, skipping...", scope)
             continue
         
-        # recursively parse the import file
+        # recursively parse import files
         parse_file(import_node.filename, ir)
     return
 
@@ -122,7 +125,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 operand_nodes = []
                 for op in operands:
                     if isinstance(op, Tree) and op.data == "register_pair":
-                        registers = list(op.find_token("REGISTER"))
+                        registers = list[Token](op.find_token("REGISTER"))
                         pair_string = registers[0].value + ":" + registers[1].value
                         logger.verbose(f"parse: register pair: {pair_string}")
                         operand_nodes.append(OperandNode(line, "REGISTER_PAIR", pair_string))
@@ -132,8 +135,8 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                     else:
                         logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)
                 
-                opstring = "operands "+ ", ".join([str(op) for op in operand_nodes]) if operand_nodes else "no operands"
-                logger.debug(f"parse: creating node for instr {mnemonic.value} with {opstring} (line {line})")
+                opstring = ", ".join([str(op) for op in operand_nodes]) if operand_nodes else "no operands"
+                logger.debug(f"parse: creating instr {mnemonic.value} {opstring} (line {line})")
                 ir_nodes.append(InstructionNode(line, mnemonic.value, operand_nodes))
 
             case "label":
@@ -168,12 +171,12 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
             case "macro_definition":
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
-                logger.warning(f"macros are not yet supported; skipping definition of macro {name.value} on line {line}.", scope)
+                logger.warning(f"macros are not yet supported: skipping definition of macro {name.value} on line {line}.", scope)
 
             case "macro_call":
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
-                logger.fatal(f"macros are not yet supported; please remove call to macro {name.value} on line {line}", scope)
+                logger.fatal(f"macros are not yet supported: please remove call to macro {name.value} on line {line}.", scope)
 
             case _:
                 logger.fatal(f"unknown node type: {node_type}", scope)
