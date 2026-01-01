@@ -6,10 +6,13 @@
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
         "**/__pycache__": true,
-        ".gitignore": true,
-        ".vscode": true,
         "**/__init__.py": true,
-        "uv.lock": true
+        ".vscode/": true,
+        "uv.lock": true,
+        ".python-version": true,
+        "pyproject.toml": true,
+        "requirements.in": true,
+        
     },
     "hide-files.files": []
 }
