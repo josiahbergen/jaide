@@ -1,4 +1,12 @@
 imported_label:
-    MOVE A, 0xFF
-    OUTB A, 0x00
+    MOVE A, 0x68
+    MOVE B, 0x69
+    MOVE C, 0x21
+    MOVE D, 0xA
+    MOVE X, 0x00
+
+    OUTB A, X
+    OUTB B, X
+    OUTB C, X
+    OUTB D, X
     HALT

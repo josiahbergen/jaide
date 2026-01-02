@@ -1,0 +1,27 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.jj",
+    "**/.repo",
+    "**/CVS",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "**/.classpath",
+    "**/.settings",
+    "**/__pycache__/",
+    "**/__init__.py",
+    ".vscode",
+    ".python-version",
+    "pyproject.toml",
+    "requirements.in",
+    "uv.lock"
+  ],
+  
+  "format_on_save": "off"
+}

@@ -28,7 +28,7 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 21      SEC                                                 set carry flag                  carry flag <- 1
 22      CLC                                                 clear carry flag                carry flag <- 0
 23      CLZ                                                 clear zero flag                 zero flag  <- 0
-24      JMP         [imm16 | reg:reg]                       unconditional jump              PC <- [imm16 | reg:reg]
+24      JUMP        [imm16 | reg:reg]                       unconditional jump              PC <- [imm16 | reg:reg]
 25      JZ          [imm16 | reg:reg]                       jump if zero                    PC <- [imm16 | reg:reg] if zero flag is 1 else NOP
 26      JNZ         [imm16 | reg:reg]                       jump of not zero                PC <- [imm16 | reg:reg] if zero flag is 0 else NOP
 27      JC          [imm16 | reg:reg]                       jump if carry                   PC <- [imm16 | reg:reg] if carry flag is 1 else NOP

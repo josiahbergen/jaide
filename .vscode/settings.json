@@ -1,18 +1,16 @@
 {
     "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "**/__pycache__": true,
-        "**/__init__.py": true,
-        ".vscode/": true,
-        "uv.lock": true,
         ".python-version": true,
-        "pyproject.toml": true,
-        "requirements.in": true,
-        
+        ".vscode/": true,
+        "**/__init__.py": true,
+        "**/__pycache__": true,
+        "**/.DS_Store": true,
+        "**/.git": true,
+        "**/.hg": true,
+        "**/.svn": true,
+        "**/.zed/": true,
+        "**/Thumbs.db": true,
+        "requirements.in": true
     },
     "hide-files.files": []
 }

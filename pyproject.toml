@@ -1,5 +1,5 @@
 [project]
-name = "jaide8"
+name = "jaide"
 version = "0.1.0"
 description = "custom 8-bit cpu"
 readme = "README.md"

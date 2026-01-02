@@ -149,7 +149,7 @@ class InstructionNode(IRNode):
             scope = "ir.py:InstructionNode.assert_operand_types()"
             for i, op in enumerate[OperandNode](self.operands):
                 if op.type not in expected_types[i]:
-                    logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {", ".join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
+                    logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {', '.join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
 
         match self.mnemonic:
             case "SEC" | "CLC" | "CLZ" | "HALT" | "NOP":
@@ -264,7 +264,7 @@ class InstructionNode(IRNode):
 
         # get integer values of the operands
         operands: list[int] = [op.get_integer_value() for op in self.operands]
-        logger.verbose(f"bytes: operands are {", ".join([str(val) for val in operands])}")
+        logger.verbose(f"bytes: operands are {', '.join([str(val) for val in operands])}")
 
         def assert_operand_count(required: int):
             scope = "ir.py:InstructionNode.assert_operand_count()"
@@ -274,7 +274,7 @@ class InstructionNode(IRNode):
         def assert_immediate_size(required: int, value: int):
             scope = "ir.py:InstructionNode.assert_immediate_size()"
             if value >= (2 ** required):
-                logger.fatal(f"immediate value {value} is too large for a{"n" if required == 8 else "n"} {required}-bit immediate (line {self.line})", scope)
+                logger.fatal(f"immediate value {value} is too large for a{'n' if required == 8 else 'n'} {required}-bit immediate (line {self.line})", scope)
 
         match self.addressing_mode:
             case 0: # no operands, easy!
@@ -472,12 +472,12 @@ class DataDirectiveNode(IRNode):
     def get_string_value(self, string: str) -> list[int]:
         # get the bytes of a string
         bytes: list[int] = [ord(char) for char in string]
-        logger.verbose(f"parse_bytes: got bytes of string \"{string}\": {", ".join([str(byte) for byte in bytes])}")
+        logger.verbose(f"parse_bytes: got bytes of string \"{string}\": {', '.join([str(byte) for byte in bytes])}")
         return bytes
 
 
     def get_size(self) -> int:
-        logger.verbose(f"data directive: got size {len(self.data)} (raw: {", ".join([str(byte) for byte in self.data])})")
+        logger.verbose(f"data directive: got size {len(self.data)} (raw: {', '.join([str(byte) for byte in self.data])})")
         return len(self.data)
 
 

@@ -114,7 +114,7 @@ _\* These bytes are not in all instructions. See the table below._
 | 100   | 3      | `REG, IMM8`        | Register / 8-bit Immediate                    |
 | 101   | 4      | `REG, [IMM16]`     | Register / Address as 16-bit Immediate\*      |
 | 110   | 3      | `REG, [REG:REG]`   | Register / Address as Register Pair\*         |
-| 111   | 4      | `REG:REG, [IMM16]` | Register Pair / Address as 16-bit Immediate\* |
+| 111   | 4      | `[IMM16]`          | Address as 16-bit Immediate\* |
 
 _\* All 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` if represented as an immediate, `L:H` if represented as a register pair._
 

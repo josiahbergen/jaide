@@ -27,7 +27,7 @@ def generate_ir(file: str) -> list[IRNode]:
     for node in ir_nodes:
         logger.verbose(f"parse: {str(node)}")
 
-    logger.info(f"parsed {len(ir)} source file{"s" if len(ir) > 1 else ""}...")
+    logger.info(f"done parsing {len(ir)} source file{'s' if len(ir) > 1 else ''}")
 
     return ir_nodes
 
@@ -72,7 +72,7 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
 
     # find all import nodes
     imports = [node for node in ir[file] if isinstance(node, ImportDirectiveNode)]
-    logger.debug(f"parse: found {len(imports)} import file(s): {", ".join([import_node.filename for import_node in imports])}")
+    logger.debug(f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}")
 
     for import_node in imports:
         
@@ -162,7 +162,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 elif data_directive:
                     line = warn_if_no_line(next(data_directive.find_token("DATA")), scope)
                     data = list[Token](data_directive.scan_values(lambda v: isinstance(v, Token) and v.type in {"NUMBER", "STRING"}))
-                    logger.debug(f"parse: creating node for data directive: {", ".join([str(token) for token in data])} (line {line})")
+                    logger.debug(f"parse: creating node for data directive: {', '.join([str(token) for token in data])} (line {line})")
                     ir_nodes.append(DataDirectiveNode(line, [(token.type, token.value) for token in data]))
                 
                 else:
@@ -187,7 +187,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
 def flatten_imports(ir: dict[str, list[IRNode]]) -> list[IRNode]:
     """ Flatten the main ir dict into a single list of linear IR nodes. """
 
-    logger.debug(f"parse: flattening {len(ir)} file{"s" if len(ir) > 1 else ""}...")
+    logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
     big_list = []
     added_files: set[str] = set[str]()
     append_ir_nodes(list[str](ir.keys())[0], ir, big_list, added_files)

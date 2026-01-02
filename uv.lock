@@ -11,7 +11,7 @@ wheels = [
 ]
 
 [[package]]
-name = "jaide8"
+name = "jaide"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

@@ -52,6 +52,12 @@ class Logger:
             print(f"{message}")
 
 
+    def error(self, message: str):
+        """ Print non-fatal error message. """
+
+        formatted = f"{f.RED}err:{f.RESET} {message}"
+        print(formatted)
+
     def fatal(self, message: str, scope: str):
         """ Print error message and exit the program with error status. """
         # formatted = b.RED + f.BLACK + "\n fatal! " + b.RESET + f.RED + " " + scope + ": " + message + f.RESET
@@ -68,7 +74,7 @@ class Logger:
         # formatted = f"\n{b.RED}{f.BLACK} stopped! {b.RESET}{f.RESET} {scope}: {message}{f.RESET}"
 
         # newline = '\n' if self.level >= self.log_level.INFO else ''
-        formatted = f"{b.RED}{f.BLACK} {message} {b.RESET}{f.RESET} process killed at {scope} {f.RESET}"
+        formatted = f"\n{b.RED}{f.BLACK} {message} {b.RESET}{f.RESET} process killed at {scope} {f.RESET}"
         print(formatted)
         sys.exit(0)  # exit with non-error
 
