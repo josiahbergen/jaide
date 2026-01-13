@@ -24,7 +24,9 @@ equal: ; they were equal! great!
 ```
 
 ## Data
+
 You can add raw data bytes to your assembled code. Binary, hex, decimal, and string literals are supported.
+
 ```jasm
 data_example: ; use a label to keep track of the location
 DATA 0x1111 ; 0x1111 will now live in memory at [data_example]
@@ -34,7 +36,9 @@ DATA "hello, world!", 0 ; putting a string literal in memory
 ```
 
 ## Macros
+
 Macros are supported, as well as inline expressions.
+
 ```jasm
 ; a macro to load a 16-bit address into register pair X:Y
 MACRO load_address %addr
@@ -50,5 +54,6 @@ MOVE A, 0xFF
 STORE A, X:Y ; note the register pair notation
 ```
 
-## That's it!
+That's it!
+
 Nothing else is really defined yet, so check back for more detailed documentation soon!

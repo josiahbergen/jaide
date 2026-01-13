@@ -23,7 +23,7 @@ def check_files(file: str):
 
     # check if file exists
     if not os.path.exists(file):
-        logger.fatal("file does not exist.", scope)
+        logger.fatal(f"file {file} does not exist.", scope)
 
     # check if file has a valid binary extension
     if not file.endswith(".bin"):

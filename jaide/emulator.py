@@ -352,11 +352,11 @@ class Emulator:
                 return default
 
         def help_string(command: str, args: str, message: str):
-            command_args = f"{command}{' ' if args else ''}{f.LIGHTBLACK_EX}{args}{f.RESET}"
+            command_args = f"{command}{' ' if args else ''}{f.RESET}{args}{f.RESET}"
             return f"{command_args:<30} {message}"
 
         while True:
-            command, *args = input(f"{f.LIGHTBLACK_EX}jaide > {f.WHITE}").split()
+            command, *args = input(f"{f.LIGHTWHITE_EX}jaide > {f.RESET}").split()
 
             match command:
                 case "run":
