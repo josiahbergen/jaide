@@ -166,7 +166,7 @@ class InstructionNode(IRNode):
             case "JUMP" | "JZ" | "JNZ" | "JC" | "JNC":
                 assert_num_operands(1)
                 assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]]])
-            case "MOVE" | "ADD" | "ADDC" | "SUB" | "SUBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
+            case "MOVE" | "ADD" | "ADC" | "SUB" | "SBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
                 assert_num_operands(2)
                 assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]]])
             case "LOAD" | "STORE":
@@ -212,7 +212,7 @@ class InstructionNode(IRNode):
                     return ADDRESSING_MODES["REGISTER"]
 
             # register + register or 8-bit immediate
-            case "MOVE" | "ADD" | "ADDC" | "SUB" | "SUBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
+            case "MOVE" | "ADD" | "ADC" | "SUB" | "SBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
                 if optypes[1] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["REGISTER_IMM8"]
                 else:
@@ -357,7 +357,7 @@ class InstructionNode(IRNode):
                 binary.append(byte_2)
 
                 # register pair is encoded in the third byte little-endian style,
-                # i.e. pair A:B is encoded as AAAABBBB
+                # i.e. pair A:B (L:H) is encoded as AAAABBBB
 
                 byte_3 = operands[1] # pair is already encoded as a single integer in get_integer_value()
                 logger.verbose(f"bytes: third byte is {byte_3:08b} (register pair: {operands[1] >> 4:04b}, {operands[1] & 0b00001111:04b})")

@@ -29,8 +29,8 @@ exp_term    = number | macro_arg | expression ;
 operator    = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~" ;
 
 (* instructions and registers *)
-mnemonic    = "LOAD" | "STORE" | "MOVE" | "PUSH" | "POP" | "ADD" | "ADDC"
-            | "SUB" | "SUBB" | "INC" | "DEC" | "LSHF" | "RSHF" | "AND"
+mnemonic    = "LOAD" | "STORE" | "MOVE" | "PUSH" | "POP" | "ADD" | "ADC"
+            | "SUB" | "SBB" | "INC" | "DEC" | "LSHF" | "RSHF" | "AND"
             | "OR" | "NOR" | "NOT" | "XOR" | "INB" | "OUTB" | "CMP"
             | "SETC" | "CLRC" | "CLRZ" | "JUMP" | "JZ" | "JNZ" | "JC"
             | "JNC" | "INT" | "HALT" | "NOP" ;

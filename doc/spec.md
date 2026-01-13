@@ -55,9 +55,9 @@ REPL commands:
 | 3      | PUSH     | reg/imm8  |                 | push to stack                | [SP--] <- imm8/reg                                |
 | 4      | POP      | reg       |                 | pop from stack               | reg <- [++SP]                                     |
 | 5      | ADD^     | reg       | reg/imm8        | add                          | reg <- reg + (imm8/reg)                           |
-| 6      | ADDC^    | reg       | reg/imm8        | add with carry               | reg <- reg + (imm8/reg)                           |
+| 6      | ADC^    | reg       | reg/imm8        | add with carry               | reg <- reg + (imm8/reg)                           |
 | 7      | SUB^     | reg       | reg/imm8        | subtract                     | reg <- reg - (imm8/reg)                           |
-| 8      | SUBB^    | reg       | reg/imm8        | subract with borrow          | reg <- reg - (imm8/reg)                           |
+| 8      | SUB^    | reg       | reg/imm8        | subract with borrow          | reg <- reg - (imm8/reg)                           |
 | 9      | INC      | reg       |                 | increment                    | reg <- reg + 1                                    |
 | 10     | DEC      | reg       |                 | decrement                    | reg <- reg - 1                                    |
 | 11     | SHL      | reg       | reg/imm8        | bit shift left               | reg <- reg << (reg/imm8)                          |

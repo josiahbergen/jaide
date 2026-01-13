@@ -4,8 +4,8 @@ start:
     PUSH 0x10
     JUMP literals
     JZ 0x1234
-    ADDC D, B
-    ADDC D, 0x10
+    ADC D, B
+    ADC D, 0x10
     LOAD D, 0x1234
     LOAD D, D:B
     LOAD D, literals

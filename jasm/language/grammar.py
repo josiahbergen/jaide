@@ -74,7 +74,7 @@ GRAMMAR = r"""
 
     # Mnemonics
     # Priority 100 ensures these are matched before generic LABELNAMEs
-    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JUMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADC|SUB|SBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JUMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
 
     # Directives (priority 95 ensures these are matched before LABELNAME)
     DATA.95: /DATA\b/i
@@ -138,7 +138,7 @@ GRAMMAR_OLD = r"""
 
     # instructions are always matched first 
     # (i.e. will never be interpreted as a label, etc.)
-    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADC|SUB|SBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
 
     # Register pairs are matched before single registers
     REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS):(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)/i
