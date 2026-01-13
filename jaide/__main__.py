@@ -11,6 +11,7 @@ from .util.logger import logger
 def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description="JAIDE emulator")
     arg_parser.add_argument("binary", nargs="?", default="", help="a binary file to load")
+    arg_parser.add_argument("-r", "--run", action="store_true", help="run the binary file immediately")
     return arg_parser.parse_args()
 
 
@@ -42,6 +43,7 @@ def main():
     logger.nl()
 
     binary = args.binary
+    auto_run = args.run
 
     try:
 
@@ -51,6 +53,10 @@ def main():
         if binary:
             check_files(binary)
             emulator.load_binary(binary)
+            
+            if auto_run:
+                emulator.run()
+                return
         else:
             logger.warning("no binary file provided, you will need to load one manually.", scope)
         

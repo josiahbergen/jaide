@@ -344,6 +344,7 @@ class Emulator:
             return f"{command_args:<30} {message}"
 
         while True:
+
             command, *args = input(f"{f.LIGHTWHITE_EX}jaide > {f.RESET}").split()
 
             match command:

@@ -27,7 +27,7 @@ def generate_ir(file: str) -> list[IRNode]:
     for node in ir_nodes:
         logger.verbose(f"parse: {str(node)}")
 
-    logger.info(f"done parsing {len(ir)} source file{'s' if len(ir) > 1 else ''}")
+    logger.info(f"done parsing {len(ir)} source file{'s' if len(ir) > 1 else ''}...")
 
     return ir_nodes
 
