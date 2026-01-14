@@ -49,9 +49,5 @@ label_name  = letter , { letter | digit | "_" } ;
 comment     = ( ";" ) , { char | w } ;
 w           = { " " | "\t" } ;
 char        = letter | digit | symbol ;
-letter      = "A"..."Z" | "a"..."z" ;
-digit       = "0"..."9" ;
-hex_digit   = digit | "A"..."F" | "a"..."f" ;
+hex_digit   = digit | "A" | "B" | "C" | "D" | "E" | "F" | "a" | "b" | "c" | "d" | "e" | "f" ;
 bin_digit   = "0" | "1" ;
-symbol      = "[" | "]" | "{" | "}" | "(" | ")" | "<" | ">" | "'" | '"' | "=" | "|"
-            | "." | "," | ";" | "-" | "+" | "*" | "?" | "!" | "/" | "\\" ;
