@@ -1,194 +1,227 @@
-# JAIDE8 SPECIFICATION
+# jaide: a 16-bit computing system architecture
 
-Meet JAIDE8: A custom CPU architecture design with a custom everything.
+## overview
 
-## Features
+- 32 instructions
+- 16-bit data width
+- 16-bit address bus (with plans for a 32-bit extension)
+- 7 general-purpose 16-bit registers and 5 special registers
+- load-store, little-endian, von-neumann architecture
 
-- 32 instructions (8 addressing modes)
-- 8-bit data width
-- 16-bit address bus (64k of accessable memory)
-- Memory banking
-- Device communication through built-in CPU instructions
+## programming jaide
 
-## Programming JAIDE8
+jaide is programmed with `jasm`. jasm is a custom assembly language. it has a custom assembler that produces binaries unique to jaide's architecture.
 
-JAIDE8 is programmed with `JASM`. JASM is a custom assembly language.
+see the [language specification](lang.md) for more information.
 
-It has a custom assembler that produces binaries unique to JAIDE8's architecture.
+the full grammar used for lexical analysis is contained in [jasm/language/grammar.py](../jasm/language/grammar.py).
 
-See the [language specification](lang.md) for more information.
+## how to run your code
 
-The full Lark grammar used for lexical analysis is contained in [asm/util.py](../asm/util.py).
+jasm files use the `.jasm` file extension. Compile your code with `python -m jasm <source> -o <output>`.
 
-## How to Run Your Code
+once assembled to a binary file, run your code with `python -m jaide <binary>`.
 
-JASM files use the `.jasm` file extension. Compile your code with `python jasm.py hello.jasm -o hello.bin`.
+for now, binaries are simply a raw memory image.
 
-Once assembled to a binary file, run your code with `python emulator.py hello.bin`.
+in the jaide emulator, type help to view a list of commands.
 
-## Emulator
+## reset state
 
-The emulator allows you to run compiled binaries and inspect the CPU state.
+on reset, the contents of all registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
 
-Usage: `python emulator.py [binary]`
+## registers
 
-REPL commands:
+the jaide architecture supports up to 16 registers. all registers contain 16 bits.
 
-- `load <path>`: Load a binary file into memory
-- `step`: Execute one instruction
-- `cont`: Continue execution until a breakpoint or halt
-- `run`: Run until halt
-- `break <hex>`: Set a breakpoint at address
-- `regs`: Display register values
-- `mem <hex> <len>`: Display memory contents
-- `disasm [addr]`: Disassemble instruction at address (or PC)
-- `ports`: Display non-zero port values
-- `quit`: Exit the emulator
+_currently, 7 general purpose and 5 special registers are implemented. the four unused registers are reserved for future floating-point support._
 
-## Instruction Set Reference
+### general purpose registers
 
-| OPCODE | MNEMONIC | OPERAND 1 | OPERAND 2       | DESCRIPTION                  | OPERATION                                         |
-| ------ | -------- | --------- | --------------- | ---------------------------- | ------------------------------------------------- |
-| 0      | LOAD     | reg       | [imm16/reg:reg] | load 8-bit value from memory | reg <- [imm16/reg:reg]                            |
-| 1      | STORE    | reg       | [imm16/reg:reg] | store 8-bit value to memory  | [imm16/reg:reg] <- reg                            |
-| 2      | MOVE     | reg       | reg/imm8        | move 8-bit value             | reg <- reg/imm8                                   |
-| 3      | PUSH     | reg/imm8  |                 | push to stack                | [SP--] <- imm8/reg                                |
-| 4      | POP      | reg       |                 | pop from stack               | reg <- [++SP]                                     |
-| 5      | ADD^     | reg       | reg/imm8        | add                          | reg <- reg + (imm8/reg)                           |
-| 6      | ADC^     | reg       | reg/imm8        | add with carry               | reg <- reg + (imm8/reg)                           |
-| 7      | SUB^     | reg       | reg/imm8        | subtract                     | reg <- reg - (imm8/reg)                           |
-| 8      | SUB^     | reg       | reg/imm8        | subract with borrow          | reg <- reg - (imm8/reg)                           |
-| 9      | INC      | reg       |                 | increment                    | reg <- reg + 1                                    |
-| 10     | DEC      | reg       |                 | decrement                    | reg <- reg - 1                                    |
-| 11     | SHL      | reg       | reg/imm8        | bit shift left               | reg <- reg << (reg/imm8)                          |
-| 12     | SHR      | reg       | reg/imm8        | bit shift right              | reg <- reg >> (reg/imm8)                          |
-| 13     | AND      | reg       | reg/imm8        | bitwise and                  | reg <- reg AND (reg/imm8)                         |
-| 14     | OR       | reg       | reg/imm8        | bitwise or                   | reg <- reg OR (reg/imm8)                          |
-| 15     | NOR      | reg       | reg/imm8        | bitwise nor                  | reg <- reg NOR (reg/imm8)                         |
-| 16     | NOT      | reg       |                 | bitwise not                  | reg <- reg NOR (reg/imm8)                         |
-| 17     | XOR      | reg       | reg/imm8        | bitwise xor                  | reg <- reg XOR (reg/imm8)                         |
-| 18     | INB      | reg       | port(reg/imm8)  | get byte from I/O port       | reg <- port(reg/imm8)                             |
-| 19     | OUTB     | reg       | port(reg/imm8)  | send byte through I/O port   | port(reg/imm8) <- reg                             |
-| 20     | CMP^     | reg       | reg/imm8        | compare                      | Z, C, B <- reg - reg/imm8                         |
-| 21     | SEC      |           |                 | set carry flag               | carry flag <- 1                                   |
-| 22     | CLC      |           |                 | clear carry flag             | carry flag <- 0                                   |
-| 23     | CLZ      |           |                 | clear zero flag              | zero flag <- 0                                    |
-| 24     | JMP      | [imm16]   |                 | unconditional jump           | PC <- [imm16/reg:reg]                             |
-| 25     | JZ       | [imm16]   |                 | jump if zero                 | PC <- [imm16/reg:reg] if zero flag is 1 else NOP  |
-| 26     | JNZ      | [imm16]   |                 | jump of not zero             | PC <- [imm16/reg:reg] if zero flag is 0 else NOP  |
-| 27     | JC       | [imm16]   |                 | jump if carry                | PC <- [imm16/reg:reg] if carry flag is 1 else NOP |
-| 28     | JNC      | [imm16]   |                 | jump if not carry            | PC <- [imm16/reg:reg] if carry flag is 0 else NOP |
-| 29     | INT\*    | imm8      |                 | call an interrupt            | NOP (to be added later)                           |
-| 30     | HALT\*   |           |                 | halt                         | halted flag <- 1                                  |
-| 31     | NOP      |           |                 | no operation                 | n/a                                               |
+`A`, `B`, `C`, `D`, `E`, `X`, and `Y`.
+
+### special registers
+
+`PC` program counter _(read-only)_
+
+`SP` stack pointer
+
+`MB` memory bank
+
+`F` flags _(zero, carry, negative (unused), overflow, interrupts enabled)_
+
+the format of the flags register is `C Z N O I - - - -`.
+
+`Z` zero _(read-only, value is always 0x0000)_
+
+## instruction format
+
+instructions are 16 bits long, and may contain a 16-bit immediate immediately (ha) after them.
+
+the format of an instruction is as follows: `AAAAA BBB` `CCCC DDDD` `EEEEEEEE` `EEEEEEEE`
+
+`AAAAA` defines the opcode of the instruction.
+
+`BBB` defines what the next bits in the instruction contain.
+
+`CCCC` and `DDDD` define register operands _(if applicable)_.
+
+`EEEEEEEE` `EEEEEEEE` defines a 16-bit immediate value _(little-endian, if applicable)_.
+
+the value encoded in `BBB` defines these isntruction formats:
+
+| value | operands     | defined bytes                          |
+| ----- | ------------ | -------------------------------------- |
+| 0     | no operands  | `XXXXX 000 ---- ---- ----------------` |
+| 1     | reg          | `XXXXX 001 XXXX ---- ----------------` |
+| 2     | imm16\*      | `XXXXX 010 ---- ---- XXXXXXXXXXXXXXXX` |
+| 3     | reg, reg     | `XXXXX 011 XXXX XXXX ----------------` |
+| 4     | reg, imm16\* | `XXXXX 100 XXXX ---- XXXXXXXXXXXXXXXX` |
+| 5     | [reg]^       | `XXXXX 101 XXXX ---- ----------------` |
+| 6     | _reserved_   | `----- 110 ---- ---- ----------------` |
+| 7     | _reserved_   | `----- 111 ---- ---- ----------------` |
+
+_\*all 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` when represented as an immediate value._
+
+_^all addresses are absolute. [reg] is defined as "the address contained inside reg", i.e. reg dereferenced_
+
+## instruction set
+
+| OPCODE | MNEMONIC | OPERAND 1       | OPERAND 2       | DESCRIPTION                   | OPERATION                                |
+| ------ | -------- | --------------- | --------------- | ----------------------------- | ---------------------------------------- |
+| 0      | GET      | reg             | [imm16/reg]     | load 16-bit value from memory | reg <- [imm16/reg]                       |
+| 1      | SET      | [imm16/reg]     | reg             | store 16-bit value to memory  | [imm16/reg] <- reg                       |
+| 2      | MOV      | reg             | reg/imm16       | move 16-bit value             | reg <- reg/imm16                         |
+| 3      | PSH      | reg/imm16       |                 | push to stack                 | [SP--] <- imm16/reg                      |
+| 4      | POP      | reg             |                 | pop from stack                | reg <- [++SP]                            |
+| 5      | ADD^     | reg             | reg/imm16       | add                           | reg, Z, C, O <- reg + (imm16/reg)        |
+| 6      | ADC^     | reg             | reg/imm16       | add with carry                | reg, Z, C, O <- reg + (imm16/reg) + C    |
+| 7      | SUB^     | reg             | reg/imm16       | subtract                      | reg, Z, C, O <- reg - (imm16/reg)        |
+| 8      | SBC^     | reg             | reg/imm16       | subtract with borrow          | reg, Z, C, O <- reg - (imm16/reg) - C    |
+| 9      | INC      | reg             |                 | increment                     | reg, Z, C, O <- reg++                    |
+| 10     | DEC      | reg             |                 | decrement                     | reg, Z, C, O <- reg--                    |
+| 11     | SHL      | reg             | reg/imm16       | bit shift left                | reg, Z, C, O <- reg << (reg/imm16)       |
+| 12     | SHR      | reg             | reg/imm16       | bit shift right               | reg, Z, C, O <- reg >> (reg/imm16)       |
+| 13     | AND      | reg             | reg/imm16       | bitwise and                   | reg, Z <- reg & (reg/imm16)              |
+| 14     | OR       | reg             | reg/imm16       | bitwise or                    | reg, Z <- reg \| (reg/imm16)             |
+| 15     | NOR      | reg             | reg/imm16       | bitwise nor                   | reg, Z <- reg ~\| (reg/imm16)            |
+| 16     | NOT      | reg             |                 | bitwise not                   | reg, Z <- ~reg                           |
+| 17     | XOR      | reg             | reg/imm16       | bitwise xor                   | reg, Z <- reg ^ (reg/imm16)              |
+| 18     | INB      | reg             | port(reg/imm16) | get word from I/O port        | reg, Z <- port(reg/imm16)                |
+| 19     | OUTB     | port(reg/imm16) | reg             | send word through I/O port    | port(reg/imm16) <- reg                   |
+| 20     | CMP^     | reg             | reg/imm16       | compare                       | Z, C <- reg - reg/imm16                  |
+| 21     | JMP      | imm16/reg       |                 | unconditional jump            | PC <- [imm16/reg]                        |
+| 22     | JZ       | imm16/reg       |                 | jump if zero                  | PC <- [imm16/reg] if Z == 1 else NOP     |
+| 23     | JNZ      | imm16/reg       |                 | jump of not zero              | PC <- [imm16/reg] if Z == 0 else NOP     |
+| 24     | JC       | imm16/reg       |                 | jump if carry                 | PC <- [imm16/reg] if C == 1 else NOP     |
+| 25     | JNC      | imm16/reg       |                 | jump if not carry             | PC <- [imm16/reg] if C == 0 else NOP     |
+| 26     | CALL     | imm16/reg       |                 | call a function               | [SP--] <- imm16/reg + 1, pc <- imm16/reg |
+| 27     | RET      |                 |                 | return from a function        | pc <- [++SP]                             |
+| 28     | INT      | imm16           |                 | call an interrupt             | see spec                                 |
+| 29     | IRET     |                 |                 | return from an interrupt      | see spec                                 |
+| 30     | HALT     |                 |                 | halt                          | halted flag <- 1                         |
+| 31     | NOP      |                 |                 | no operation                  | n/a                                      |
 
 ^ These instructions modify the flags register.
 
-\* These instructions modify the status register.
+## memory
 
-## Instruction Format
+| Range             | Size      | Purpose                        |
+| ----------------- | --------- | ------------------------------ |
+| `0xFEFF...0xFFFF` | 256 bytes | interrupt table                |
+| `0xFDFF...0xFEFF` | 256 bytes | stack (recommended)\*\*        |
+| `0xC000...0xFDFF` | 15 KiB    | general purpose RAM            |
+| `0x8000...0xBFFF` | 16 KiB    | general purpose RAM (banked)\* |
+| `0x0000...0x7FFF` | 32 KiB    | general purpose ROM            |
 
-Instruction format is `AAAAA BBB` `CCCC DDDD` `EEEE EEEE*` `FFFFFFFF*` where:
+_\*this memory can be swapped using the MB register._
 
-`AAAAA` is the instruction operand code and `BBB` is the addressing mode.
+_\*\*the stack grows downwards. it is recommended that SP = 0xFEFF._
 
-`BBB` defines what `CCCC`, `DDDD`, `EEEE EEEE`, and `FFFFFFFF` contain (or if they are utilized at all).
+ROM is protected from writes (`STORE 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
 
-- `000`: No operands.
-- `001`: `CCCC` defines a single register argument. `DDDD EEEEEEEEE FFFFFFFF` are unused.
-- `010`: `EEEEEEEE` defines an 8-bit immediate. `CCCC DDDD` and `FFFFFFFF` are unused.
-- `011`: `CCCC` and `DDDD` define a first and second register argument, respectively. `EEEEEEEE FFFFFFFF` are unused.
-- `100`: `CCCC` defines a register argument. `EEEEEEE` defines an 8-bit immediate. `DDDD` is unused.
-- `101`: `CCCC` defines a single register argument. `EEEEEEEE FFFFFFFF` defines a memory location. `DDDD` is unused.
-- `110`: `CCCC` defines a single register argument. `EEEE EEEE` (`LLLL HHHH`) defines a register pair which is interpreted as a memory location.
-- `111`: `EEEEEEEE FFFFFFFF` defines a 16-bit immediate. `CCCC DDDD` are unused.
+### banking
 
-_\* These bytes are not in all instructions. See the table below._
+there are up to 256 possible memory banks. MB = 0 indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
 
-`BBB` also defines how many bytes an instruction takes up in memory:
+### the stack
 
-| Value | Length | Type               | Description                                   |
-| ----- | ------ | ------------------ | --------------------------------------------- |
-| 000   | 1      | No operands        | _Really?_                                     |
-| 001   | 2      | `REG`              | Register                                      |
-| 010   | 3      | `IMM8`             | 8-bit Immediate                               |
-| 011   | 2      | `REG, REG`         | Register / Register                           |
-| 100   | 3      | `REG, IMM8`        | Register / 8-bit Immediate                    |
-| 101   | 4      | `REG, [IMM16]`     | Register / Address as 16-bit Immediate\*      |
-| 110   | 3      | `REG, [REG:REG]`   | Register / Address as Register Pair\*         |
-| 111   | 4      | `[IMM16]`          | Address as 16-bit Immediate\*                 |
+`PUSH` and `POP` put/get a word (2 bytes) from the stack.
 
-_\* All 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` if represented as an immediate, `L:H` if represented as a register pair._
+SP must be a multiple of 2 to facilitate this. SP always points to the last used word.
 
-## Registers
+stack overflow/underflow behaviour is undefined.
 
-There are six 8-bit general purpose registers:
+## interrupts
 
-| Index | Name | Purpose                        |
-| ----- | ---- | ------------------------------ |
-| 0     | A    | General purpose / accumulator  |
-| 1     | B    | General purpose                |
-| 2     | C    | General purpose                |
-| 3     | D    | General purpose                |
-| 4     | X    | Low address / general purpose  |
-| 5     | Y    | High address / general purpose |
+jaide supports up to 128 programmable interrupts. please note that existing programs are recommended to only take advantage 64, due to potential breaking changes.
 
-There are five memory-mapped registers (see Memory Layout below)
+interrupts 0 to 3 are reserved for hardware interrutps. a programmer must define handlers for each of them.
 
-| Index | Name | Purpose                     |
-| ----- | ---- | --------------------------- |
-| 6     | F    | Flags                       |
-| 7     | Z    | Zero                        |
-| 8     | PC   | Program Counter (read-only) |
-| 9     | SP   | Stack Pointer               |
-| A     | MB   | Memory Bank                 |
-| B     | STS  | Status                      |
+if a hardware interrupt is not handled, the unhandled fault interrupt will be called. if this is not handed, jaide will reset.
 
-### Flags Register
+### hardware interrupts
 
-The bytes of the Flags register is defined as follows:
+| interrupt | description         |
+| --------- | ------------------- |
+| 0         | unhandled fault     |
+| 1         | invalid instruction |
+| 2         | protection fault    |
+| 3         | reserved            |
 
-```text
-0: Carry
-1: Zero
-2: Negative
-3: Overflow
-Bytes 5-7 are reserved for future use.
-```
+### the INT and IRET instructions
 
-### Status Register
+when an interrupt `n` is called, jaide saves it's state and transfers execution to the address found at the offset `2n` into the interrupt table, starting at `0xFFFF` and moving downwards.
 
-The bytes of the Status register is defined as follows:
+more specifically, when `INT` is called:
 
-```text
-0: Error
-1: Halted
-Bytes 2-7 are reserved for future use.
-```
+| action                      | description                                              |
+| --------------------------- | -------------------------------------------------------- |
+| `NOP if I == 0`             | if interrupts are masked, jaide will `NOP` and continue. |
+| `[SP--] <- PC`              | program counter is pushed                                |
+| `[SP--] <- F`               | flags are pushed                                         |
+| `I <- 0`                    | ineterrupt mask is cleared                               |
+| `vector = 0xFFFF - (n * 2)` | handler address is computed                              |
+| `PC <- MEM16[vector]`       | execution jumps to handler                               |
 
-## Memory Layout
+nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
 
-Total addressable memory: `64Kib`
+normal execution can be restored by calling `IRET`.
 
-The memory layout is as follows:
+more specifically, when `IRET` is called:
 
-| Range          | Size      | Purpose                                         |
-| -------------- | --------- | ----------------------------------------------- |
-| 0x0000..0x7FFF | 32 KiB    | General Purpose ROM                             |
-| 0x8000..0xBFFF | 16 KiB    | General Purpose RAM (banked)\*                  |
-| 0xC000..0xFDFF | 15 KiB    | General Purpose RAM                             |
-| 0xFC00..0xFEFF | 768 bytes | Stack (recommended)\*\*                         |
-| 0xFF00..0xFFF8 | 249 bytes | Scratch                                         |
-| 0xFFF9..0xFFF9 | 1 byte    | Flags register(mapped)                          |
-| 0xFFFA..0xFFFA | 1 byte    | Zero register(mapped)                           |
-| 0xFFFB..0xFFFB | 1 byte    | Memory Bank register (mapped)                   |
-| 0xFFFC..0xFFFD | 2 bytes   | Stack Pointer (mapped, 16 bits little-endian)   |
-| 0xFFFE..0xFFFF | 2 bytes   | Program Counter (mapped, 16 bits little-endian) |
+| action           | description                                              |
+| ---------------- | -------------------------------------------------------- |
+| `PC++ if I == 0` | if interrupts are masked, jaide will `NOP` and continue. |
+| `F <- [SP++]`    | flags are popped (unmasks interrupts if applicable)      |
+| `PC <- [SP++]`   | program counter is popped                                |
 
-_\* This memory can be swapped using the MB register. MB = 0 indicates that the built-in RAM is in use. It is recommended that MB = 1 point to the built-in VRAM._
+### enhanced interrupts (future plan)
 
-_\*\* The stack grows downwards. It is recommended that SP = 0xFEFF._
+in the future, a more feature-rich interrupt system will be implemented.
 
-## Ports
+in this new system, only 85 interrupts will be available.
 
-Ports can be used to interact with I/O devices. The INB and OUTB exist to facilitate this. JAIDE8 supports up to 256 I/O devices.
+interrupts will be defined in the interrupt table, which contains 85 interrupt table entries (each 3 bytes in size).
+
+the interrupt table is located at 0xFEFF, and is defined as follows:
+
+| 0       | 3       | 6       | ... | 252      | 255          |
+| ------- | ------- | ------- | --- | -------- | ------------ |
+| entry 1 | entry 2 | entry 3 | ... | entry 85 | padding byte |
+
+each interrupt table entry is defined as follows:
+
+| 0        | 3            | 4        | 8                | 16                |
+| -------- | ------------ | -------- | ---------------- | ----------------- |
+| priority | maskable bit | reserved | address low byte | address high byte |
+
+priority is a 3-bit value. low values take priority over high ones.
+
+if maskable is 0, then this interrupt will ignore the value if the `I` flag.
+
+## i/o ports
+
+ports can be used to interact with I/O devices. The INB and OUTB instructions exist to facilitate this. jaide supports up to 256 I/O devices.
+
+all ports have 16-bit data widths. there currently exists no standard for communication to/from jaide's ports.
