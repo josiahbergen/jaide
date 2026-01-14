@@ -1,9 +1,9 @@
 imported_label:
-    MOVE A, 0x68
-    MOVE B, 0x69
-    MOVE C, 0x21
-    MOVE D, 0xA
-    MOVE X, 0x00
+    MOV A, 0x68
+    MOV B, 0x69
+    MOV C, 0x21
+    MOV D, 0xA
+    MOV X, 0x00
 
     OUTB A, X
     OUTB B, X

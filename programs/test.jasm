@@ -2,14 +2,13 @@ start:
     NOP
     POP D
     PUSH 0x10
-    JUMP literals
+    JMP literals
     JZ 0x1234
     ADC D, B
     ADC D, 0x10
-    LOAD D, 0x1234
-    LOAD D, D:B
-    LOAD D, literals
-    STORE D, 500
+    GET D, 0x1234
+    GET D, literals
+    PUT D, 500
 literals:
     DATA 0x12, 0x34
     DATA "hello, world!", 0

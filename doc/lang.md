@@ -3,7 +3,7 @@
 
 To make programming easier, extensions for [VSCode](https://github.com/josiahbergen/jasm), [Cursor](https://github.com/josiahbergen/jasm), and [Zed](https://github.com/josiahbergen/zed-jasm) are available.
 
-To see a list of all instructions, see the [instruction table](inst.txt). You can also view the [language EBNF](ebnf.txt).
+For a list of all instructions, see the table in the [spec](spec.md). You can also view the [language EBNF](ebnf.txt).
 
 Keep in mind that proficiency in at least one assembly language is assumed when reading this document. JASM is very similar to other assembly programming languages, and you will find that most aspects come naturally!
 
@@ -55,5 +55,3 @@ STORE A, X:Y ; note the register pair notation
 ```
 
 That's it!
-
-Nothing else is really defined yet, so check back for more detailed documentation soon!

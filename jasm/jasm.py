@@ -4,7 +4,7 @@
 
 from jasm.util.logger import logger
 from jasm.parse import generate_ir
-# from jasm.macros import expand_macros
+from jasm.macros import expand_macros
 from jasm.labels import resolve_labels
 from jasm.binary import generate_binary
 
@@ -17,7 +17,7 @@ def assemble(file: str, output: str):
     ir = generate_ir(file)
 
     # expand macros (to be added in a later release)
-    # ir = expand_macros(ir)
+    ir = expand_macros(ir)
 
     # resolve labels
     resolve_labels(ir)

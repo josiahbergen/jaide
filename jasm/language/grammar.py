@@ -19,9 +19,9 @@ GRAMMAR = r"""
 
     # Macros 
     # Matches: MACRO name args \n body END MACRO
-    macro_definition: MACRO LABELNAME macro_def_args? _NL macro_body END MACRO
+    macro_definition: MACRO LABELNAME macro_definition_args? _NL macro_body END MACRO
 
-    macro_def_args: macro_arg ("," macro_arg)*
+    macro_definition_args: macro_arg ("," macro_arg)*
     
     # A macro body contains lines, but valid lines inside a macro are restricted 
     # (instructions, data, or nested calls)
@@ -52,7 +52,7 @@ GRAMMAR = r"""
 
     # EBNF: expression = "(" [ operator ] exp_term { operator exp_term } ")"
     # We allow an optional leading operator for unary contexts (e.g. (- 5))
-    expression: "(" [OPERATOR] exp_term (OPERATOR exp_term)* ")"
+    expression: "(" OPERATOR? exp_term (OPERATOR exp_term)* ")"
 
     ?exp_term: NUMBER
              | macro_arg
@@ -72,7 +72,7 @@ GRAMMAR = r"""
 
     # Mnemonics
     # Priority 100 ensures these are matched before generic LABELNAMEs
-    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADC|SUB|SBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JUMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|INC|DEC|LSH|RSH|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|CALL|RET|INT|IRET|HALT|NOP)\b/i
 
     # Directives (priority 95 ensures these are matched before LABELNAME)
     DATA.95: /DATA\b/i

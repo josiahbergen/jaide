@@ -2,7 +2,6 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
-
 from .constants import OPCODES, OPERAND_TYPES, OPERAND_TYPE_TO_STRING, REGISTERS, ADDRESSING_MODES, ADDRESSING_MODE_TO_SIZE
 from ..util.logger import logger
 
@@ -52,7 +51,7 @@ class OperandNode(IRNode):
         
         # stored as a string which is parsed during code generation
         # this probably sucks
-        self.value: str = value 
+        self.value: str = value
 
         # validate the operand type
         if type_string not in OPERAND_TYPES.keys():
@@ -134,9 +133,6 @@ class InstructionNode(IRNode):
         self.addressing_mode: int = self.get_addressing_mode()
         self.size: int = self.get_size()
 
-        self.validate_instruction_semantics()
-
-
     def validate_instruction_semantics(self) -> None:
         scope = "ir.py:InstructionNode.validate_instruction_semantics()"
 
@@ -152,26 +148,20 @@ class InstructionNode(IRNode):
                     logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {', '.join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
 
         match self.mnemonic:
-            case "SEC" | "CLC" | "CLZ" | "HALT" | "NOP":
+            case "RET" | "IRET" | "HALT" | "NOP":
                 assert_num_operands(0)
-            case "INT":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["NUMBER"]]])
             case "POP" | "INC" | "DEC" | "NOT":
                 assert_num_operands(1)
                 assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
-            case "PUSH":
+            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "INT" | "PUSH":
                 assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]]])
-            case "JUMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]]])
-            case "MOVE" | "ADD" | "ADC" | "SUB" | "SBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
+                assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"]]])
+            case "PUT" | "OUTB":
+                assert_num_operands(2)
+                assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"]], [OPERAND_TYPES["REGISTER"]]])
+            case "GET" | "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB":
                 assert_num_operands(2)
                 assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]]])
-            case "LOAD" | "STORE":
-                assert_num_operands(2)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]]])
             case _:
                 logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
 
@@ -193,40 +183,33 @@ class InstructionNode(IRNode):
 
         match self.mnemonic:
             # No operands
-            case "SEC" | "CLC" | "CLZ" | "HALT" | "NOP":
+            case "RET" | "IRET" | "HALT" | "NOP":
                 return ADDRESSING_MODES["NO_OPERANDS"]
 
             # Single register operand
             case "POP" | "INC" | "DEC" | "NOT":
                 return ADDRESSING_MODES["REGISTER"]
 
-            # Single 8-bit immediate operand
-            case "INT":
-                return ADDRESSING_MODES["IMM8"]
-
-            # Single register or single 8-bit immediate operand
-            case "PUSH":
+            # single operand (either immediate or register)
+            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "INT" | "PUSH":
                 if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMM8"]
+                    return ADDRESSING_MODES["IMMEDIATE"]
                 else:
                     return ADDRESSING_MODES["REGISTER"]
 
-            # register + register or 8-bit immediate
-            case "MOVE" | "ADD" | "ADC" | "SUB" | "SBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB" | "OUTB":
-                if optypes[1] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["REGISTER_IMM8"]
+            # two operands but the choice is made by the first operand
+            case "PUT" | "OUTB":
+                if optypes[0] == OPERAND_TYPES["NUMBER"]:
+                    return ADDRESSING_MODES["REGISTER_IMMEDIATE"]
                 else:
                     return ADDRESSING_MODES["REGISTER_REGISTER"]
 
-            # Register + 16-bit memory address or register + register pair memory address
-            case "LOAD" | "STORE":
-                if len(optypes) > 1 and optypes[1] == OPERAND_TYPES["REGISTER_PAIR"]:
-                    return ADDRESSING_MODES["REGISTER_REGPAIR_ADDRESS"]
-                return ADDRESSING_MODES["REGISTER_IMM16_ADDRESS"]
-
-            # 16-bit immediate memory address
-            case "JUMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                return ADDRESSING_MODES["IMM16"]
+            # two operands but the choice is made by the second operand
+            case "GET" | "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB":
+                if optypes[1] == OPERAND_TYPES["NUMBER"]:
+                    return ADDRESSING_MODES["REGISTER_IMMEDIATE"]
+                else:
+                    return ADDRESSING_MODES["REGISTER_REGISTER"]
 
             case _:
                 logger.fatal(f"{self.mnemonic} has no defined addressing mode", scope)
@@ -240,6 +223,8 @@ class InstructionNode(IRNode):
         scope = "ir.py:InstructionNode.get_bytes()"
 
         logger.verbose(f"bytes: starting generation of {self.mnemonic} (line {self.line})")
+
+        self.validate_instruction_semantics()
         binary = bytearray()
 
         # format for the first byte is always AAAAABBB where
@@ -507,3 +492,46 @@ class LabelNode(IRNode):
 
     def __str__(self):
         return f"label: {self.label} at pc {self.pc}"
+
+
+class ExpressionNode(IRNode):
+    def __init__(self, line: int, expression: str):
+        super().__init__(line)
+        self.expression: str = expression
+
+    def evaluate(self) -> int:
+        scope = "ir.py:ExpressionNode.evaluate()"
+        logger.warning(f"expression evaluation is not yet supported: skipping evaluation of {self.expression} on line {self.line}", scope)
+        return 0
+
+    def __str__(self):
+        return f"expression: {self.expression}"
+
+
+class MacroArgumentNode(IRNode):
+
+    def __init__(self, line: int, name: str):
+        super().__init__(line)
+        self.name: str = name
+        self.value: IRNode | None = None
+
+    def __str__(self):
+        return f"macro argument: {self.name}"
+
+
+class MacroNode(IRNode):
+    def __init__(self, line: int, name: str, args: list[MacroArgumentNode], body: list[IRNode]):
+        super().__init__(line)
+        self.name: str = name
+        self.args: list[MacroArgumentNode] = args
+        self.body: list[IRNode] = body
+
+    def __str__(self):
+        return f"macro definition: {self.name} with {len(self.args)} arguments"
+
+
+class MacroCallNode(IRNode):
+    def __init__(self, line: int, name: str, args: list[OperandNode]):
+        super().__init__(line)
+        self.name: str = name
+        self.args: list[OperandNode] = args

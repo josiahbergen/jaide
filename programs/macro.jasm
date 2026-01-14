@@ -1,0 +1,46 @@
+
+MACRO TEST_MACRO %arg1, %arg2
+    ; print a character to the console and do some other stuff too
+    OUTB 0x00, %arg1
+    ; the aforementioned other stuff
+    MOV A, 0x00
+    MOV B, 0x00
+    MOV C, 0x00
+    MOV D, 0x00
+    MOV E, 0x00
+    MOV X, (%arg1 >> 4)
+    MOV Y, (%arg1 + 10)
+END MACRO
+
+MACRO PRINTC %char
+    ; print a character to the console
+    OUTB 0x00, %char
+END MACRO
+
+MACRO EMPTY %char
+    ; do nothing
+END MACRO
+
+MACRO ISROM %address
+    ; puts 1 in A if the address is in ROM, 0 if it is in RAM
+    CMP %address, 0x8000
+    MOV A, F
+    AND A, b10000000
+    RSH A, 7
+END MACRO
+
+MACRO ISROM %address
+    HALT ; useless, but should be skipped due to re-definition
+END MACRO
+
+MACRO DIGTOCHAR %reg
+    ; convert the digit in %reg to a character
+    ADD %reg, 0x30
+END MACRO
+
+
+start:
+    ISROM 0xC000
+    DIGTOCHAR A
+    PRINTC A
+    HALT

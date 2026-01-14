@@ -20,7 +20,7 @@ op_list     = generic_op , { "," , [ w ] , generic_op } ;
 
 (* operands *)
 generic_op  = operand | macro_arg | expression ;
-operand     = register_pair | register | number | label_name ;
+operand     = register | number | label_name ;
 macro_arg   = "%" , label_name ;
 
 (* expressions *)
@@ -29,14 +29,13 @@ exp_term    = number | macro_arg | expression ;
 operator    = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~" ;
 
 (* instructions and registers *)
-mnemonic    = "LOD" | "STO" | "MOV" | "PSH" | "POP" | "ADD" | "ADC"
+mnemonic    = "GET" | "PUT" | "MOV" | "PUSH" | "POP" | "ADD" | "ADC"
             | "SUB" | "SBC" | "INC" | "DEC" | "LSH" | "RSH" | "AND"
             | "OR" | "NOR" | "NOT" | "XOR" | "INB" | "OUTB" | "CMP"
-            | "SETC" | "CLRC" | "CLRZ" | "JUMP" | "JZ" | "JNZ" | "JC"
-            | "JNC" | "INT" | "HALT" | "NOP" ;
+            | "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "RET"
+            | "INT" | "IRET" | "HALT" | "NOP" ;
 
-register_pair = register , ":" , register ;
-register    = "A" | "B" | "C" | "D" | "X" | "Y" | "SP" | "PC" | "Z" | "F" | "MB" | "STS" ;
+register    = "A" | "B" | "C" | "D" | "E" | "X" | "Y" | "PC" | "SP" | "MB" | "F" | "Z" | ;
 
 (* base terminals *)
 constant    = number | string ;

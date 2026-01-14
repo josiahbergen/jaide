@@ -1,10 +1,10 @@
 start:
     ; this is a comment
-    MOVE A, 0x10
-    MOVE B, 0x10
+    MOV A, 0x10
+    MOV B, 0x10
     ADD A, B
 end:
-    JUMP imported_label
+    JMP imported_label
 
 IMPORT "programs/import.jasm"
 

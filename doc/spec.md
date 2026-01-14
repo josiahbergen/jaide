@@ -52,7 +52,7 @@ _currently, 7 general purpose and 5 special registers are implemented. the four 
 
 the format of the flags register is `C Z N O I - - - -`.
 
-`Z` zero _(read-only, value is always 0x0000)_
+`Z` zero _(read-only, always equal to 0x0000)_
 
 ## instruction format
 
@@ -70,29 +70,29 @@ the format of an instruction is as follows: `AAAAA BBB` `CCCC DDDD` `EEEEEEEE` `
 
 the value encoded in `BBB` defines these isntruction formats:
 
-| value | operands     | defined bytes                          |
-| ----- | ------------ | -------------------------------------- |
-| 0     | no operands  | `XXXXX 000 ---- ---- ----------------` |
-| 1     | reg          | `XXXXX 001 XXXX ---- ----------------` |
-| 2     | imm16\*      | `XXXXX 010 ---- ---- XXXXXXXXXXXXXXXX` |
-| 3     | reg, reg     | `XXXXX 011 XXXX XXXX ----------------` |
-| 4     | reg, imm16\* | `XXXXX 100 XXXX ---- XXXXXXXXXXXXXXXX` |
-| 5     | [reg]^       | `XXXXX 101 XXXX ---- ----------------` |
-| 6     | _reserved_   | `----- 110 ---- ---- ----------------` |
-| 7     | _reserved_   | `----- 111 ---- ---- ----------------` |
+| value | operands     | defined bytes                                 |
+| ----- | ------------ | --------------------------------------------- |
+| 0     | no operands  | `XXXXX 000` `---- ----` `--------` `--------` |
+| 1     | reg          | `XXXXX 001` `XXXX ----` `--------` `--------` |
+| 2     | imm16\*      | `XXXXX 010` `---- ----` `XXXXXXXX` `XXXXXXXX` |
+| 3     | reg, reg     | `XXXXX 011` `XXXX XXXX` `--------` `--------` |
+| 4     | reg, imm16\* | `XXXXX 100` `XXXX ----` `XXXXXXXX` `XXXXXXXX` |
+| 5     | _reserved_   | `----- 101` `---- ----` `--------` `--------` |
+| 6     | _reserved_   | `----- 110` `---- ----` `--------` `--------` |
+| 7     | _reserved_   | `----- 111` `---- ----` `--------` `--------` |
 
-_\*all 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` when represented as an immediate value._
+_\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate value._
 
-_^all addresses are absolute. [reg] is defined as "the address contained inside reg", i.e. reg dereferenced_
+_all addresses are absolute. [reg] is defined as "the address contained inside reg", i.e. reg dereferenced._
 
 ## instruction set
 
 | OPCODE | MNEMONIC | OPERAND 1       | OPERAND 2       | DESCRIPTION                   | OPERATION                                |
 | ------ | -------- | --------------- | --------------- | ----------------------------- | ---------------------------------------- |
 | 0      | GET      | reg             | [imm16/reg]     | load 16-bit value from memory | reg <- [imm16/reg]                       |
-| 1      | SET      | [imm16/reg]     | reg             | store 16-bit value to memory  | [imm16/reg] <- reg                       |
+| 1      | PUT      | [imm16/reg]     | reg             | store 16-bit value to memory  | [imm16/reg] <- reg                       |
 | 2      | MOV      | reg             | reg/imm16       | move 16-bit value             | reg <- reg/imm16                         |
-| 3      | PSH      | reg/imm16       |                 | push to stack                 | [SP--] <- imm16/reg                      |
+| 3      | PUSH      | reg/imm16       |                 | push to stack                 | [SP--] <- imm16/reg                      |
 | 4      | POP      | reg             |                 | pop from stack                | reg <- [++SP]                            |
 | 5      | ADD^     | reg             | reg/imm16       | add                           | reg, Z, C, O <- reg + (imm16/reg)        |
 | 6      | ADC^     | reg             | reg/imm16       | add with carry                | reg, Z, C, O <- reg + (imm16/reg) + C    |
@@ -100,8 +100,8 @@ _^all addresses are absolute. [reg] is defined as "the address contained inside 
 | 8      | SBC^     | reg             | reg/imm16       | subtract with borrow          | reg, Z, C, O <- reg - (imm16/reg) - C    |
 | 9      | INC      | reg             |                 | increment                     | reg, Z, C, O <- reg++                    |
 | 10     | DEC      | reg             |                 | decrement                     | reg, Z, C, O <- reg--                    |
-| 11     | SHL      | reg             | reg/imm16       | bit shift left                | reg, Z, C, O <- reg << (reg/imm16)       |
-| 12     | SHR      | reg             | reg/imm16       | bit shift right               | reg, Z, C, O <- reg >> (reg/imm16)       |
+| 11     | LSH      | reg             | reg/imm16       | bit shift left                | reg, Z, C, O <- reg << (reg/imm16)       |
+| 12     | RSH      | reg             | reg/imm16       | bit shift right               | reg, Z, C, O <- reg >> (reg/imm16)       |
 | 13     | AND      | reg             | reg/imm16       | bitwise and                   | reg, Z <- reg & (reg/imm16)              |
 | 14     | OR       | reg             | reg/imm16       | bitwise or                    | reg, Z <- reg \| (reg/imm16)             |
 | 15     | NOR      | reg             | reg/imm16       | bitwise nor                   | reg, Z <- reg ~\| (reg/imm16)            |
@@ -117,7 +117,7 @@ _^all addresses are absolute. [reg] is defined as "the address contained inside 
 | 25     | JNC      | imm16/reg       |                 | jump if not carry             | PC <- [imm16/reg] if C == 0 else NOP     |
 | 26     | CALL     | imm16/reg       |                 | call a function               | [SP--] <- imm16/reg + 1, pc <- imm16/reg |
 | 27     | RET      |                 |                 | return from a function        | pc <- [++SP]                             |
-| 28     | INT      | imm16           |                 | call an interrupt             | see spec                                 |
+| 28     | INT      | imm16/reg           |                 | call an interrupt             | see spec                                 |
 | 29     | IRET     |                 |                 | return from an interrupt      | see spec                                 |
 | 30     | HALT     |                 |                 | halt                          | halted flag <- 1                         |
 | 31     | NOP      |                 |                 | no operation                  | n/a                                      |
@@ -171,7 +171,7 @@ if a hardware interrupt is not handled, the unhandled fault interrupt will be ca
 
 ### the INT and IRET instructions
 
-when an interrupt `n` is called, jaide saves it's state and transfers execution to the address found at the offset `2n` into the interrupt table, starting at `0xFFFF` and moving downwards.
+when an interrupt `n` is called, jaide saves its state and transfers execution to the address found at the offset `2n` into the interrupt table, starting at `0xFFFF` and moving downwards.
 
 more specifically, when `INT` is called:
 

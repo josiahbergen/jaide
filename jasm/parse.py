@@ -5,7 +5,7 @@
 from lark.lexer import Token
 from lark.tree import Tree
 import os
-from .language.ir import IRNode, InstructionNode, OperandNode, ImportDirectiveNode, DataDirectiveNode, LabelNode
+from .language.ir import IRNode, InstructionNode, OperandNode, ImportDirectiveNode, DataDirectiveNode, LabelNode, MacroNode, MacroArgumentNode
 from .util.logger import logger
 from .language.grammar import GRAMMAR
 from lark import Lark, ParseTree
@@ -94,7 +94,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
     ir_nodes = []
 
     for subtree in tree.children:
-        logger.verbose(f"parse: processing {type(subtree)}: {str(subtree)}")
+        # logger.verbose(f"parse: processing {type(subtree)}: {str(subtree)}")
 
         # Skip Token objects (they don't have .data attribute)
         if isinstance(subtree, Token):
@@ -124,13 +124,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 # logger.fatal(f"bad operands for instruction {mnemonic.value} on line {line}", scope)
                 operand_nodes = []
                 for op in operands:
-                    if isinstance(op, Tree) and op.data == "register_pair":
-                        registers = list[Token](op.find_token("REGISTER"))
-                        pair_string = registers[0].value + ":" + registers[1].value
-                        logger.verbose(f"parse: register pair: {pair_string}")
-                        operand_nodes.append(OperandNode(line, "REGISTER_PAIR", pair_string))
-
-                    elif isinstance(op, Token):
+                    if isinstance(op, Token):
                         operand_nodes.append(OperandNode(line, op.type, op.value))
                     else:
                         logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)
@@ -171,17 +165,99 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
             case "macro_definition":
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
-                logger.warning(f"macros are not yet supported: skipping definition of macro {name.value} on line {line}.", scope)
+
+                if any(macro.name == name.value for macro in ir_nodes if isinstance(macro, MacroNode)):
+                    logger.warning(f"macro {name.value} re-defined on line {line}, keeping first definition...", scope)
+                    continue
+
+                # get arguments
+                args_raw = next(subtree.find_data("macro_definition_args"), None)
+                args_raw = args_raw.children if args_raw else []
+                args = []
+                for arg in args_raw:
+                    if not isinstance(arg, Tree):
+                        logger.fatal(f"unexpected token in macro definition (expected macro argument): {str(arg)}", scope)
+                    arg_name = next(arg.find_token("LABELNAME"))
+                    args.append(MacroArgumentNode(line, arg_name.value))
+                    logger.verbose(f"parse: creating node for macro argument: \"{arg_name.value}\" (line {line})")
+
+                # get tree with all the body
+                body_tree = next(subtree.find_data("macro_body"), None)
+
+                if body_tree is None:
+                    logger.fatal(f"bad macro body on line {line}.", scope)
+
+                body_nodes = generate_macro_body(body_tree)
+
+                logger.verbose(f"parse: creating full node for macro definition: {name.value} with {len(args)} arguments and {len(body_nodes)} body nodes (line {line})")
+                ir_nodes.append(MacroNode(line, name.value, args, body_nodes))
 
             case "macro_call":
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
-                logger.fatal(f"macros are not yet supported: please remove call to macro {name.value} on line {line}.", scope)
+                logger.warning(f"macros are not yet supported: skipping call to macro {name.value} on line {line}.", scope)
 
             case _:
                 logger.fatal(f"unknown node type: {node_type}", scope)
     
     return ir_nodes
+
+
+def generate_macro_body(body_tree: Tree) -> list[IRNode]:
+    """ Generate the IR nodes for a macro body. """
+    scope = "parse.py:generate_macro_body()"
+    body_nodes = []
+
+    for statement in body_tree.children:
+        if not isinstance(statement, Tree):
+            logger.fatal(f"unexpected token in macro body (expected macro statement): {str(statement)}", scope)
+        logger.verbose(f"parse: parsing statement: {str(statement)}")
+        
+        if statement.data != "instruction":
+            logger.fatal(f"unexpected statement type in macro body (expected instruction): {str(statement)}", scope)
+        
+        mnemonic = next(statement.find_token("MNEMONIC"))
+        operand_list = next(statement.find_data("operand_list"), None)
+        operands = operand_list.children if operand_list else []
+        line = warn_if_no_line(mnemonic, scope)
+        
+        # logger.fatal(f"bad operands for instruction {mnemonic.value} on line {line}", scope)
+        operand_nodes = []
+        for op in operands:
+
+            if isinstance(op, Tree):
+                arg_type = op.data.upper()
+                if arg_type == "MACRO_ARG":
+                    op_value = next(op.find_token("LABELNAME"))
+                elif arg_type == "EXPRESSION":
+                    op_value = generate_expression_string(op)
+                else:
+                    logger.fatal(f"unexpected operand type in macro body (expected macro argument or expression): {arg_type}", scope)
+                operand_nodes.append(OperandNode(line, arg_type, op_value))
+
+            elif isinstance(op, Token):
+                operand_nodes.append(OperandNode(line, op.type, op.value))
+            else:
+                logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)
+        
+        opstring = ", ".join([str(op) for op in operand_nodes]) if operand_nodes else "no operands"
+        logger.debug(f"parse: creating instr {mnemonic.value} {opstring} (line {line})")
+        body_nodes.append(InstructionNode(line, mnemonic.value, operand_nodes))
+        
+    return body_nodes
+
+def generate_expression_string(expression_tree: Tree) -> str:
+    """ Generate the string representation of an expression. """
+    scope = "parse.py:generate_expression_string()"
+    expression_string = ""
+    for child in expression_tree.children:
+        if isinstance(child, Token):
+            expression_string += child.value
+        elif isinstance(child, Tree):
+            expression_string += generate_expression_string(child)
+        else:
+            logger.fatal(f"unexpected node type in expression (expected token or tree): {type(child)}", scope)
+    return expression_string
 
 
 def flatten_imports(ir: dict[str, list[IRNode]]) -> list[IRNode]:

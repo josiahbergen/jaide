@@ -348,14 +348,19 @@ class Emulator:
             command, *args = input(f"{f.LIGHTWHITE_EX}jaide > {f.RESET}").split()
 
             match command:
-                case "run":
-                    self.run()
-                    
+
                 case "load":
                     if not assert_num_args(1, opt=1): continue # noqa: E701
                     file = args[0]
                     addr = parse_integer(1, base=16, default=0)
                     self.load_binary(file, addr)
+                
+                case "run":
+                    self.run()
+    
+                case "step":
+                    res = self.step()
+                    if res: print(res) # noqa: E701
                 
                 case "break":
                     if not assert_num_args(1, opt=0): continue # noqa: E701
@@ -373,22 +378,46 @@ class Emulator:
                     num = len(self.breakpoints)
                     self.breakpoints.clear() # clear the set
                     print(f"removed {num} breakpoint{'' if num == 1 else 's'}.")
-                
-                case "step":
-                    res = self.step()
-                    if res: print(res) # noqa: E701
-                
-                case "regs":
+
+                case "regs" | "r":
                     line_1 = "    ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):02X}" for reg in REGISTERS])
-                    line_2 = f"PC: 0x{self.pc:04X}  SP: 0x{self.sp:04X}  MB: 0x{self.mb:04X}  ST: 0x{self.st:02X}    Z:  0x{self.z:02X}"
+                    line_2 = f"PC: 0x{self.pc:04X}  SP: 0x{self.sp:04X}  MB: 0x{self.mb:02X}    ST: 0x{self.st:02X}    Z:  0x{self.z:02X}"
                     print(line_1, line_2, sep="\n")
+
+                case "flags" | "f":
+                    print(f"C: {self.flag_get(FLAG_C)}  Z: {self.flag_get(FLAG_Z)}  N: {self.flag_get(FLAG_N)}  O: {self.flag_get(FLAG_O)}")
+                
+                case "set":
+                    if not assert_num_args(2, opt=0): continue # noqa: E701
+                    value = parse_integer(1, base=16)
+                    if value < 0 or value > 0xFF and args[0].upper() not in ["PC", "SP"]:
+                        logger.error("invalid value for unsigned 8-bit integer.")
+                        continue
+                    if value < 0 or value > 0xFFFF and args[0].upper() in ["PC", "SP"]:
+                        logger.error("invalid value for 16-bit integer.")
+                        continue
+                    reg = args[0].upper()
+                    if reg not in REGISTERS:
+                        if reg == "PC":
+                            self.pc = value
+                        elif reg == "SP":
+                            self.sp = value
+                        elif reg == "MB":
+                            self.mb = value
+                        elif reg == "ST":
+                            self.st = value
+                        elif reg == "Z":
+                            self.z = value
+                        else:
+                            logger.error(f"invalid register (expected one of {', '.join(REGISTERS)}, PC, SP, MB, ST, Z).")
+                            continue
+                    else:
+                        self.reg_set(REGISTERS.index(reg), value)
+                    print(f"set register {reg} to 0x{value:02X}.")
                 
                 case "mem":
                     if not assert_num_args(1, opt=1): continue # noqa: E701
-                    if args[0] == "pc":
-                        addr = self.pc
-                    else:
-                        addr = parse_integer(0, base=16)
+                    addr = self.pc if args[0].upper() == "PC" else parse_integer(0, base=16)
                     length = parse_integer(1, default=16)
                     chunk = self.memory[addr:addr+length]
                     for i in range(0, len(chunk), 16):
@@ -396,7 +425,7 @@ class Emulator:
                         hex_bytes = " ".join(f"{b:02x}" for b in row)
                         print(f"0x{addr+i:04X} | {hex_bytes:<47} | {''.join(chr(b) if 0x20 <= b <= 0x7E else '.' for b in row)}")
                 
-                case "disasm":
+                case "disasm" | "d":
                     if not assert_num_args(0, opt=1): continue # noqa: E701
                     addr = parse_integer(0, base=16, default=self.pc)
                     print(self.disasm_at(addr))
@@ -413,11 +442,13 @@ class Emulator:
                 case "help":
                     print(help_string("load", "<path> [addr]", "load a binary file into memory"))
                     print(help_string("run", "", "execute until until a breakpoint or halt"))
+                    print(help_string("step", "", "execute one instruction"))
                     print(help_string("break", "<addr>", "set a breakpoint at the given addrezss"))
                     print(help_string("blist", "", "list all breakpoints"))
                     print(help_string("bclear", "", "clear all breakpoints"))
-                    print(help_string("step", "", "execute one instruction"))
                     print(help_string("regs", "", "display register values"))
+                    print(help_string("flags", "", "display flag values"))
+                    print(help_string("set", "<reg> <value>", "set the value of a register"))
                     print(help_string("mem", "<addr/pc> <len>", "display memory contents at addr (or pc)"))
                     print(help_string("disasm", "[addr]", "disassemble instruction at address (or pc)"))
                     print(help_string("ports", "", "display non-zero port values"))
