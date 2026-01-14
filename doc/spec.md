@@ -55,9 +55,9 @@ REPL commands:
 | 3      | PUSH     | reg/imm8  |                 | push to stack                | [SP--] <- imm8/reg                                |
 | 4      | POP      | reg       |                 | pop from stack               | reg <- [++SP]                                     |
 | 5      | ADD^     | reg       | reg/imm8        | add                          | reg <- reg + (imm8/reg)                           |
-| 6      | ADC^    | reg       | reg/imm8        | add with carry               | reg <- reg + (imm8/reg)                           |
+| 6      | ADC^     | reg       | reg/imm8        | add with carry               | reg <- reg + (imm8/reg)                           |
 | 7      | SUB^     | reg       | reg/imm8        | subtract                     | reg <- reg - (imm8/reg)                           |
-| 8      | SUB^    | reg       | reg/imm8        | subract with borrow          | reg <- reg - (imm8/reg)                           |
+| 8      | SUB^     | reg       | reg/imm8        | subract with borrow          | reg <- reg - (imm8/reg)                           |
 | 9      | INC      | reg       |                 | increment                    | reg <- reg + 1                                    |
 | 10     | DEC      | reg       |                 | decrement                    | reg <- reg - 1                                    |
 | 11     | SHL      | reg       | reg/imm8        | bit shift left               | reg <- reg << (reg/imm8)                          |
@@ -82,7 +82,9 @@ REPL commands:
 | 30     | HALT\*   |           |                 | halt                         | halted flag <- 1                                  |
 | 31     | NOP      |           |                 | no operation                 | n/a                                               |
 
-^ These instructions modify the flags register. <br> \* These instructions modify the status register.
+^ These instructions modify the flags register.
+
+\* These instructions modify the status register.
 
 ## Instruction Format
 
@@ -114,7 +116,7 @@ _\* These bytes are not in all instructions. See the table below._
 | 100   | 3      | `REG, IMM8`        | Register / 8-bit Immediate                    |
 | 101   | 4      | `REG, [IMM16]`     | Register / Address as 16-bit Immediate\*      |
 | 110   | 3      | `REG, [REG:REG]`   | Register / Address as Register Pair\*         |
-| 111   | 4      | `[IMM16]`          | Address as 16-bit Immediate\* |
+| 111   | 4      | `[IMM16]`          | Address as 16-bit Immediate\*                 |
 
 _\* All 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` if represented as an immediate, `L:H` if represented as a register pair._
 
@@ -146,7 +148,7 @@ There are five memory-mapped registers (see Memory Layout below)
 
 The bytes of the Flags register is defined as follows:
 
-```
+```text
 0: Carry
 1: Zero
 2: Negative
@@ -158,7 +160,7 @@ Bytes 5-7 are reserved for future use.
 
 The bytes of the Status register is defined as follows:
 
-```
+```text
 0: Error
 1: Halted
 Bytes 2-7 are reserved for future use.

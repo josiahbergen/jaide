@@ -2,8 +2,6 @@
 # grammar definition for the JASM language.
 # josiah bergen, december 2025
 
-
-# this is ai generated (based off of my ebnf), so it probably sucks and is wrong
 GRAMMAR = r"""
     start: (_NL | statement)*
     
@@ -113,44 +111,3 @@ GRAMMAR = r"""
     %ignore WS_INLINE
     %ignore COMMENT
 """
-
-GRAMMAR_OLD = r"""
-    ?start: line* # Programs must begin with a start label
-
-    ?line: instr # Lines contain an instruction or a label
-         | label
-
-    label: LABELNAME ":"
-
-    instr: MNEMONIC operand_list?
-
-    operand_list: operand ("," operand)*
-
-    ?operand: REGISTER_PAIR
-            | REGISTER
-            | NUMBER
-            | LABELNAME
-
-    COMMENT: /;.*/ 
-
-    # priorities for token matching
-    # higher number = higher priority
-
-    # instructions are always matched first 
-    # (i.e. will never be interpreted as a label, etc.)
-    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADC|SUB|SBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
-
-    # Register pairs are matched before single registers
-    REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS):(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)/i
-    REGISTER.80: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)\b/i
-    
-    NUMBER.20: /0[xX][0-9a-fA-F]+/i
-          | /[bB][01]+/
-          | /[0-9]+/
-    LABELNAME.10: /[A-Za-z_][A-Za-z0-9_]*/
-
-    # Lark provides common definitions for whitespace.
-    %import common.WS
-    # Ignore comments and whitespace.
-    %ignore WS
-    %ignore COMMENT"""
