@@ -1,10 +1,29 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<project source="4.0.0" version="1.0">
-  This file is intended to be loaded by Logisim-evolution v4.0.0(https://github.com/logisim-evolution/).
+<project source="3.9.0" version="1.0">
+  This file is intended to be loaded by Logisim-evolution v3.9.0(https://github.com/logisim-evolution/).
 
   <lib desc="#Wiring" name="0">
+    <tool name="Splitter">
+      <a name="facing" val="west"/>
+      <a name="fanout" val="3"/>
+      <a name="incoming" val="3"/>
+    </tool>
     <tool name="Pin">
       <a name="appearance" val="classic"/>
+      <a name="facing" val="north"/>
+    </tool>
+    <tool name="Probe">
+      <a name="appearance" val="classic"/>
+      <a name="facing" val="north"/>
+    </tool>
+    <tool name="Pull Resistor">
+      <a name="facing" val="north"/>
+    </tool>
+    <tool name="Clock">
+      <a name="facing" val="north"/>
+    </tool>
+    <tool name="Constant">
+      <a name="facing" val="north"/>
     </tool>
   </lib>
   <lib desc="#Gates" name="1"/>
@@ -38,7 +57,7 @@
     <tool lib="0" name="Pin"/>
     <tool lib="0" name="Pin">
       <a name="facing" val="west"/>
-      <a name="type" val="output"/>
+      <a name="output" val="true"/>
     </tool>
     <sep/>
     <tool lib="1" name="NOT Gate"/>
@@ -56,25 +75,127 @@
     <a name="circuit" val="main"/>
     <a name="circuitnamedboxfixedsize" val="true"/>
     <a name="simulationFrequency" val="2.0"/>
-    <comp lib="4" loc="(880,370)" name="Register">
+    <comp lib="0" loc="(1010,810)" name="Tunnel">
+      <a name="facing" val="east"/>
+      <a name="label" val="sts_op"/>
+      <a name="width" val="6"/>
+    </comp>
+    <comp lib="0" loc="(1010,850)" name="Tunnel">
+      <a name="facing" val="east"/>
+      <a name="label" val="sts_am"/>
+      <a name="width" val="2"/>
+    </comp>
+    <comp lib="0" loc="(1160,810)" name="Tunnel">
+      <a name="facing" val="east"/>
+      <a name="label" val="sts_ra"/>
+      <a name="width" val="4"/>
+    </comp>
+    <comp lib="0" loc="(1160,850)" name="Tunnel">
+      <a name="facing" val="east"/>
+      <a name="label" val="sts_rb"/>
+      <a name="width" val="4"/>
+    </comp>
+    <comp lib="0" loc="(1220,450)" name="Splitter">
+      <a name="bit1" val="0"/>
+      <a name="bit10" val="3"/>
+      <a name="bit11" val="3"/>
+      <a name="bit12" val="3"/>
+      <a name="bit13" val="3"/>
+      <a name="bit14" val="3"/>
+      <a name="bit15" val="3"/>
+      <a name="bit2" val="0"/>
+      <a name="bit3" val="0"/>
+      <a name="bit4" val="1"/>
+      <a name="bit5" val="1"/>
+      <a name="bit6" val="1"/>
+      <a name="bit7" val="1"/>
+      <a name="bit8" val="2"/>
+      <a name="bit9" val="2"/>
+      <a name="fanout" val="4"/>
+      <a name="incoming" val="16"/>
+      <a name="spacing" val="2"/>
+    </comp>
+    <comp lib="0" loc="(1260,740)" name="Tunnel">
+      <a name="facing" val="north"/>
+      <a name="label" val="sts_op"/>
+      <a name="width" val="6"/>
+    </comp>
+    <comp lib="0" loc="(1290,700)" name="Tunnel">
+      <a name="facing" val="north"/>
+      <a name="label" val="sts_am"/>
+      <a name="width" val="2"/>
+    </comp>
+    <comp lib="0" loc="(1320,660)" name="Tunnel">
+      <a name="facing" val="north"/>
+      <a name="label" val="sts_ra"/>
+      <a name="width" val="4"/>
+    </comp>
+    <comp lib="0" loc="(1350,620)" name="Tunnel">
+      <a name="facing" val="north"/>
+      <a name="label" val="sts_rb"/>
+      <a name="width" val="4"/>
+    </comp>
+    <comp lib="4" loc="(830,370)" name="Register">
       <a name="appearance" val="logisim_evolution"/>
       <a name="label" val="pc"/>
+      <a name="width" val="16"/>
+    </comp>
+    <comp lib="4" loc="(830,500)" name="Register">
+      <a name="appearance" val="logisim_evolution"/>
+      <a name="label" val="a"/>
+      <a name="width" val="16"/>
+    </comp>
+    <comp lib="4" loc="(830,640)" name="Register">
+      <a name="appearance" val="logisim_evolution"/>
+      <a name="label" val="b"/>
       <a name="width" val="16"/>
     </comp>
     <comp lib="4" loc="(960,390)" name="ROM">
       <a name="addrWidth" val="16"/>
       <a name="appearance" val="logisim_evolution"/>
       <a name="contents">addr/data: 16 16
-0
+a00 ffff
 </a>
       <a name="dataWidth" val="16"/>
     </comp>
-    <comp lib="5" loc="(740,440)" name="Button">
-      <a name="label" val="clk"/>
-      <a name="labelloc" val="north"/>
+    <comp lib="5" loc="(1030,810)" name="LedBar">
+      <a name="inputtype" val="row"/>
+      <a name="labelloc" val="east"/>
+      <a name="matrixcols" val="6"/>
     </comp>
-    <wire from="(1200,450)" to="(1240,450)"/>
-    <wire from="(740,440)" to="(880,440)"/>
-    <wire from="(940,400)" to="(960,400)"/>
+    <comp lib="5" loc="(1070,850)" name="LedBar">
+      <a name="inputtype" val="row"/>
+      <a name="labelloc" val="east"/>
+      <a name="matrixcols" val="2"/>
+    </comp>
+    <comp lib="5" loc="(1180,810)" name="LedBar">
+      <a name="inputtype" val="row"/>
+      <a name="labelloc" val="east"/>
+      <a name="matrixcols" val="4"/>
+    </comp>
+    <comp lib="5" loc="(1180,850)" name="LedBar">
+      <a name="inputtype" val="row"/>
+      <a name="labelloc" val="east"/>
+      <a name="matrixcols" val="4"/>
+    </comp>
+    <wire from="(1010,810)" to="(1030,810)"/>
+    <wire from="(1010,850)" to="(1070,850)"/>
+    <wire from="(1160,810)" to="(1180,810)"/>
+    <wire from="(1160,850)" to="(1180,850)"/>
+    <wire from="(1200,370)" to="(1200,450)"/>
+    <wire from="(1200,450)" to="(1220,450)"/>
+    <wire from="(1240,380)" to="(1350,380)"/>
+    <wire from="(1240,400)" to="(1320,400)"/>
+    <wire from="(1240,420)" to="(1290,420)"/>
+    <wire from="(1240,440)" to="(1260,440)"/>
+    <wire from="(1260,440)" to="(1260,740)"/>
+    <wire from="(1260,440)" to="(1460,440)"/>
+    <wire from="(1290,420)" to="(1290,700)"/>
+    <wire from="(1290,420)" to="(1440,420)"/>
+    <wire from="(1320,400)" to="(1320,660)"/>
+    <wire from="(1320,400)" to="(1410,400)"/>
+    <wire from="(1350,380)" to="(1350,620)"/>
+    <wire from="(1350,380)" to="(1460,380)"/>
+    <wire from="(890,400)" to="(960,400)"/>
   </circuit>
 </project>

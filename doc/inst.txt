@@ -1,41 +1,66 @@
 
 JASM SPECIFICATION
-VERSION 1.1
+VERSION 0.3
 
-OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION                     OPERATION
+CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               DESCRIPTION                   OPERATION
+0     HALT                        -     000000 -- ---- ---- -------- --------  halt                          machine halts
+1     LOAD      RA       [RB]     3     000001 11 AAAA BBBB -------- --------  load 16-bit word from memory  RA <- [RB]
+1     LOAD      RA       [imm16]  2     000001 10 AAAA ---- XXXXXXXX XXXXXXXX  load 16-bit word from memory  RA <- [imm16]
+2     STORE     [RA]     RB       3     000010 11 BBBB AAAA -------- --------  put 16-bit word into memory   [RA] <- RB
+2     STORE     [imm16]  RB       2     000010 10 BBBB ---- XXXXXXXX XXXXXXXX  put 16-bit word into memory   [imm16] <- RB
+3     MOV       RA       RB       0     000011 00 AAAA BBBB -------- --------  move 16-bit word              RA <- RB
+3     MOV       RA       imm16    1     000011 01 AAAA ---- XXXXXXXX XXXXXXXX  move 16-bit word              RA <- imm16
+4     PUSH      RA                0     000100 00 ---- AAAA -------- --------  push to stack                 [SP--] <- RA
+4     PUSH      imm16             1     000100 01 ---- ---- XXXXXXXX XXXXXXXX  push to stack                 [SP--] <- imm16
+5     POP       RA                -     000101 -- AAAA ---- -------- --------  pop from stack                RA <- [++SP]
+6     ADD^      RA       RB       0     000110 00 AAAA BBBB -------- --------  add                           RA, Z, C, O  <- RA + RB
+6     ADD^      RA       imm16    1     000110 01 AAAA ---- XXXXXXXX XXXXXXXX  add                           RA, Z, C, O  <- RA + imm16
+7     ADC^      RA       RB       0     000111 00 AAAA BBBB -------- --------  add with carry                RA, Z, C, O <- RA + RB + C
+7     ADC^      RA       imm16    1     000111 01 AAAA ---- XXXXXXXX XXXXXXXX  add with carry                RA, Z, C, O <- RA + imm16  + C
+8     SUB^      RA       RB       0     001000 00 AAAA BBBB -------- --------  subtract                      RA, Z, C, O <- RA - RB
+8     SUB^      RA       imm16    1     001000 01 AAAA ---- XXXXXXXX XXXXXXXX  subtract                      RA, Z, C, O <- RA - imm16
+9     SBC^      RA       RB       0     001001 00 AAAA BBBB -------- --------  subtract with borrow          RA, Z, C, O <- RA - RB - C
+9     SBC^      RA       imm16    1     001001 01 AAAA ---- XXXXXXXX XXXXXXXX  subtract with borrow          RA, Z, C, O <- RA - imm16 - C
+10    INC       RA                -     001010 -- AAAA ---- -------- --------  increment                     RA, Z, C, O <- RA++
+11    DEC       RA                -     001011 -- AAAA ---- -------- --------  decrement                     RA, Z, C, O <- RA--
+12    LSH       RA       RB       0     001110 00 AAAA BBBB -------- --------  bit shift left                RA, Z, C, O <- RA << RB
+12    LSH       RA       imm16    1     001100 01 AAAA ---- XXXXXXXX XXXXXXXX  bit shift left                RA, Z, C, O <- RA << imm16
+13    RSH       RA       RB       0     001101 00 AAAA BBBB -------- --------  bit shift right               RA, Z, C, O <- RA >> RB
+13    RSH       RA       imm16    1     001101 01 AAAA ---- XXXXXXXX XXXXXXXX  bit shift right               RA, Z, C, O <- RA >> imm16
+14    AND       RA       RB       0     001110 00 AAAA BBBB -------- --------  bitwise and                   RA, Z <- RA & RB
+14    AND       RA       imm16    1     001110 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise and                   RA, Z <- RA & imm16
+15    OR        RA       RB       0     001111 00 AAAA BBBB -------- --------  bitwise or                    RA, Z <- RA | RB
+15    OR        RA       imm16    1     001111 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise or                    RA, Z <- RA | imm16
+16    NOR       RA       RB       0     010000 00 AAAA BBBB -------- --------  bitwise nor                   RA, Z <- RA ~| RB
+16    NOR       RA       imm16    1     010000 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise nor                   RA, Z <- RA ~| imm16
+17    NOT       RA                -     010001 -- AAAA ---- -------- --------  bitwise not                   RA, Z <- ~RA
+18    XOR       RA       RB       0     010010 00 AAAA BBBB -------- --------  bitwise xor                   RA, Z <- RA  ^ RB
+18    XOR       RA       imm16    1     010010 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise xor                   RA, Z <- RA  ^ imm16
+19    INB       RA       RB       0     010011 00 AAAA BBBB -------- --------  get word from I/O port        RA, Z <- port(RB)
+19    INB       RA       imm16    1     010011 01 AAAA ---- XXXXXXXX XXXXXXXX  get word from I/O port        reg, Z <- port(imm16)
+20    OUTB      RA       RB       0     010100 00 BBBB AAAA -------- --------  send word through I/O port    port(RA) <- RB
+20    OUTB      imm16    RB       1     010100 01 BBBB ---- XXXXXXXX XXXXXXXX  send word through I/O port    port(imm16) <- RB
+21    CMP^      RA       RB       0     010101 00 AAAA BBBB -------- --------  compare                       Z, C <- RA - RB
+21    CMP^      RA       imm16    1     010101 01 AAAA ---- XXXXXXXX XXXXXXXX  compare                       Z, C <- RA - imm16
+22    JMP       [RA]              3     010110 11 ---- AAAA -------- --------  unconditional, absolute jump  PC <- [RA]
+22    JMP       [imm16]           2     010110 10 ---- ---- XXXXXXXX XXXXXXXX  unconditional, absolute jump  PC <- [imm16]
+23    JZ        [RA]              3     010111 11 ---- AAAA -------- --------  jump if zero                  PC <- [RA]  if Z == 1 else NOP
+23    JZ        [imm16]           2     010111 10 ---- ---- XXXXXXXX XXXXXXXX  jump if zero                  PC <- [imm16]  if Z == 1 else NOP
+24    JNZ       [RA]              3     011000 11 ---- AAAA -------- --------  jump of not zero              PC <- [RA] if Z == 0 else NOP
+24    JNZ       [imm16]           2     011000 10 ---- ---- XXXXXXXX XXXXXXXX  jump of not zero              PC <- [imm16] if Z == 0 else NOP
+25    JC        [RA]              3     011001 11 ---- AAAA -------- --------  jump if carry                 PC <- [RA] if C == 1 else NOP
+25    JC        [imm16]           2     011001 10 ---- ---- XXXXXXXX XXXXXXXX  jump if carry                 PC <- [imm16] if C == 1 else NOP
+26    JNC       [RA]              3     011010 11 ---- AAAA -------- --------  jump if not carry             PC <- [RA] if C == 0 else NOP
+26    JNC       [imm16]           2     011010 10 ---- ---- XXXXXXXX XXXXXXXX  jump if not carry             PC <- [imm16] if C == 0 else NOP
+27    CALL      [RA]              3     011011 11 ---- AAAA -------- --------  call a function               [SP--] <- RA + 1, pc <- imm16/r eg
+27    CALL      [imm16]           2     011011 10 ---- ---- XXXXXXXX XXXXXXXX  call a function               [SP--] <- imm16 + 1, pc <- imm16/r eg
+28    RET                         -     011100 -- ---- ---- -------- --------  return from a function        PC <- [++SP]
+29    INT       [RA]              3     011101 11 ---- AAAA -------- --------  call an interrupt             see "interrupts" section in the spec
+29    INT       [imm16]           2     011101 10 ---- ---- XXXXXXXX XXXXXXXX  call an interrupt             see "interrupts" section in the spec
+30    IRET                        -     011110 -- ---- ---- -------- --------  return from an interrupt      see "interrupts" section in the spec
+31    NOP                         -     011111 -- ---- ---- -------- --------  no operation                  n/a
 
-0       LOAD        reg                 [imm16 | reg:reg]   load 8-bit value from memory    reg <- [imm16 | reg:reg]
-1       STORE       reg                 [imm16 | reg:reg]   store 8-bit value to memory     [imm16 | reg:reg] <- reg
-2       MOVE        reg                 reg | imm8          move 8-bit value                reg <- reg | imm8
-3       PUSH        reg | imm8                              push to stack                   [SP--] <- imm8/reg
-4       POP         reg                                     pop from stack                  reg <- [++SP] *note that the stack grows downwards
-5       ADD^        reg                 reg | imm8          add                             reg <- reg + (imm8 | reg)
-6       ADC^        reg                 reg | imm8          add with carry                  reg <- reg + (imm8 | reg)
-7       SUB^        reg                 reg | imm8          subtract                        reg <- reg - (imm8 | reg)
-8       SBB^        reg                 reg | imm8          subract with borrow             reg <- reg - (imm8 | reg)
-9       INC         reg                                     increment                       reg <- reg + 1
-10      DEC         reg                                     decrement                       reg <- reg - 1
-11      SHL         reg                 reg | imm8          bit shift left                  reg <- reg << (reg | imm8)
-12      SHR         reg                 reg | imm8          bit shift right                 reg <- reg >> (reg | imm8)
-13      AND         reg                 reg | imm8          bitwise and                     reg <- reg AND (reg | imm8)
-14      OR          reg                 reg | imm8          bitwise or                      reg <- reg OR  (reg | imm8)
-15      NOR         reg                 reg | imm8          bitwise nor                     reg <- reg NOR (reg | imm8)
-16      NOT         reg                                     bitwise not                     reg <- reg NOR (reg | imm8)
-17      XOR         reg                 reg | imm8          bitwise xor                     reg <- reg XOR (reg | imm8)
-18      INB         reg                 port(reg | imm8)    get byte from I/O port          reg <- port(reg | imm8)
-19      OUTB        reg                 port(reg | imm8)    send byte through I/O port      port(reg | imm8) <- reg
-20      CMP^        reg                 reg | imm8          compare                         Z, C, B <- reg - reg/imm8
-21      SEC                                                 set carry flag                  carry flag <- 1
-22      CLC                                                 clear carry flag                carry flag <- 0
-23      CLZ                                                 clear zero flag                 zero flag  <- 0
-24      JUMP        [imm16]                                 unconditional jump              PC <- [imm16]
-25      JZ          [imm16]                                 jump if zero                    PC <- [imm16] if zero flag is 1 else NOP
-26      JNZ         [imm16]                                 jump of not zero                PC <- [imm16] if zero flag is 0 else NOP
-27      JC          [imm16]                                 jump if carry                   PC <- [imm16] if carry flag is 1 else NOP
-28      JNC         [imm16]                                 jump if not carry               PC <- [imm16] if carry flag is 0 else NOP
-29      INT*        imm8                                    call an interrupt               NOP (to be implemented later)
-30      HALT*                                               halt                            halted flag <- 1
-31      NOP                                                 no operation                    n/a
-
-^ these instructions modify the flags register.
-* these instructions modify the status register.
+NOTE: ALL INSTRUCTIONS ARE 16 BITS IN LENGTH. SOME INSTRUCTIONS MAY DEFINE A 16-BIT WORD IMMEDIATELY AFTER THE INSTRUCTION.
+NOTE: SEE THE SPECIFICATION FOR IMFORMATION ABOUT INSTRUCTION FORMATS AND ADDRESSING MODES.
+NOTE: THE ADDRESSING MODE ALWAYS DEFINES HOW THE FIRST REGISTER ARGUMENT IS INTERPRETED.
+NOTE: ALL JUMP INSTRUCTIONS DEFINE ABSOLUTE MEMORY LOCATIONS.

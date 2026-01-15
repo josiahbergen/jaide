@@ -58,71 +58,32 @@ the format of the flags register is `C Z N O I - - - -`.
 
 instructions are 16 bits long, and may contain a 16-bit immediate immediately (ha) after them.
 
-the format of an instruction is as follows: `AAAAA BBB` `CCCC DDDD` `EEEEEEEE` `EEEEEEEE`
+the format of an instruction is as follows: `AAAAAA BB` `CCCC DDDD` `EEEEEEEE` `EEEEEEEE`
 
-`AAAAA` defines the opcode of the instruction.
+`AAAAAA` defines the opcode of the instruction. the opcode defines operand count
 
-`BBB` defines what the next bits in the instruction contain.
+`BB` defines the addressing mode of the source operand _(`D` or `E`, register or immediate)_.
 
-`CCCC` and `DDDD` define register operands _(if applicable)_.
+`CCCC` defines a destination register.
 
-`EEEEEEEE` `EEEEEEEE` defines a 16-bit immediate value _(little-endian, if applicable)_.
+`DDDD` defines a source or address register _(if applicable)_.
 
-the value encoded in `BBB` defines these isntruction formats:
+`EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset _(little-endian, if applicable)_.
 
-| value | operands     | defined bytes                                 |
-| ----- | ------------ | --------------------------------------------- |
-| 0     | no operands  | `XXXXX 000` `---- ----` `--------` `--------` |
-| 1     | reg          | `XXXXX 001` `XXXX ----` `--------` `--------` |
-| 2     | imm16\*      | `XXXXX 010` `---- ----` `XXXXXXXX` `XXXXXXXX` |
-| 3     | reg, reg     | `XXXXX 011` `XXXX XXXX` `--------` `--------` |
-| 4     | reg, imm16\* | `XXXXX 100` `XXXX ----` `XXXXXXXX` `XXXXXXXX` |
-| 5     | _reserved_   | `----- 101` `---- ----` `--------` `--------` |
-| 6     | _reserved_   | `----- 110` `---- ----` `--------` `--------` |
-| 7     | _reserved_   | `----- 111` `---- ----` `--------` `--------` |
+addressing modes:
 
-_\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate value._
+| value | notation | mode            |
+| ----- | -------- | --------------- |
+| 0     | reg      | register        |
+| 1     | imm16*   | immediate       |
+| 2     | [imm16]* | memory direct   |
+| 3     | [reg]    | memory indirect |
 
-_all addresses are absolute. [reg] is defined as "the address contained inside reg", i.e. reg dereferenced._
+_\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
 ## instruction set
 
-| OPCODE | MNEMONIC | OPERAND 1       | OPERAND 2       | DESCRIPTION                   | OPERATION                                |
-| ------ | -------- | --------------- | --------------- | ----------------------------- | ---------------------------------------- |
-| 0      | GET      | reg             | [imm16/reg]     | load 16-bit value from memory | reg <- [imm16/reg]                       |
-| 1      | PUT      | [imm16/reg]     | reg             | store 16-bit value to memory  | [imm16/reg] <- reg                       |
-| 2      | MOV      | reg             | reg/imm16       | move 16-bit value             | reg <- reg/imm16                         |
-| 3      | PUSH      | reg/imm16       |                 | push to stack                 | [SP--] <- imm16/reg                      |
-| 4      | POP      | reg             |                 | pop from stack                | reg <- [++SP]                            |
-| 5      | ADD^     | reg             | reg/imm16       | add                           | reg, Z, C, O <- reg + (imm16/reg)        |
-| 6      | ADC^     | reg             | reg/imm16       | add with carry                | reg, Z, C, O <- reg + (imm16/reg) + C    |
-| 7      | SUB^     | reg             | reg/imm16       | subtract                      | reg, Z, C, O <- reg - (imm16/reg)        |
-| 8      | SBC^     | reg             | reg/imm16       | subtract with borrow          | reg, Z, C, O <- reg - (imm16/reg) - C    |
-| 9      | INC      | reg             |                 | increment                     | reg, Z, C, O <- reg++                    |
-| 10     | DEC      | reg             |                 | decrement                     | reg, Z, C, O <- reg--                    |
-| 11     | LSH      | reg             | reg/imm16       | bit shift left                | reg, Z, C, O <- reg << (reg/imm16)       |
-| 12     | RSH      | reg             | reg/imm16       | bit shift right               | reg, Z, C, O <- reg >> (reg/imm16)       |
-| 13     | AND      | reg             | reg/imm16       | bitwise and                   | reg, Z <- reg & (reg/imm16)              |
-| 14     | OR       | reg             | reg/imm16       | bitwise or                    | reg, Z <- reg \| (reg/imm16)             |
-| 15     | NOR      | reg             | reg/imm16       | bitwise nor                   | reg, Z <- reg ~\| (reg/imm16)            |
-| 16     | NOT      | reg             |                 | bitwise not                   | reg, Z <- ~reg                           |
-| 17     | XOR      | reg             | reg/imm16       | bitwise xor                   | reg, Z <- reg ^ (reg/imm16)              |
-| 18     | INB      | reg             | port(reg/imm16) | get word from I/O port        | reg, Z <- port(reg/imm16)                |
-| 19     | OUTB     | port(reg/imm16) | reg             | send word through I/O port    | port(reg/imm16) <- reg                   |
-| 20     | CMP^     | reg             | reg/imm16       | compare                       | Z, C <- reg - reg/imm16                  |
-| 21     | JMP      | imm16/reg       |                 | unconditional jump            | PC <- [imm16/reg]                        |
-| 22     | JZ       | imm16/reg       |                 | jump if zero                  | PC <- [imm16/reg] if Z == 1 else NOP     |
-| 23     | JNZ      | imm16/reg       |                 | jump of not zero              | PC <- [imm16/reg] if Z == 0 else NOP     |
-| 24     | JC       | imm16/reg       |                 | jump if carry                 | PC <- [imm16/reg] if C == 1 else NOP     |
-| 25     | JNC      | imm16/reg       |                 | jump if not carry             | PC <- [imm16/reg] if C == 0 else NOP     |
-| 26     | CALL     | imm16/reg       |                 | call a function               | [SP--] <- imm16/reg + 1, pc <- imm16/reg |
-| 27     | RET      |                 |                 | return from a function        | pc <- [++SP]                             |
-| 28     | INT      | imm16/reg           |                 | call an interrupt             | see spec                                 |
-| 29     | IRET     |                 |                 | return from an interrupt      | see spec                                 |
-| 30     | HALT     |                 |                 | halt                          | halted flag <- 1                         |
-| 31     | NOP      |                 |                 | no operation                  | n/a                                      |
-
-^ These instructions modify the flags register.
+see [inst.txt](inst.txt) for the full instruction set specification.
 
 ## memory
 
