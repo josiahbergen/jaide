@@ -5,7 +5,7 @@
 from lark.lexer import Token
 from lark.tree import Tree
 import os
-from .language.ir import IRNode, InstructionNode, OperandNode, ImportDirectiveNode, DataDirectiveNode, LabelNode, MacroNode, MacroArgumentNode
+from .language.ir import IRNode, InstructionNode, OperandNode, ImportDirectiveNode, DataDirectiveNode, LabelNode, MacroNode, MacroArgumentNode, MacroCallNode
 from .util.logger import logger
 from .language.grammar import GRAMMAR
 from lark import Lark, ParseTree
@@ -166,9 +166,11 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
 
-                if any(macro.name == name.value for macro in ir_nodes if isinstance(macro, MacroNode)):
+                if name.value in IRNode.macros:
                     logger.warning(f"macro {name.value} re-defined on line {line}, keeping first definition...", scope)
                     continue
+
+                logger.debug(f"parse: creating macro_def: {name.value} (line {line})")
 
                 # get arguments
                 args_raw = next(subtree.find_data("macro_definition_args"), None)
@@ -190,12 +192,27 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 body_nodes = generate_macro_body(body_tree)
 
                 logger.verbose(f"parse: creating full node for macro definition: {name.value} with {len(args)} arguments and {len(body_nodes)} body nodes (line {line})")
-                ir_nodes.append(MacroNode(line, name.value, args, body_nodes))
+                IRNode.macros[name.value] = MacroNode(line, name.value, args, body_nodes)
+                logger.verbose(f"parse: finished parsing definition of macro {name.value}!")
 
             case "macro_call":
                 name = next(subtree.find_token("LABELNAME"))
                 line = warn_if_no_line(name, scope)
-                logger.warning(f"macros are not yet supported: skipping call to macro {name.value} on line {line}.", scope)
+
+                args_raw = next(subtree.find_data("operand_list"), None)
+                args_raw = args_raw.children if args_raw else []
+                logger.verbose(f"parse: tried operand list: {str(args_raw)}")
+
+                args = []
+                for arg in args_raw:
+                    if isinstance(arg, Token):
+                        args.append(OperandNode(line, arg.type, arg.value))
+                    else:
+                        logger.fatal(f"unexpected node type in macro call (expected operand): {type(arg)}", scope)
+                
+                opstring = ", ".join([str(op) for op in args]) if args else "no arguments"
+                logger.debug(f"parse: creating macro_call: {name.value} {opstring} (line {line})")
+                ir_nodes.append(MacroCallNode(line, name.value, args))
 
             case _:
                 logger.fatal(f"unknown node type: {node_type}", scope)
@@ -211,7 +228,6 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
     for statement in body_tree.children:
         if not isinstance(statement, Tree):
             logger.fatal(f"unexpected token in macro body (expected macro statement): {str(statement)}", scope)
-        logger.verbose(f"parse: parsing statement: {str(statement)}")
         
         if statement.data != "instruction":
             logger.fatal(f"unexpected statement type in macro body (expected instruction): {str(statement)}", scope)
@@ -241,7 +257,7 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
                 logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)
         
         opstring = ", ".join([str(op) for op in operand_nodes]) if operand_nodes else "no operands"
-        logger.debug(f"parse: creating instr {mnemonic.value} {opstring} (line {line})")
+        logger.verbose(f"parse: adding instruction {mnemonic.value} {opstring} (line {line}) to macro body")
         body_nodes.append(InstructionNode(line, mnemonic.value, operand_nodes))
         
     return body_nodes

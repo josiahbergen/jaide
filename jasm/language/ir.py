@@ -11,6 +11,8 @@ class IRNode:
     
     # class variable to store resolved labels
     labels: dict[str, int] = {}
+    # class variable to store macro definitions
+    macros: dict[str, 'MacroNode'] = {}
 
     def __init__(self, line: int):
         self.line = line
@@ -526,8 +528,29 @@ class MacroNode(IRNode):
         self.args: list[MacroArgumentNode] = args
         self.body: list[IRNode] = body
 
+    def expand(self, args: list[OperandNode]) -> list[IRNode]:
+        scope = "ir.py:MacroNode.expand()"
+        
+        logger.verbose(f"macro: args are {', '.join([str(arg) for arg in args])}")
+        for instr in self.body:
+            logger.verbose(f"macro: expanding {self.name} parsing {instr}")
+
+            # error checking
+            if isinstance(instr, MacroCallNode):
+                logger.fatal(f"macros cannot contain macro calls: {self.name} (line {self.line})", scope)
+            elif isinstance(instr, DataDirectiveNode):
+                logger.fatal(f"macros cannot contain data directives: {self.name} (line {self.line})", scope)
+            elif isinstance(instr, LabelNode):
+                logger.fatal(f"macros cannot contain labels: {self.name} (line {self.line})", scope)
+            elif not isinstance(instr, InstructionNode):
+                logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
+
+            instr_args = instr.operands
+
+        return self.body
+
     def __str__(self):
-        return f"macro definition: {self.name} with {len(self.args)} arguments"
+        return f"macro definition {self.name} with {len(self.args)} arguments"
 
 
 class MacroCallNode(IRNode):
@@ -535,3 +558,6 @@ class MacroCallNode(IRNode):
         super().__init__(line)
         self.name: str = name
         self.args: list[OperandNode] = args
+
+    def __str__(self):
+        return f"macro call to {self.name} with {len(self.args)} arguments"

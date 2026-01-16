@@ -8,8 +8,8 @@ MACRO TEST_MACRO %arg1, %arg2
     MOV C, 0x00
     MOV D, 0x00
     MOV E, 0x00
-    MOV X, (%arg1 >> 4)
-    MOV Y, (%arg1 + 10)
+    MOV X, %arg1
+    ADD Y, %arg2
 END MACRO
 
 MACRO PRINTC %char
@@ -43,4 +43,5 @@ start:
     ISROM 0xC000
     DIGTOCHAR A
     PRINTC A
+    ; TEST_MACRO 0x10, A
     HALT
