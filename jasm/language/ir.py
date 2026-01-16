@@ -510,15 +510,26 @@ class ExpressionNode(IRNode):
         return f"expression: {self.expression}"
 
 
+class MacroCallNode(IRNode):
+    def __init__(self, line: int, name: str, args: list[OperandNode]):
+        super().__init__(line)
+        self.name: str = name
+        self.args: list[OperandNode] = args
+
+    def __str__(self):
+        return f"macro call to {self.name} with {len(self.args)} arguments"
+
+
 class MacroArgumentNode(IRNode):
 
-    def __init__(self, line: int, name: str):
+    def __init__(self, line: int, name: str, index: int):
         super().__init__(line)
         self.name: str = name
         self.value: IRNode | None = None
+        self.index: int = index
 
     def __str__(self):
-        return f"macro argument: {self.name}"
+        return f"macro argument: {self.name} (index {self.index})"
 
 
 class MacroNode(IRNode):
@@ -528,12 +539,11 @@ class MacroNode(IRNode):
         self.args: list[MacroArgumentNode] = args
         self.body: list[IRNode] = body
 
-    def expand(self, args: list[OperandNode]) -> list[IRNode]:
+    def expand(self, real_args: list[OperandNode]) -> list[IRNode]:
         scope = "ir.py:MacroNode.expand()"
         
-        logger.verbose(f"macro: args are {', '.join([str(arg) for arg in args])}")
+        logger.verbose(f"macro: args are {', '.join([str(r) for r in real_args])}")
         for instr in self.body:
-            logger.verbose(f"macro: expanding {self.name} parsing {instr}")
 
             # error checking
             if isinstance(instr, MacroCallNode):
@@ -544,20 +554,14 @@ class MacroNode(IRNode):
                 logger.fatal(f"macros cannot contain labels: {self.name} (line {self.line})", scope)
             elif not isinstance(instr, InstructionNode):
                 logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
-
-            instr_args = instr.operands
+            
+            for p_arg in self.args: # loop through all placeholder arguments
+                print(p_arg.name, real_args[p_arg.index].value)
+                if p_arg.name == real_args[p_arg.index].value: # if the placeholder argument matches a real argument
+                    p_arg.value = real_args[p_arg.index] # set the placeholder argument to the real argument
 
         return self.body
 
     def __str__(self):
         return f"macro definition {self.name} with {len(self.args)} arguments"
 
-
-class MacroCallNode(IRNode):
-    def __init__(self, line: int, name: str, args: list[OperandNode]):
-        super().__init__(line)
-        self.name: str = name
-        self.args: list[OperandNode] = args
-
-    def __str__(self):
-        return f"macro call to {self.name} with {len(self.args)} arguments"

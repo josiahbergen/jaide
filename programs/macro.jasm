@@ -43,5 +43,5 @@ start:
     ISROM 0xC000
     DIGTOCHAR A
     PRINTC A
-    ; TEST_MACRO 0x10, A
+    TEST_MACRO 0x10, A
     HALT

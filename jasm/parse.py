@@ -2,13 +2,13 @@
 # parsing functions for the JASM language.
 # josiah bergen, december 2025
 
+from lark import Lark, ParseTree
+from lark.tree import Tree, Branch
 from lark.lexer import Token
-from lark.tree import Tree
 import os
 from .language.ir import IRNode, InstructionNode, OperandNode, ImportDirectiveNode, DataDirectiveNode, LabelNode, MacroNode, MacroArgumentNode, MacroCallNode
 from .util.logger import logger
 from .language.grammar import GRAMMAR
-from lark import Lark, ParseTree
 
 def generate_ir(file: str) -> list[IRNode]:
     """ Generate the IR from the source file. """
@@ -176,11 +176,11 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                 args_raw = next(subtree.find_data("macro_definition_args"), None)
                 args_raw = args_raw.children if args_raw else []
                 args = []
-                for arg in args_raw:
+                for i, arg in enumerate[Branch[Token]](args_raw):
                     if not isinstance(arg, Tree):
                         logger.fatal(f"unexpected token in macro definition (expected macro argument): {str(arg)}", scope)
                     arg_name = next(arg.find_token("LABELNAME"))
-                    args.append(MacroArgumentNode(line, arg_name.value))
+                    args.append(MacroArgumentNode(line, arg_name.value, i))
                     logger.verbose(f"parse: creating node for macro argument: \"{arg_name.value}\" (line {line})")
 
                 # get tree with all the body
