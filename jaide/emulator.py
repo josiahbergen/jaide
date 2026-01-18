@@ -8,6 +8,7 @@ from typing import Callable
 
 from .util.logger import logger
 from .constants import MNEMONICS, ADDRESSING_MODE_TO_SIZE, ADDRESSING_MODE_TO_STRING, OPCODE_TO_POSSIBLE_MODES
+from .devices.screen import Screen
 
 
 MEMORY_SIZE = 0xFFFF + 1
@@ -355,6 +356,17 @@ class Emulator:
                     addr = parse_integer(1, base=16, default=0)
                     self.load_binary(file, addr)
                 
+
+                case "device":
+
+                    if not assert_num_args(1): continue # noqa: E701
+                    device = args[0]
+                    if device == "screen":
+                        self.screen = Screen(800, 600)
+                    else:
+                        logger.error(f"invalid device {device}. valid devices are: screen")
+                        continue
+
                 case "run":
                     self.run()
     
@@ -440,7 +452,9 @@ class Emulator:
                     os.system("cls" if os.name == "nt" else "clear")
                 
                 case "help":
+                    print("jaide emulator shell version 0.0.3 command list")
                     print(help_string("load", "<path> [addr]", "load a binary file into memory"))
+                    print(help_string("device", "<device>", "initialize a device"))
                     print(help_string("run", "", "execute until until a breakpoint or halt"))
                     print(help_string("step", "", "execute one instruction"))
                     print(help_string("break", "<addr>", "set a breakpoint at the given addrezss"))

@@ -541,8 +541,12 @@ class MacroNode(IRNode):
 
     def expand(self, real_args: list[OperandNode]) -> list[IRNode]:
         scope = "ir.py:MacroNode.expand()"
-        
-        logger.verbose(f"macro: args are {', '.join([str(r) for r in real_args])}")
+
+        args_map: dict[str, OperandNode] = {}
+        for arg in self.args:
+            args_map[arg.name] = real_args[arg.index]
+        logger.verbose(f"macro: args map: {', '.join([f"{k}: {v}" for k, v in args_map.items()])}")
+
         for instr in self.body:
 
             # error checking
@@ -554,11 +558,12 @@ class MacroNode(IRNode):
                 logger.fatal(f"macros cannot contain labels: {self.name} (line {self.line})", scope)
             elif not isinstance(instr, InstructionNode):
                 logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
+
+            for i, operand in enumerate[OperandNode](instr.operands):
+                if operand.type == OPERAND_TYPES["MACRO_ARG"]:
+                    logger.verbose(f"macro: replacing macro argument {operand.value} with {args_map[operand.value]}")
+                    instr.operands[i] = args_map[operand.value]
             
-            for p_arg in self.args: # loop through all placeholder arguments
-                print(p_arg.name, real_args[p_arg.index].value)
-                if p_arg.name == real_args[p_arg.index].value: # if the placeholder argument matches a real argument
-                    p_arg.value = real_args[p_arg.index] # set the placeholder argument to the real argument
 
         return self.body
 

@@ -84,7 +84,7 @@ GRAMMAR = r"""
 
     # Registers
     # Priority 90 ensures 'A' is parsed as a Register, not a Label
-    REGISTER.90: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)\b/i
+    REGISTER.90: /(A|B|C|D|E|X|Y|SP|PC|Z|F|MB|STS)\b/i
 
     # Numbers
     # Hex (0x...), Bin (b...), Dec (0-9...)

@@ -244,7 +244,7 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
             if isinstance(op, Tree):
                 arg_type = op.data.upper()
                 if arg_type == "MACRO_ARG":
-                    op_value = next(op.find_token("LABELNAME"))
+                    op_value = next(op.find_token("LABELNAME")).value
                 elif arg_type == "EXPRESSION":
                     op_value = generate_expression_string(op)
                 else:
