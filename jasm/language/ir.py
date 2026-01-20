@@ -275,9 +275,8 @@ class InstructionNode(IRNode):
         logger.verbose(f"bytes: stored opcode is {self.opcode} with addressing mode {ADDRESSING_MODE_TO_STRING[self.addressing_mode]}.")
 
         opcode_bits = (self.opcode & 0b00111111) << 2 # mask to low 6 bits and shift two to the left
-        addressing_mode_bits = self.addressing_mode & 0b00000011 # mask to low 2 bits
+        addressing_mode_bits = (0 if (self.addressing_mode == -1) else self.addressing_mode) & 0b00000011 # mask to low 2 bits
         byte_1 = opcode_bits | addressing_mode_bits
-        binary.append(byte_1)
 
         logger.verbose(f"bytes: first byte is {pretty_byte_1_string(byte_1)}")
 
@@ -306,11 +305,15 @@ class InstructionNode(IRNode):
 
         reg_byte = (rega_bits << 4) | regb_bits
         logger.verbose(f"bytes: reg byte is {pretty_byte_1_string(reg_byte)}")
+
+        # its gotta be little endian, so the reg byte goes first
         binary.append(reg_byte)
+        binary.append(byte_1)
+
 
         if imm16_bits is not None:
             assert_bit_length(16, imm16_bits)
-            imm16_bytes = imm16_bits.to_bytes(2, byteorder="big")
+            imm16_bytes = imm16_bits.to_bytes(2, byteorder="little")
             binary.extend(imm16_bytes)
             logger.verbose(f"bytes: imm16 bytes are {self.pretty_bit_string(imm16_bytes)}")
 
@@ -390,8 +393,8 @@ class DataDirectiveNode(IRNode):
         else:
             logger.fatal(f"invalid number string on line {self.line}: \"{number_str}\"", scope)
 
-        if final_value > 0xFF:
-            logger.fatal(f"number {number_str} ({final_value}) is too large for an 8-bit value (line {self.line})", scope)
+        if final_value > 0xFFFF:
+            logger.fatal(f"number {number_str} ({final_value}) is too large for a 16-bit value (line {self.line})", scope)
 
         logger.verbose(f"parse_bytes: \"{number_str}\" -> {final_value}")
         return final_value
@@ -411,7 +414,9 @@ class DataDirectiveNode(IRNode):
 
     def get_bytes(self) -> bytearray:
         bits = bytearray()
-        bits.extend(self.data)
+        for word in self.data:
+            bits.append(word & 0xFF)
+            bits.append((word >> 8) & 0xFF)
         logger.verbose(f"get_bytes: {self.pretty_bit_string(bits)} (from {self.readable_data_string()})")
         return bits
 

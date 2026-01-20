@@ -3,9 +3,9 @@
 ## overview
 
 - 32 instructions
-- 16-bit data width
-- 16-bit address bus (with plans for a 32-bit extension)
-- 7 general-purpose 16-bit registers and 5 special registers
+- 16-bit word length
+- 16-bit address bus touches 128k of word-addressable memory (more with banking)
+- 12 registers (7 general-purpose, 5 special), all 16-bit
 - load-store, little-endian, von-neumann architecture
 
 ## programming jaide
@@ -28,7 +28,9 @@ in the jaide emulator, type help to view a list of commands.
 
 ## reset state
 
-on reset, the contents of all registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+on reset, the content of all* registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+
+_*it is recommended that SP be set to 0xFEFF on reset._
 
 ## registers
 
@@ -48,29 +50,31 @@ _currently, 7 general purpose and 5 special registers are implemented. the four 
 
 `MB` memory bank
 
-`F` flags _(zero, carry, negative (unused), overflow, interrupts enabled)_
+`F` flags _(zero, carry, negative, overflow, interrupts enabled)_
 
-the format of the flags register is `C Z N O I - - - -`.
+the format of the flags register is `C Z N O I - - - - - - - - - - -`.
 
 `Z` zero _(read-only, always equal to 0x0000)_
 
-## instruction format
+## instructions
 
-instructions are 16 bits long, and may contain a 16-bit immediate immediately (ha) after them.
+jaide uses a little-endian instruction format. instructions are 16 bits (two bytes) long, and may contain a 16-bit immediate located directly after them.
 
-the format of an instruction is as follows: `AAAAAA BB` `CCCC DDDD` `EEEEEEEE` `EEEEEEEE`
+a single 16-bit instruction word is defined as follows: 
 
-`AAAAAA` defines the opcode of the instruction. the opcode defines operand count
+`CCCC DDDD` `AAAAAA BB` `EEEEEEEE` `EEEEEEEE`
 
-`BB` defines the addressing mode of the source operand _(`D` or `E`, register or immediate)_.
+`AAAAAA` defines the opcode of the instruction (bits 8-13 of the word).
 
-`CCCC` defines a destination register.
+`BB` defines the addressing mode of the source operand (bits 14-15 of the word).
 
-`DDDD` defines a source or address register _(if applicable)_.
+`CCCC` defines a source or address register (bits 0-3 of the word).
+
+`DDDD` defines a destination register (bits 4-7 of the word).
 
 `EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset _(little-endian, if applicable)_.
 
-addressing modes:
+### addressing modes:
 
 | value | notation | mode            |
 | ----- | -------- | --------------- |
@@ -81,9 +85,11 @@ addressing modes:
 
 _\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
-## instruction set
+### instruction set
 
-see [inst.txt](inst.txt) for the full instruction set specification.
+see [inst.txt](inst.txt) for the full instruction set specification and encoding.
+
+at this time, only 32 instructions are defined. jaide supports up to 64 unique instructions, and these will eventially all be implemented. 
 
 ## memory
 
@@ -97,7 +103,7 @@ see [inst.txt](inst.txt) for the full instruction set specification.
 
 _\*this memory can be swapped using the MB register._
 
-_\*\*the stack grows downwards. it is recommended that SP = 0xFEFF._
+_\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._
 
 ROM is protected from writes (`STORE 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
 
@@ -147,9 +153,7 @@ more specifically, when `INT` is called:
 
 nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
 
-normal execution can be restored by calling `IRET`.
-
-more specifically, when `IRET` is called:
+normal execution can be restored by calling `IRET`. more specifically, when `IRET` is called:
 
 | action           | description                                              |
 | ---------------- | -------------------------------------------------------- |

@@ -3,10 +3,9 @@ imported_label:
     MOV B, 0x69
     MOV C, 0x21
     MOV D, 0xA
-    MOV X, 0x00
 
-    OUTB A, X
-    OUTB B, X
-    OUTB C, X
-    OUTB D, X
+    OUTB 0x00, A
+    OUTB 0x00, B
+    OUTB 0x00, C
+    OUTB 0x00, D
     HALT

@@ -1,6 +1,20 @@
+# constants.py
 # constants used by the jaide emulator.
 # josiah bergen, january 2026
 
+from enum import Enum
+
+
+MEMORY_SIZE = 0x1FFFF + 1 # 128k (word addressable)
+MEMORY_BANKS = 256
+
+REGISTERS = ["A", "B", "C", "D", "E", "X", "Y"]
+
+FLAG_C = 0 # carry
+FLAG_Z = 1 # zero
+FLAG_N = 2 # negative
+FLAG_O = 3 # overflow
+FLAG_I = 4 # interrupts enabled
 
 # mnemonics
 OP_HALT = 0
@@ -12,7 +26,7 @@ OP_POP = 5
 OP_ADD = 6
 OP_ADC = 7
 OP_SUB = 8
-OP_SBB = 9
+OP_SBC = 9
 OP_INC = 10
 OP_DEC = 11
 OP_SHL = 12
@@ -25,7 +39,7 @@ OP_XOR = 18
 OP_INB = 19
 OP_OUTB = 20
 OP_CMP = 21
-OP_JUMP = 22
+OP_JMP = 22
 OP_JZ = 23
 OP_JNZ = 24
 OP_JC = 25
@@ -46,7 +60,7 @@ MNEMONICS: dict[int, str] = {
     OP_ADD: "ADD",
     OP_ADC: "ADC",
     OP_SUB: "SUB",
-    OP_SBB: "SBB",
+    OP_SBC: "SBC",
     OP_INC: "INC",
     OP_DEC: "DEC",
     OP_SHL: "LSH",
@@ -59,7 +73,7 @@ MNEMONICS: dict[int, str] = {
     OP_INB: "INB",
     OP_OUTB: "OUTB",
     OP_CMP: "CMP",
-    OP_JUMP: "JMP",
+    OP_JMP: "JMP",
     OP_JZ: "JZ",
     OP_JNZ: "JNZ",
     OP_JC: "JC",
@@ -72,56 +86,379 @@ MNEMONICS: dict[int, str] = {
 }
 
 # addressing modes
+MODE_NULL = 0
 MODE_REG = 0
 MODE_IMM16 = 1
 MODE_MEM_DIRECT = 2
 MODE_MEM_INDIRECT = 3
 
-ADDRESSING_MODE_TO_SIZE = {
-    MODE_REG: 2,
-    MODE_IMM16: 4,
-    MODE_MEM_DIRECT: 4,
-    MODE_MEM_INDIRECT: 2,
-}
-
-ADDRESSING_MODE_TO_STRING = {
+MODE_TO_STRING = {
+    MODE_NULL: "NULL",
     MODE_REG: "REG",
     MODE_IMM16: "IMM16",
     MODE_MEM_DIRECT: "[IMM16]",
     MODE_MEM_INDIRECT: "[REG]",
 }
 
-OPCODE_TO_POSSIBLE_MODES = {
-    OP_HALT: [],
-    OP_LOAD: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_STORE: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_MOVE: [MODE_REG, MODE_IMM16],
-    OP_PUSH: [MODE_REG, MODE_IMM16],
-    OP_POP: [MODE_REG],
-    OP_ADD: [MODE_REG, MODE_IMM16],
-    OP_ADC: [MODE_REG, MODE_IMM16],
-    OP_SUB: [MODE_REG, MODE_IMM16],
-    OP_SBB: [MODE_REG, MODE_IMM16],
-    OP_INC: [MODE_REG],
-    OP_DEC: [MODE_REG],
-    OP_SHL: [MODE_REG, MODE_IMM16],
-    OP_SHR: [MODE_REG, MODE_IMM16],
-    OP_AND: [MODE_REG, MODE_IMM16],
-    OP_OR: [MODE_REG, MODE_IMM16],
-    OP_NOR: [MODE_REG, MODE_IMM16],
-    OP_NOT: [MODE_REG],
-    OP_XOR: [MODE_REG, MODE_IMM16],
-    OP_INB: [MODE_REG, MODE_IMM16],
-    OP_OUTB: [MODE_REG, MODE_IMM16],
-    OP_CMP: [MODE_REG, MODE_IMM16],
-    OP_JUMP: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_JZ: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_JNZ: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_JC: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_JNC: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_CALL: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT],
-    OP_RET: [],
-    OP_INT: [MODE_MEM_DIRECT, MODE_MEM_INDIRECT], # Based on inst.txt line 123-124
-    OP_IRET: [],
-    OP_NOP: [],
+# addressing mode to word size
+MODE_TO_SIZE = {
+    MODE_NULL: 1,
+    MODE_REG: 1,
+    MODE_IMM16: 2,
+    MODE_MEM_DIRECT: 2,
+    MODE_MEM_INDIRECT: 1,
 }
+
+class LOC(Enum):
+    REGA = 0
+    REGB = 1
+    IMM16 = 2
+
+class OPS(Enum):
+    FIRST_OPERAND = 0
+    SECOND_OPERAND = 1
+
+
+INSTRUCTION_ENCODINGS = {
+    OP_HALT: {
+        MODE_NULL: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_LOAD: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_STORE: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_MOVE: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_PUSH: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_POP: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_ADD: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_ADC: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_SUB: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_SBC: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_INC: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_DEC: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_SHL: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_SHR: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_AND: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_OR: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_NOR: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+    },
+    OP_NOT: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_XOR: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_INB: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_OUTB: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: None,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_CMP: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    OP_JMP: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_JZ: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_JNZ: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_JC: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_JNC: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_CALL: {
+        MODE_MEM_INDIRECT: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_MEM_DIRECT: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_RET: {
+        MODE_NULL: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_INT: {
+        MODE_REG: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        MODE_IMM16: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    OP_IRET: {
+        MODE_NULL: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    OP_NOP: {
+        MODE_NULL: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+}
+
+

@@ -52,8 +52,3 @@ END MACRO
 ; to invoke:
 ISROM 0xC000 ; A <- 0
 ```
-
-## instruction set
-
-1: HALT
-immediately halts execution

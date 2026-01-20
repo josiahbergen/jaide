@@ -124,3 +124,10 @@ CODE  MNEMONIC  OPERAND  OPERAND         MODE   ENCODING
 29    INT       [imm16]                  2      011101 10 ---- ---- XXXXXXXX XXXXXXXX
 30    IRET                               -      011110 -- ---- ---- -------- --------
 31    NOP                                -      011111 -- ---- ---- -------- --------
+
+NOTE: The ENCODING column above shows the 16-bit instruction word in "Logical" order (Opcode Mode RA RB). 
+Because jaide is a Little-Endian system with 16-bit data width, this word is stored in memory as follows:
+Byte 0: RA(4 bits) | RB(4 bits)
+Byte 1: Opcode(6 bits) | Mode(2 bits)
+Byte 2: Immediate Low Byte (if applicable)
+Byte 3: Immediate High Byte (if applicable)

@@ -54,7 +54,6 @@ class Logger:
 
     def error(self, message: str):
         """ Print non-fatal error message. """
-
         formatted = f"{f.RED}err:{f.RESET} {message}"
         print(formatted)
 

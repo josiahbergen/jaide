@@ -1,6 +1,6 @@
 start:
     ; this is a comment
-    MOV A, 0x10
+    MOV A, 0x11
     MOV B, 0x10
     ADD A, B
 end:

@@ -6,90 +6,28 @@ from colorama import Fore as f
 import os
 from typing import Callable
 
-from .util.logger import logger
-from .constants import MNEMONICS, ADDRESSING_MODE_TO_SIZE, ADDRESSING_MODE_TO_STRING, OPCODE_TO_POSSIBLE_MODES
+from .constants import (
+    MNEMONICS, INSTRUCTION_ENCODINGS,
+    MEMORY_SIZE, REGISTERS, LOC, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
+    OP_HALT, OP_LOAD, OP_STORE, OP_MOVE, OP_PUSH, OP_POP, OP_ADD, OP_ADC, OP_SUB, OP_SBC,
+    OP_INC, OP_DEC, OP_SHL, OP_SHR, OP_AND, OP_OR, OP_NOR, OP_NOT, OP_XOR, OP_INB, OP_OUTB,
+    OP_CMP, OP_JMP, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_CALL, OP_RET, OP_INT, OP_IRET, OP_NOP,
+    MODE_REG, MODE_IMM16, MODE_MEM_DIRECT,
+)
 from .devices.screen import Screen
-
-OP_HALT = 0
-OP_LOAD = 1
-OP_STORE = 2
-OP_MOVE = 3
-OP_PUSH = 4
-OP_POP = 5
-OP_ADD = 6
-OP_ADC = 7
-OP_SUB = 8
-OP_SBC = 9
-OP_INC = 10
-OP_DEC = 11
-OP_SHL = 12
-OP_SHR = 13
-OP_AND = 14
-OP_OR = 15
-OP_NOR = 16
-OP_NOT = 17
-OP_XOR = 18
-OP_INB = 19
-OP_OUTB = 20
-OP_CMP = 21
-OP_JUMP = 22
-OP_JZ = 23
-OP_JNZ = 24
-OP_JC = 25
-OP_JNC = 26
-OP_CALL = 27
-OP_RET = 28
-OP_INT = 29
-OP_IRET = 30
-OP_NOP = 31
-
-MEMORY_SIZE = 0xFFFF + 1
-REGISTERS = ["A", "B", "C", "D", "E", "X", "Y"]
-
-FLAG_C = 0 # carry
-FLAG_Z = 1 # zero
-FLAG_N = 2 # negative
-FLAG_O = 3 # overflow
-FLAG_I = 4 # interrupts enabled
-
-# addressing modes
-MODE_NO_OPERANDS = 0b000
-MODE_REG = 0b001
-MODE_IMM8 = 0b010 
-MODE_REG_REG = 0b011 
-MODE_REG_IMM8 = 0b100 
-MODE_REG_IMM16 = 0b101 
-MODE_REG_REGPAIR = 0b110
-MODE_IMM16 = 0b111
-
-
-def mask8(x: int) -> int: return x & 0xFF # mask to 8 bits
-def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
-
-
-class EmulatorException(Exception):
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
-
-
-class Register:
-    def __init__(self, name: str, value: int):
-        self.name = name
-        self.set_value(value)
-
-    def set_value(self, value: int) -> None:
-        self.value = mask16(value)
-
-    def get_value(self) -> int:
-        return mask16(self.value)
+from .exceptions import EmulatorException
+from .core import mask16, _add_core, _sub_core, _shl_core, _shr_core, _push_core, _pop_core
+from .register import Register
+from .util.logger import logger
 
 class Emulator:
 
     def __init__(self):
 
-        # registers
+        # general purpose registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
+
+        # special registers
         self.pc: Register = Register("PC", 0) # program counter
         self.sp: Register = Register("SP", 0xFEFF) # stack pointer
         self.f: Register = Register("F", 0) # flags
@@ -98,7 +36,7 @@ class Emulator:
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
-        self.ports: list[int] = [0] * 256 # 256 8-bit ports
+        self.ports: list[int] = [0] * 256 # 256 16-bit ports
 
         # debugger etc.
         self.breakpoints: set[int] = set[int]()
@@ -108,42 +46,7 @@ class Emulator:
         self._populate_handlers()
 
 
-    def _populate_handlers(self) -> None:
-        self.handlers[OP_HALT]  = self.handle_halt
-        self.handlers[OP_LOAD]  = self.handle_load
-        self.handlers[OP_STORE] = self.handle_store
-        self.handlers[OP_MOVE]  = self.handle_move
-        self.handlers[OP_PUSH]  = self.handle_push
-        self.handlers[OP_POP]   = self.handle_pop
-        self.handlers[OP_ADD]   = self.handle_add
-        self.handlers[OP_ADC]   = self.handle_adc
-        self.handlers[OP_SUB]   = self.handle_sub
-        self.handlers[OP_SBC]   = self.handle_sbc
-        self.handlers[OP_INC]   = self.handle_inc
-        self.handlers[OP_DEC]   = self.handle_dec
-        self.handlers[OP_SHL]   = self.handle_shl
-        self.handlers[OP_SHR]   = self.handle_shr
-        self.handlers[OP_AND]   = self.handle_and
-        self.handlers[OP_OR]    = self.handle_or
-        self.handlers[OP_NOR]   = self.handle_nor
-        self.handlers[OP_NOT]   = self.handle_not
-        self.handlers[OP_XOR]   = self.handle_xor
-        self.handlers[OP_INB]   = self.handle_inb
-        self.handlers[OP_OUTB]  = self.handle_outb
-        self.handlers[OP_CMP]   = self.handle_cmp
-        self.handlers[OP_JUMP]  = self.handle_jump
-        self.handlers[OP_JZ]    = self.handle_jz
-        self.handlers[OP_JNZ]   = self.handle_jnz
-        self.handlers[OP_JC]    = self.handle_jc
-        self.handlers[OP_JNC]   = self.handle_jnc
-        self.handlers[OP_CALL]  = self.handle_call
-        self.handlers[OP_RET]   = self.handle_ret
-        self.handlers[OP_INT]   = self.handle_int
-        self.handlers[OP_IRET]  = self.handle_iret
-        self.handlers[OP_NOP]   = self.handle_nop
-
-
-    # memory helpers
+    # memory
     def load_binary(self, file: str, addr: int = 0):
 
         # check if file exists
@@ -160,135 +63,82 @@ class Emulator:
             return
 
         self.memory[addr:addr+len(binary)] = binary
-        print(f"loaded {len(binary)} bytes to memory at 0x{addr:04X}.")
-
-    def read8(self, addr: int) -> int: 
-        return self.memory[mask16(addr)]
-
-    def write8(self, addr: int, value: int):
-        self.memory[mask16(addr)] = mask8(value)
+        print(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
     
     def read16(self, addr: int) -> int: 
-        return self.memory[mask16(addr)]
+        # fetch a 16-bit little-endian value from memory using word addressing
+        lo = self.memory[addr * 2]
+        hi = self.memory[addr * 2 + 1]
+        return (hi << 8) | lo
 
     def write16(self, addr: int, value: int):
-        self.memory[mask16(addr)] = mask16(value)
+        # write a 16-bit little-endian value to memory using word addressing
+        self.memory[addr * 2] = value & 0xFF
+        self.memory[addr * 2 + 1] = (value >> 8) & 0xFF
 
-    def disasm_at(self, addr: int) -> str:
-        byte = self.memory[addr]
-        opcode = byte >> 3
-        addressing_mode = byte & 0b00000111
-        all_bytes = self.memory[addr:addr+ADDRESSING_MODE_TO_SIZE[addressing_mode]]
+    def split_word(self, word: int) -> tuple[int, int]:
+        # returns low, high
+        return word & 0xFF, (word >> 8) & 0xFF
 
-        bytes_string = " ".join([f"{b:08b}" for b in all_bytes])
-        return f"{bytes_string}: {MNEMONICS[opcode]} {ADDRESSING_MODE_TO_STRING[addressing_mode]}"
-
-    # register helpers
+    # registers
     def reg_get(self, index: int) -> int:
-        if index < 0 or index >= len(REGISTERS): return 0 # noqa: E701
-        return mask8(self.reg[REGISTERS[index]])
+        if index < 0 or index >= len(REGISTERS): 
+            raise EmulatorException(f"invalid register index {index}.")
+        return self.reg[REGISTERS[index]].value
     
     def reg_set(self, index: int, value: int) -> None:
-        if index < 0 or index >= len(REGISTERS): return # noqa: E701
-        self.reg[REGISTERS[index]] = mask8(value)
-
-    # stack helpers
-    # the stack grows downwards and sp always points to the element on the top of the stack
-    def push_stack(self, value: int) -> None:
-        self.sp = mask16(self.sp - 1) # decrement stack pointer
-        self.write8(mask16(self.sp), value) # write value to new pointer location
-
-    def pop_stack(self) -> int:
-        value = self.read8(self.sp) # read value
-        self.sp = mask16(self.sp + 1) # increment stack pointer
-        return value
+        if index < 0 or index >= len(REGISTERS): 
+            raise EmulatorException(f"invalid register index {index}.")
+        self.reg[REGISTERS[index]].set(value)
 
     # flag helpers
-    def flag_get(self, bit: int) -> int:
-        if bit < 0 or bit >= 4: return 0 # noqa: E701
-        return (self.f >> bit) & 1
+    def flag_get(self, bit: int) -> bool:
+        if bit < 0 or bit > 4: 
+            raise EmulatorException(f"attempted to get invalid flag bit {bit}.")
+        return (self.f.value >> bit) & 1 == 1
 
-    def flag_set(self, bit: int, value: int) -> None:
-        if bit < 0 or bit >= 4: return # noqa: E701
-        # insane bit manipulation
-        self.f = (self.f & ~(1 << bit)) | (value << bit)
+    def flag_set(self, bit: int, value: bool) -> None:
+        if bit < 0 or bit > 4: 
+            raise EmulatorException(f"attempted to set invalid flag bit {bit}.")
+        flag_mask = (1 if value else 0) << bit
+        # resets flag bit to 0 then ors with real value
+        self.f.set((self.f.value & ~flag_mask) | flag_mask)
 
     # port helpers
     def port_get(self, port: int) -> int:
-        return mask8(self.ports[port])
+        return mask16(self.ports[port])
     
     def port_set(self, port: int, value: int) -> None:
-        self.ports[port] = mask8(value)
-
-        # port 0 is special and will print the value to the console
-        if port == 0:
+        value = mask16(value)
+        if port == 0: # port 0 is special and will print the value to the console
             print(chr(value), end="", flush=True)
-
+        self.ports[port] = value
 
     # main fetch/decode
     def fetch(self) -> int:
-        # fetch byte and increment program counter
-        value = self.read8(self.pc)
-        self.pc = mask16(self.pc + 1)
+        # fetch word and increment program counter
+        value = self.read16(self.pc.value)
+        self.pc.set(self.pc.value + 1)
         return value
 
     def decode(self) -> tuple[int, ...]:
-        first_byte = self.fetch()
-        opcode = (first_byte >> 3) & 0b11111
-        mode = first_byte & 0b111
+        word = self.fetch()
+        regs, instr = self.split_word(word)
         
-        match mode:
-            case 0b000: # no operands
-                return (opcode, mode)
-            
-            case 0b001: # reg
-                byte2 = self.fetch()
-                reg = (byte2 >> 4) & 0x0F
-                return (opcode, mode, reg)
-            
-            case 0b010: # imm8
-                self.fetch()  # Skip unused byte
-                imm8 = self.fetch()
-                return (opcode, mode, imm8)
-            
-            case 0b011: # reg, reg
-                byte2 = self.fetch()
-                reg_d = (byte2 >> 4) & 0x0F
-                reg_s = byte2 & 0x0F
-                return (opcode, mode, reg_d, reg_s)
-            
-            case 0b100: # reg, imm8
-                byte2 = self.fetch()
-                reg_d = (byte2 >> 4) & 0x0F
-                imm8 = self.fetch()
-                return (opcode, mode, reg_d, imm8)
-            
-            case 0b101: # reg, imm16
-                byte2 = self.fetch()
-                reg_d = (byte2 >> 4) & 0x0F
-                lo = self.fetch()
-                hi = self.fetch()
-                addr = (hi << 8) | lo
-                return (opcode, mode, reg_d, addr)
-            
-            case 0b110: # reg, regpair
-                byte2 = self.fetch()
-                reg = (byte2 >> 4) & 0x0F
-                pair = self.fetch()
-                # regpair is encoded as A:B (L:H) -> AAAABBBB
-                pair_hi = pair & 0b00001111
-                pair_lo = pair >> 4
-                return (opcode, mode, reg, pair_lo, pair_hi)
-            
-            case 0b111: # imm16
-                self.fetch()  # Skip unused byte
-                lo = self.fetch()
-                hi = self.fetch()
-                addr = (hi << 8) | lo
-                return (opcode, mode, addr)
-            case _:
-                logger.error(f"invalid addressing mode {mode} at 0x{self.pc:04X}.")
-                return (opcode, mode)
+        opcode = (instr >> 2) & 0b111111
+        mode = instr & 0b11
+        reg_a = regs & 0b1111
+        reg_b = (regs >> 4) & 0b1111
+        imm16 = 0
+
+        if mode not in INSTRUCTION_ENCODINGS[opcode]:
+            logger.error(f"invalid addressing mode {mode} for {MNEMONICS[opcode]} at {self.pc}. halting.")
+            return (0, 0, 0, 0, 0)
+
+        if INSTRUCTION_ENCODINGS[opcode][mode][LOC.IMM16] is not None:
+            imm16 = self.fetch()
+
+        return opcode, mode, reg_a, reg_b, imm16
 
     # main run loop
     def run(self) -> None:
@@ -315,9 +165,8 @@ class Emulator:
             self.handlers[opcode](decoded)
         except EmulatorException as e:
             return e.message
-        return None
 
-    # main run loop
+    # repl and shell interface
     def repl(self):
         scope = "emulator.py:repl()"
         
@@ -348,6 +197,22 @@ class Emulator:
             command_args = f"{command}{' ' if args else ''}{f.RESET}{args}{f.RESET}"
             return f"{command_args:<30} {message}"
 
+        def disasm_at(addr: int) -> str:
+            word = self.read16(addr)
+            regs, instr = self.split_word(word)
+            opcode, mode, reg_a, reg_b, imm16 = (instr >> 2) & 0b111111, instr & 0b11, regs & 0b1111, (regs >> 4) & 0b1111, 0
+
+            if mode not in INSTRUCTION_ENCODINGS[opcode]:
+                return f"{MNEMONICS[opcode]} {mode:02X} (invalid addressing mode)"
+            if mode in [MODE_IMM16, MODE_MEM_DIRECT]:
+                imm16 = self.read16(addr + 1)
+
+            encoding = INSTRUCTION_ENCODINGS[opcode][mode]
+            reg_a_str = f" {REGISTERS[reg_a]}" if encoding[LOC.REGA] is not None else ''
+            reg_b_str = f" {REGISTERS[reg_b]}" if encoding[LOC.REGB] is not None else ''
+            imm16_str = f" {imm16:04X}" if encoding[LOC.IMM16] is not None else ''
+            return f"{MNEMONICS[opcode]}{reg_a_str}{reg_b_str}{imm16_str}"
+                
         while True:
 
             command, *args = input(f"{f.LIGHTWHITE_EX}jaide > {f.RESET}").split()
@@ -360,8 +225,7 @@ class Emulator:
                     addr = parse_integer(1, base=16, default=0)
                     self.load_binary(file, addr)
                 
-
-                case "device":
+                case "dev":
 
                     if not assert_num_args(1): continue # noqa: E701
                     device = args[0]
@@ -388,7 +252,7 @@ class Emulator:
                     num = len(self.breakpoints)
                     print(f"found {num} breakpoint{'' if num == 1 else 's'}{':' if num > 0 else '.'}")
                     for addr in self.breakpoints:
-                        print(f"0x{addr:04X}: {self.disasm_at(addr)}")
+                        print(f"0x{addr:04X}: {disasm_at(addr)}")
                 
                 case "bclear":
                     num = len(self.breakpoints)
@@ -396,55 +260,44 @@ class Emulator:
                     print(f"removed {num} breakpoint{'' if num == 1 else 's'}.")
 
                 case "regs" | "r":
-                    line_1 = "    ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):02X}" for reg in REGISTERS])
-                    line_2 = f"PC: 0x{self.pc:04X}  SP: 0x{self.sp:04X}  MB: 0x{self.mb:02X}    ST: 0x{self.st:02X}    Z:  0x{self.z:02X}"
+                    line_1 = "  ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):04X}" for reg in REGISTERS])
+                    line_2 = f"PC: 0x{self.pc.value:04X}  SP: 0x{self.sp.value:04X}  MB: 0x{self.mb.value:04X}  Z:  0x{self.z.value:04X}"
                     print(line_1, line_2, sep="\n")
 
                 case "flags" | "f":
-                    print(f"C: {self.flag_get(FLAG_C)}  Z: {self.flag_get(FLAG_Z)}  N: {self.flag_get(FLAG_N)}  O: {self.flag_get(FLAG_O)}")
+                    print(f"C: {self.flag_get(FLAG_C)}  Z: {self.flag_get(FLAG_Z)}  N: {self.flag_get(FLAG_N)}  O: {self.flag_get(FLAG_O)}      I: {self.flag_get(FLAG_I)}")
                 
                 case "set":
                     if not assert_num_args(2, opt=0): continue # noqa: E701
                     value = parse_integer(1, base=16)
-                    if value < 0 or value > 0xFF and args[0].upper() not in ["PC", "SP"]:
-                        logger.error("invalid value for unsigned 8-bit integer.")
-                        continue
-                    if value < 0 or value > 0xFFFF and args[0].upper() in ["PC", "SP"]:
+                    if value < 0 or value > 0xFFFF:
                         logger.error("invalid value for 16-bit integer.")
                         continue
                     reg = args[0].upper()
                     if reg not in REGISTERS:
-                        if reg == "PC":
-                            self.pc = value
-                        elif reg == "SP":
-                            self.sp = value
-                        elif reg == "MB":
-                            self.mb = value
-                        elif reg == "ST":
-                            self.st = value
-                        elif reg == "Z":
-                            self.z = value
-                        else:
-                            logger.error(f"invalid register (expected one of {', '.join(REGISTERS)}, PC, SP, MB, ST, Z).")
-                            continue
+                        if reg == "PC": self.pc.set(value) # noqa: E701
+                        elif reg == "SP": self.sp.set(value) # noqa: E701
+                        elif reg == "MB": self.mb.set(value) # noqa: E701
+                        elif reg == "Z": self.z.set(value) # noqa: E701
+                        else: logger.error(f"invalid register (expected one of {', '.join(REGISTERS)}, PC, SP, MB, ST, Z).") # noqa: E701
                     else:
                         self.reg_set(REGISTERS.index(reg), value)
-                    print(f"set register {reg} to 0x{value:02X}.")
+                    print(f"set register {reg} to 0x{value:04X}.")
                 
-                case "mem":
+                case "mem" | "m":
                     if not assert_num_args(1, opt=1): continue # noqa: E701
-                    addr = self.pc if args[0].upper() == "PC" else parse_integer(0, base=16)
-                    length = parse_integer(1, default=16)
+                    addr = self.pc.value if args[0].upper() == "PC" else parse_integer(0, base=16)
+                    length = parse_integer(1, default=16) * 2
                     chunk = self.memory[addr:addr+length]
-                    for i in range(0, len(chunk), 16):
-                        row = chunk[i:i+16]
-                        hex_bytes = " ".join(f"{b:02x}" for b in row)
-                        print(f"0x{addr+i:04X} | {hex_bytes:<47} | {''.join(chr(b) if 0x20 <= b <= 0x7E else '.' for b in row)}")
+                    for i in range(0, len(chunk), 32):
+                        row = chunk[i:i+32]
+                        words: list[int] = [(row[i] | row[i+1] << 8) for i in range(0, len(row), 2)]
+                        print(f"0x{addr+i:04X} | {" ".join([f"{w:04X}" for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
                 
                 case "disasm" | "d":
                     if not assert_num_args(0, opt=1): continue # noqa: E701
-                    addr = parse_integer(0, base=16, default=self.pc)
-                    print(self.disasm_at(addr))
+                    addr = parse_integer(0, base=16, default=self.pc.value)
+                    print(disasm_at(addr))
                 
                 case "ports":
                     non_zero = [i for i in range(len(self.ports)) if self.ports[i] != 0]
@@ -458,7 +311,7 @@ class Emulator:
                 case "help":
                     print("jaide emulator shell version 0.0.3 command list")
                     print(help_string("load", "<path> [addr]", "load a binary file into memory"))
-                    print(help_string("device", "<device>", "initialize a device"))
+                    print(help_string("dev", "<name>", "initialize a device"))
                     print(help_string("run", "", "execute until until a breakpoint or halt"))
                     print(help_string("step", "", "execute one instruction"))
                     print(help_string("break", "<addr>", "set a breakpoint at the given addrezss"))
@@ -484,6 +337,7 @@ class Emulator:
                 case _:
                     print("invalid command. type 'help' for a list of commands.")
 
+
     def assert_addressing_mode(self, actual: int, expected: int | list[int]) -> None:
         if isinstance(expected, int):
             expected = [expected]
@@ -495,380 +349,125 @@ class Emulator:
         # decoded is always a tuple of (opcode, mode, *operands)
         return decoded[1]
 
-    # core arithmetic helpers
-    def _add_core(self, a: int, b: int, carry_in: int = 0) -> tuple[int, int, int]:
-        full = a + b + carry_in
-        result = mask8(full)
-        carry = 1 if full > 0xFF else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        return result, carry, overflow
-
-    def _sub_core(self, a: int, b: int, borrow_in: int = 0) -> tuple[int, int, int]:
-        full = a - b - borrow_in
-        result = mask8(full)
-        carry = 1 if a >= b + borrow_in else 0
-        overflow = 1 if (((a ^ b) & 0x80) != 0 and ((a ^ result) & 0x80) != 0) else 0
-        return result, carry, overflow
-
-    def _shl_core(self, a: int, b: int) -> tuple[int, int, int]:
-        # TODO: test
-        full = a << b
-        result = mask8(full)
-        carry = 1 if a & (1 << (8 - b)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        return result, carry, overflow
-
-    def _shr_core(self, a: int, b: int) -> tuple[int, int, int]:
-        # TODO: test
-        full = a >> b
-        result = mask8(full)
-        carry = 1 if a & (1 << (b - 1)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        return result, carry, overflow
 
     # operation handlers
-    def handle_load(self, decoded: tuple[int, ...]) -> str | None: 
-
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_LOAD])
-
-        if mode == MODE_REG_IMM16:
-            _, _, reg_d, addr = decoded
-            self.reg_set(reg_d, self.read16(addr))
-        else: # MODE_REG_REGPAIR:
-            _, _, reg_d, pair_lo, pair_hi = decoded
-            addr = self.reg_get(pair_hi) << 8 | self.reg_get(pair_lo)
-            self.reg_set(reg_d, self.read16(addr))
-
-    def handle_store(self, decoded: tuple[int, ...]) -> str | None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_STORE])
-
-        if mode == MODE_REG_IMM16:
-            _, _, reg_s, addr = decoded
-            self.write16(addr, self.reg_get(reg_s))
-        else: # MODE_REG_REGPAIR:
-            _, _, reg_s, pair_lo, pair_hi = decoded
-            addr = self.reg_get(pair_hi) << 8 | self.reg_get(pair_lo)
-            self.write16(addr, self.reg_get(reg_s))
-    
-    def handle_move(self, decoded: tuple[int, ...]) -> None:
-
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, [MODE_REG_IMM8, MODE_REG_REG])
-
-        if mode == MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            self.reg_set(reg_d, imm8)
-        else: # MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            self.reg_set(reg_d, self.reg_get(reg_s))
-
-    def handle_push(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_PUSH])
-
-        if mode == MODE_REG:
-            _, _, reg = decoded
-            self.push_stack(self.reg_get(reg))
-        else: # MODE_IMM8:
-            _, _, imm8 = decoded
-            self.push_stack(imm8)
-    
-    def handle_pop(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_POP])
-
-        _, _, reg = decoded
-        self.reg_set(reg, self.pop_stack())
-
-    def handle_add(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_ADD])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._add_core(self.reg_get(reg_d), self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._add_core(self.reg_get(reg_d), imm8)
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_adc(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_ADC])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._add_core(
-                self.reg_get(reg_d),
-                self.reg_get(reg_s),
-                carry_in=self.flag_get(FLAG_C)
-            )
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._add_core(
-                self.reg_get(reg_d),
-                imm8,
-                carry_in=self.flag_get(FLAG_C)
-            )
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_sub(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_SUB])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._sub_core(self.reg_get(reg_d), self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._sub_core(self.reg_get(reg_d), imm8)
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_sbb(self, decoded: tuple[int, ...]) -> None:
-
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_SBB])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._sub_core(
-                self.reg_get(reg_d),
-                self.reg_get(reg_s),
-                borrow_in=self.flag_get(FLAG_C)
-            )
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._sub_core(
-                self.reg_get(reg_d),
-                imm8,
-                borrow_in=self.flag_get(FLAG_C)
-            )
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_inc(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_INC])
-
-        _, _, reg = decoded
-        res, carry, overflow = self._add_core(self.reg_get(reg), 1)
-        self.reg_set(reg, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_dec(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_DEC])
-
-        _, _, reg = decoded
-        res, carry, overflow = self._sub_core(self.reg_get(reg), 1)
-        self.reg_set(reg, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-        self.flag_set(FLAG_Z, 1 if res == 0 else 0)
-
-    def handle_shl(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_SHL])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._shl_core(self.reg_get(reg_d), self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._shl_core(self.reg_get(reg_d), imm8)
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    def handle_shr(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_SHR])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._shr_core(self.reg_get(reg_d), self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._shr_core(self.reg_get(reg_d), imm8)
-
-        self.reg_set(reg_d, res)
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-
-    #TODO: should z, n, flags be set for boolean operations?
-
-    def handle_and(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_AND])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) & self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) & mask8(imm8))
-
-    def handle_or(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_OR])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) | self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) | mask8(imm8))
-
-    def handle_nor(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_NOR])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res = self.reg_get(reg_d) | self.reg_get(reg_s)
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res = self.reg_get(reg_d) | mask8(imm8)
-
-        self.reg_set(reg_d, ~res)
-
-    def handle_not(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_NOT])
-
-        _, _, reg = decoded
-        self.reg_set(reg, ~self.reg_get(reg))
-
-    def handle_xor(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_XOR])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) ^ self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            self.reg_set(reg_d, self.reg_get(reg_d) ^ mask8(imm8))
-
-    def handle_inb(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_INB])
-
-        if mode == MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            port = imm8
-        else: # MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            port = self.reg_get(reg_s)
-        
-        self.reg_set(reg_d, self.port_get(port))
-    
-    def handle_outb(self, decoded: tuple[int, ...]) -> str | None:
-
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, [MODE_REG_IMM8, MODE_REG_REG])
-
-        if mode == MODE_REG_IMM8:
-            _, _, reg_s, imm8 = decoded
-            port = imm8
-        else: # MODE_REG_REG:
-            _, _, reg_s, reg_d = decoded
-            # the port is the value of the destination register
-            port = self.reg_get(reg_d) 
-
-        self.port_set(port, self.reg_get(reg_s))
-
-    def handle_cmp(self, decoded: tuple[int, ...]) -> None: 
-
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_CMP])
-
-        if mode == MODE_REG_REG:
-            _, _, reg_d, reg_s = decoded
-            res, carry, overflow = self._sub_core(self.reg_get(reg_d), self.reg_get(reg_s))
-        else: # MODE_REG_IMM8:
-            _, _, reg_d, imm8 = decoded
-            res, carry, overflow = self._sub_core(self.reg_get(reg_d), imm8)
-
-        self.flag_set(FLAG_C, carry)
-        self.flag_set(FLAG_O, overflow)
-        self.flag_set(FLAG_Z, 1 if res == 0 else 0)
-        self.flag_set(FLAG_N, 1 if res < 0 else 0)
-
-    def handle_sec(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_SEC])
-        self.flag_set(FLAG_C, 1)
-    
-    def handle_clc(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_CLC])
-        self.flag_set(FLAG_C, 0)
-
-    def handle_clz(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_CLZ])
-        self.flag_set(FLAG_Z, 0)
-
-    def handle_jump(self, decoded: tuple[int, ...]) -> None: 
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_JUMP])
-
-        _, _, addr = decoded
-        self.pc = addr
-
-    def handle_jz(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_JZ])
-
-        _, _, addr = decoded
-        if self.flag_get(FLAG_Z) == 1:
-            self.pc = addr
-
-    def handle_jnz(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_JNZ])
-
-        _, _, addr = decoded
-        if self.flag_get(FLAG_Z) == 0:
-            self.pc = addr
-
-    def handle_jc(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_JC])
-
-        _, _, addr = decoded
-        if self.flag_get(FLAG_C) == 1:
-            self.pc = addr
-
-    def handle_jnc(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_JNC])
-
-        _, _, addr = decoded
-        if self.flag_get(FLAG_C) == 0:
-            self.pc = addr
-
-    def handle_int(self, decoded: tuple[int, ...]) -> None:
-        mode = self.get_mode(decoded)
-        self.assert_addressing_mode(mode, OPCODE_TO_POSSIBLE_MODES[OP_INT])
-        logger.warning("INT instruction not implemented")
 
     def handle_halt(self, decoded: tuple[int, ...]) -> None: self.halted = True
 
+    def handle_load(self, decoded: tuple[int, ...]) -> str | None: pass
+
+    def handle_store(self, decoded: tuple[int, ...]) -> str | None: pass
+    
+    def handle_move(self, decoded: tuple[int, ...]) -> None:
+        _, mode, reg_a, reg_b, imm16 = decoded
+        # MODE_REG: RA <- RB
+        # MODE_IMM16: RA <- IMM16
+        print(f"MOV {REGISTERS[reg_a]} <- {imm16} at 0x{self.pc}")
+        if mode == MODE_REG:
+            self.reg_set(reg_a, self.reg_get(reg_b))
+        elif mode == MODE_IMM16:
+            self.reg_set(reg_a, imm16)
+        else:
+            raise EmulatorException(f"invalid addressing mode {mode} for MOV at 0x{self.pc:04X}.")
+
+    def handle_push(self, decoded: tuple[int, ...]) -> None: pass
+    
+    def handle_pop(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_add(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_adc(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_sub(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_sbc(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_inc(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_dec(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_shl(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_shr(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_and(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_or(self, decoded: tuple[int, ...]) -> None: pass
+
+    #TODO: should z, n, flags be set for boolean operations?
+
+    def handle_nor(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_not(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_xor(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_inb(self, decoded: tuple[int, ...]) -> None: pass
+    
+    def handle_outb(self, decoded: tuple[int, ...]) -> str | None:
+        _, mode, reg_a, reg_b, imm16 = decoded
+        # MODE_REG: port(RA) <- RB
+        # MODE_IMM16: port(IMM16) <- RB
+        print(f"OUTB {imm16} <- {self.reg_get(reg_b)}")
+        if mode == MODE_REG:
+            self.port_set(self.reg_get(reg_a), self.reg_get(reg_b))
+        elif mode == MODE_IMM16:
+            self.port_set(imm16, self.reg_get(reg_b))
+        else:
+            raise EmulatorException(f"invalid addressing mode {mode} for OUTB at 0x{self.pc:04X}.")
+
+    def handle_cmp(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_jmp(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_jz(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_jnz(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_jc(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_jnc(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_call(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_ret(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_int(self, decoded: tuple[int, ...]) -> None: pass
+
+    def handle_iret(self, decoded: tuple[int, ...]) -> None: pass
+
     def handle_nop(self, decoded: tuple[int, ...]) -> None: pass
+
+    def _populate_handlers(self) -> None:
+        self.handlers[OP_HALT]  = self.handle_halt
+        self.handlers[OP_LOAD]  = self.handle_load
+        self.handlers[OP_STORE] = self.handle_store
+        self.handlers[OP_MOVE]  = self.handle_move
+        self.handlers[OP_PUSH]  = self.handle_push
+        self.handlers[OP_POP]   = self.handle_pop
+        self.handlers[OP_ADD]   = self.handle_add
+        self.handlers[OP_ADC]   = self.handle_adc
+        self.handlers[OP_SUB]   = self.handle_sub
+        self.handlers[OP_SBC]   = self.handle_sbc
+        self.handlers[OP_INC]   = self.handle_inc
+        self.handlers[OP_DEC]   = self.handle_dec
+        self.handlers[OP_SHL]   = self.handle_shl
+        self.handlers[OP_SHR]   = self.handle_shr
+        self.handlers[OP_AND]   = self.handle_and
+        self.handlers[OP_OR]    = self.handle_or
+        self.handlers[OP_NOR]   = self.handle_nor
+        self.handlers[OP_NOT]   = self.handle_not
+        self.handlers[OP_XOR]   = self.handle_xor
+        self.handlers[OP_INB]   = self.handle_inb
+        self.handlers[OP_OUTB]  = self.handle_outb
+        self.handlers[OP_CMP]   = self.handle_cmp
+        self.handlers[OP_JMP]   = self.handle_jmp
+        self.handlers[OP_JZ]    = self.handle_jz
+        self.handlers[OP_JNZ]   = self.handle_jnz
+        self.handlers[OP_JC]    = self.handle_jc
+        self.handlers[OP_JNC]   = self.handle_jnc
+        self.handlers[OP_CALL]  = self.handle_call
+        self.handlers[OP_RET]   = self.handle_ret
+        self.handlers[OP_INT]   = self.handle_int
+        self.handlers[OP_IRET]  = self.handle_iret
+        self.handlers[OP_NOP]   = self.handle_nop

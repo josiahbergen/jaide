@@ -73,11 +73,11 @@ OPERAND_TYPE_TO_STRING = {
 }
 
 ADDRESSING_MODES = {
+    "NULL": -1, # for instructions that take no operands, addressing mode is undefined
     "REGISTER": 0,
     "IMMEDIATE": 1,
     "IMMEDIATE_ADDRESS": 2,
     "REGISTER_ADDRESS": 3,
-    "NULL": -1,
 }
 
 ADDRESSING_MODE_TO_STRING = {
@@ -109,7 +109,6 @@ class OPS(Enum):
     SECOND_OPERAND = 1
 
 INSTRUCTION_ENCODINGS = {
-
     "HALT": {
         ADDRESSING_MODES["NULL"]: {
             LOC.REGA: None,

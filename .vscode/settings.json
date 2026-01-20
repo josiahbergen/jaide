@@ -9,7 +9,12 @@
         ".python-version": true,
         "**/__init__.py": true,
         "**/.zed/": true,
-        "requirements.in": true
+        "requirements.in": true,
+        "uv.lock": true,
+        "pyproject.toml": true,
+        ".gitignore": true,
+
+        "**/.vscode": true,
     },
     "hide-files.files": []
 }
