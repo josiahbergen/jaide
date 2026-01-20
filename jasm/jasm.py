@@ -11,7 +11,7 @@ from jasm.binary import generate_binary
 def assemble(file: str, output: str):
     """ Assemble a JASM file and return the binary. """
 
-    logger.info("JASM assembler v1.0.1 (copyright 2026 Josiah Bergen)")
+    logger.info("JASM assembler v0.0.3 (copyright 2026 Josiah Bergen)")
  
     # generate the IR
     ir = generate_ir(file)

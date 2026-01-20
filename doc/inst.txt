@@ -12,7 +12,7 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 3     MOV       RA       imm16    1     000011 01 AAAA ---- XXXXXXXX XXXXXXXX  move 16-bit word              RA <- imm16
 4     PUSH      RA                0     000100 00 AAAA ---- -------- --------  push to stack                 [SP--] <- RA
 4     PUSH      imm16             1     000100 01 ---- ---- XXXXXXXX XXXXXXXX  push to stack                 [SP--] <- imm16
-5     POP       RA                -     000101 -- AAAA ---- -------- --------  pop from stack                RA <- [++SP]
+5     POP       RA                0     000101 00 AAAA ---- -------- --------  pop from stack                RA <- [++SP]
 6     ADD^      RA       RB       0     000110 00 AAAA BBBB -------- --------  add                           RA, Z, C, O <- RA + RB
 6     ADD^      RA       imm16    1     000110 01 AAAA ---- XXXXXXXX XXXXXXXX  add                           RA, Z, C, O <- RA + imm16
 7     ADC^      RA       RB       0     000111 00 AAAA BBBB -------- --------  add with carry                RA, Z, C, O <- RA + RB + C
@@ -21,9 +21,9 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 8     SUB^      RA       imm16    1     001000 01 AAAA ---- XXXXXXXX XXXXXXXX  subtract                      RA, Z, C, O, N <- RA - imm16
 9     SBC^      RA       RB       0     001001 00 AAAA BBBB -------- --------  subtract with borrow          RA, Z, C, O, N <- RA - RB - C
 9     SBC^      RA       imm16    1     001001 01 AAAA ---- XXXXXXXX XXXXXXXX  subtract with borrow          RA, Z, C, O, N <- RA - imm16 - C
-10    INC^      RA                -     001010 -- AAAA ---- -------- --------  increment                     RA, Z, C, O <- RA++
-11    DEC^      RA                -     001011 -- AAAA ---- -------- --------  decrement                     RA, Z, C, O, N <- RA--
-12    LSH^      RA       RB       0     001100 -- AAAA BBBB -------- --------  bit shift left                RA, Z, C, O <- RA << RB
+10    INC^      RA                0     001010 00 AAAA ---- -------- --------  increment                     RA, Z, C, O <- RA++
+11    DEC^      RA                0     001011 00 AAAA ---- -------- --------  decrement                     RA, Z, C, O, N <- RA--
+12    LSH^      RA       RB       0     001100 00 AAAA BBBB -------- --------  bit shift left                RA, Z, C, O <- RA << RB
 12    LSH^      RA       imm16    1     001100 01 AAAA ---- XXXXXXXX XXXXXXXX  bit shift left                RA, Z, C, O <- RA << imm16
 13    RSH^      RA       RB       0     001101 00 AAAA BBBB -------- --------  bit shift right               RA, Z, C, O <- RA >> RB
 13    RSH^      RA       imm16    1     001101 01 AAAA ---- XXXXXXXX XXXXXXXX  bit shift right               RA, Z, C, O <- RA >> imm16
@@ -33,7 +33,7 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 15    OR^       RA       imm16    1     001111 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise or                    RA, Z <- RA | imm16
 16    NOR^      RA       RB       0     010000 00 AAAA BBBB -------- --------  bitwise nor                   RA, Z <- RA ~| RB
 16    NOR^      RA       imm16    1     010000 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise nor                   RA, Z <- RA ~| imm16
-17    NOT^      RA                -     010001 -- AAAA ---- -------- --------  bitwise not                   RA, Z <- ~RA
+17    NOT^      RA                0     010001 00 AAAA ---- -------- --------  bitwise not                   RA, Z <- ~RA
 18    XOR^      RA       RB       0     010010 00 AAAA BBBB -------- --------  bitwise xor                   RA, Z <- RA  ^ RB
 18    XOR^      RA       imm16    1     010010 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise xor                   RA, Z <- RA  ^ imm16
 19    INB^      RA       RB       0     010011 00 AAAA BBBB -------- --------  get word from I/O port        RA, Z <- port(RB)
@@ -42,21 +42,21 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 20    OUTB      imm16    RB       1     010100 01 ---- BBBB XXXXXXXX XXXXXXXX  send word through I/O port    port(imm16) <- RB
 21    CMP^      RA       RB       0     010101 00 AAAA BBBB -------- --------  compare                       Z, C, O, N <- RA - RB
 21    CMP^      RA       imm16    1     010101 01 AAAA ---- XXXXXXXX XXXXXXXX  compare                       Z, C, O, N <- RA - imm16
-22    JMP       RA                3     010110 11 AAAA ---- -------- --------  unconditional, absolute jump  PC <- [RA]
+22    JMP       [RA]              3     010110 11 AAAA ---- -------- --------  unconditional, absolute jump  PC <- [RA]
 22    JMP       [imm16]           2     010110 10 ---- ---- XXXXXXXX XXXXXXXX  unconditional, absolute jump  PC <- [imm16]
-23    JZ        RA                3     010111 11 AAAA ---- -------- --------  absolute jump if zero         PC <- [RA]  if Z == 1 else NOP
+23    JZ        [RA]              3     010111 11 AAAA ---- -------- --------  absolute jump if zero         PC <- [RA]  if Z == 1 else NOP
 23    JZ        [imm16]           2     010111 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if zero         PC <- [imm16]  if Z == 1 else NOP
-24    JNZ       RA                3     011000 11 AAAA ---- -------- --------  absolute jump of not zero     PC <- [RA] if Z == 0 else NOP
+24    JNZ       [RA]              3     011000 11 AAAA ---- -------- --------  absolute jump of not zero     PC <- [RA] if Z == 0 else NOP
 24    JNZ       [imm16]           2     011000 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump of not zero     PC <- [imm16] if Z == 0 else NOP
-25    JC        RA                3     011001 11 AAAA ---- -------- --------  absolute jump if carry        PC <- [RA] if C == 1 else NOP
+25    JC        [RA]              3     011001 11 AAAA ---- -------- --------  absolute jump if carry        PC <- [RA] if C == 1 else NOP
 25    JC        [imm16]           2     011001 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if carry        PC <- [imm16] if C == 1 else NOP
-26    JNC       RA                3     011010 11 AAAA ---- -------- --------  absolute jump if not carry    PC <- [RA] if C == 0 else NOP
+26    JNC       [RA]              3     011010 11 AAAA ---- -------- --------  absolute jump if not carry    PC <- [RA] if C == 0 else NOP
 26    JNC       [imm16]           2     011010 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if not carry    PC <- [imm16] if C == 0 else NOP
-27    CALL      RA                3     011011 11 AAAA ---- -------- --------  call a function               [SP--] <- pc + 1, pc <- RA
+27    CALL      [RA]              3     011011 11 AAAA ---- -------- --------  call a function               [SP--] <- pc + 1, pc <- RA
 27    CALL      [imm16]           2     011011 10 ---- ---- XXXXXXXX XXXXXXXX  call a function               [SP--] <- pc + 1, pc <- imm16
 28    RET                         -     011100 -- ---- ---- -------- --------  return from a function        PC <- [++SP]
-29    INT       [RA]              3     011101 11 AAAA ---- -------- --------  call an interrupt             see "interrupts" section in the spec
-29    INT       [imm16]           2     011101 10 ---- ---- XXXXXXXX XXXXXXXX  call an interrupt             see "interrupts" section in the spec
+29    INT       RA                0     011101 00 AAAA ---- -------- --------  call an interrupt             see "interrupts" section in the spec
+29    INT       imm16             1     011101 01 ---- ---- XXXXXXXX XXXXXXXX  call an interrupt             see "interrupts" section in the spec
 30    IRET                        -     011110 -- ---- ---- -------- --------  return from an interrupt      see "interrupts" section in the spec
 31    NOP                         -     011111 -- ---- ---- -------- --------  no operation                  n/a
 

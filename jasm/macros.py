@@ -34,6 +34,8 @@ def expand_macros(ir: list[IRNode]) -> None:
     for node in ir:
         if isinstance(node, InstructionNode):
             logger.verbose(f"completed expansion: {node.short_string()} {", ".join([str(op) for op in node.operands])}")
+            node.addressing_mode = node.get_addressing_mode()
+            node.size = node.get_size()
         else:
             logger.verbose(f"completed expansion: {node}")
     return

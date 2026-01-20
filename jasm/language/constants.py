@@ -2,6 +2,8 @@
 # language constants used by the assembler.
 # josiah bergen, december 2025
 
+from enum import Enum
+
 OPCODES = {
     "HALT": 0,
     "LOAD": 1,
@@ -78,6 +80,14 @@ ADDRESSING_MODES = {
     "NULL": -1,
 }
 
+ADDRESSING_MODE_TO_STRING = {
+    ADDRESSING_MODES["NULL"]: "NULL",
+    ADDRESSING_MODES["REGISTER"]: "REGISTER",
+    ADDRESSING_MODES["IMMEDIATE"]: "IMMEDIATE",
+    ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: "IMMEDIATE_ADDRESS",
+    ADDRESSING_MODES["REGISTER_ADDRESS"]: "REGISTER_ADDRESS",
+}
+
 ADDRESSING_MODE_TO_SIZE = {
     ADDRESSING_MODES["NULL"]: 2,
     ADDRESSING_MODES["REGISTER"]: 2,
@@ -86,34 +96,357 @@ ADDRESSING_MODE_TO_SIZE = {
     ADDRESSING_MODES["REGISTER_ADDRESS"]: 2,
 }
 
-ENCODING_MODES = {
-    "R": 0
-    "RI": 1
-    "RI_R": 2
-    
+# list of operands, for example reg num or num or reg reg
+# we need to know what kind of encoding we need to use for each operand
 
-                match self.mnemonic:            
-                # RA
-                case "POP" | "INC" | "DEC" | "NOT":
-                    assert_num_operands(1)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
+class LOC(Enum):
+    REGA = 0
+    REGB = 1
+    IMM16 = 2
 
-                # RA/IMM8 and [IMM16]/[RA]
-                case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                    assert_num_operands(1)
-                    assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
+class OPS(Enum):
+    FIRST_OPERAND = 0
+    SECOND_OPERAND = 1
 
-                # RA/IMM16, RB and [RA]/[IMM16], RB
-                case "OUTB" | "STORE":
-                    assert_num_operands(2)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
+INSTRUCTION_ENCODINGS = {
 
-                # RA, RB/IMM16 and RA, [RB]/[IMM16]
-                case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
-                    assert_num_operands(2)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
-
-                case _:
-                    logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
-
+    "HALT": {
+        ADDRESSING_MODES["NULL"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "LOAD": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "STORE": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "MOV": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "PUSH": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "POP": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "ADD": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "ADC": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "SUB": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "SBC": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "INC": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "DEC": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "LSH": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "RSH": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "AND": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "OR": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "NOR": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+    },
+    "NOT": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "XOR": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "INB": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "OUTB": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: None,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "CMP": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: OPS.SECOND_OPERAND,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.SECOND_OPERAND,
+        },
+    },
+    "JMP": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "JZ": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "JNZ": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "JC": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "JNC": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "CALL": {
+        ADDRESSING_MODES["REGISTER_ADDRESS"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "RET": {
+        ADDRESSING_MODES["NULL"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "INT": {
+        ADDRESSING_MODES["REGISTER"]: {
+            LOC.REGA: OPS.FIRST_OPERAND,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+        ADDRESSING_MODES["IMMEDIATE"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: OPS.FIRST_OPERAND,
+        },
+    },
+    "IRET": {
+        ADDRESSING_MODES["NULL"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
+    "NOP": {
+        ADDRESSING_MODES["NULL"]: {
+            LOC.REGA: None,
+            LOC.REGB: None,
+            LOC.IMM16: None,
+        },
+    },
 }

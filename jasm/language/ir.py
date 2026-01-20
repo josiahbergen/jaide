@@ -2,7 +2,17 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
-from .constants import OPCODES, OPERAND_TYPES, OPERAND_TYPE_TO_STRING, REGISTERS, ADDRESSING_MODES, ADDRESSING_MODE_TO_SIZE
+from .constants import ( 
+    OPCODES, 
+    OPERAND_TYPES, 
+    OPERAND_TYPE_TO_STRING, 
+    REGISTERS, 
+    ADDRESSING_MODES, 
+    ADDRESSING_MODE_TO_SIZE, 
+    ADDRESSING_MODE_TO_STRING, 
+    INSTRUCTION_ENCODINGS, 
+    LOC
+)
 from ..util.logger import logger
 
 
@@ -117,10 +127,11 @@ class InstructionNode(IRNode):
         self.mnemonic = mnemonic.upper()
         self.opcode = OPCODES[self.mnemonic]
         self.operands = operands
-        self.addressing_mode: int = self.get_addressing_mode()
-        self.size: int = self.get_size()
+        self.addressing_mode: int | None = None
+        self.size: int | None = None
 
     def validate_instruction_semantics(self) -> None:
+        scope = "ir.py:InstructionNode.validate_instruction_semantics()"
 
         def assert_num_operands(required_num: int):
             scope = "ir.py:InstructionNode.assert_num_operands()"
@@ -133,31 +144,34 @@ class InstructionNode(IRNode):
             for i, op in enumerate[OperandNode](self.operands):
                 if op.type not in expected_types[i]:
                     logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {', '.join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
+        
+        match self.mnemonic:  
+            # No operands
+            case "HALT" | "NOP" | "RET" | "IRET":
+                assert_num_operands(0)
 
+            # RA
+            case "POP" | "INC" | "DEC" | "NOT":
+                assert_num_operands(1)
+                assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
 
-            match self.mnemonic:            
-                # RA
-                case "POP" | "INC" | "DEC" | "NOT":
-                    assert_num_operands(1)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
+            # RA/IMM8 and [IMM16]/[RA]
+            case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
+                assert_num_operands(1)
+                assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
 
-                # RA/IMM8 and [IMM16]/[RA]
-                case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                    assert_num_operands(1)
-                    assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
+            # RA/IMM16, RB and [RA]/[IMM16], RB
+            case "OUTB" | "STORE":
+                assert_num_operands(2)
+                assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
 
-                # RA/IMM16, RB and [RA]/[IMM16], RB
-                case "OUTB" | "STORE":
-                    assert_num_operands(2)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
+            # RA, RB/IMM16 and RA, [RB]/[IMM16]
+            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
+                assert_num_operands(2)
+                assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
 
-                # RA, RB/IMM16 and RA, [RB]/[IMM16]
-                case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
-                    assert_num_operands(2)
-                    assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
-
-                case _:
-                    logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
+            case _:
+                logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
 
 
     def get_addressing_mode(self) -> int:
@@ -205,6 +219,7 @@ class InstructionNode(IRNode):
 
             # RA, RB/IMM16
             case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP":
+                logger.verbose(f"get_addressing_mode: optypes[1] is {optypes[1]}")
                 if optypes[1] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["IMMEDIATE"]
                 else:
@@ -229,29 +244,38 @@ class InstructionNode(IRNode):
 
 
     def get_size(self) -> int:
+        scope = "ir.py:InstructionNode.get_size()"
+        if self.addressing_mode is None:
+            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no addressing mode", scope)
         return ADDRESSING_MODE_TO_SIZE[self.addressing_mode]
 
 
     def get_bytes(self) -> bytearray:
         scope = "ir.py:InstructionNode.get_bytes()"
 
-        logger.verbose(f"bytes: starting generation of {self.mnemonic} (line {self.line})")
+        logger.verbose(f"bytes: starting generation of {self.mnemonic} {" ".join([op.value for op in self.operands])} (line {self.line})")
 
         self.validate_instruction_semantics()
+        
+        if self.addressing_mode is None:
+            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no addressing mode", scope)
+        if self.size is None:
+            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no size", scope)
+
         binary = bytearray()
 
         # format for the first byte is always AAAAABBB where
         # AAAAA is the opcode and BBB is the addressing mode
 
         def pretty_byte_1_string(byte):
-            opcode_bits = (byte >> 3) & 0b11111 # retreive opcode and mode from encoded instruction
-            addressing_mode_bits = byte & 0b111
-            return f"{byte:08b} | {opcode_bits:05b} ({opcode_bits}) {addressing_mode_bits:03b} ({addressing_mode_bits}) "
+            opcode_bits = (byte >> 2) & 0b111111 # retreive opcode and mode from encoded instruction
+            addressing_mode_bits = byte & 0b11
+            return f"{byte:08b} | {opcode_bits:06b} ({opcode_bits}) {addressing_mode_bits:02b} ({addressing_mode_bits}) "
 
-        logger.verbose(f"bytes: stored opcode is {self.opcode} with addressing mode {self.addressing_mode}.")
+        logger.verbose(f"bytes: stored opcode is {self.opcode} with addressing mode {ADDRESSING_MODE_TO_STRING[self.addressing_mode]}.")
 
-        opcode_bits = (self.opcode & 0b00011111) << 3 # mask to low 5 bits and shift three to the left
-        addressing_mode_bits = self.addressing_mode & 0b00000111 # mask to low 3 bits
+        opcode_bits = (self.opcode & 0b00111111) << 2 # mask to low 6 bits and shift two to the left
+        addressing_mode_bits = self.addressing_mode & 0b00000011 # mask to low 2 bits
         byte_1 = opcode_bits | addressing_mode_bits
         binary.append(byte_1)
 
@@ -264,125 +288,31 @@ class InstructionNode(IRNode):
         operands: list[int] = [op.get_integer_value() for op in self.operands]
         logger.verbose(f"bytes: operands are {', '.join([str(val) for val in operands])}")
 
-        def assert_operand_count(required: int):
-            scope = "ir.py:InstructionNode.assert_operand_count()"
-            if len(operands) != required:
-                logger.fatal(f"{self.mnemonic} requires {required} operands (got {len(operands)} on line {self.line})", scope)
-
-        def assert_immediate_size(required: int, value: int):
+        def assert_bit_length(required: int, value: int):
             scope = "ir.py:InstructionNode.assert_immediate_size()"
             if value >= (2 ** required):
                 logger.fatal(f"immediate value {value} is too large for a{'n' if required == 8 else 'n'} {required}-bit immediate (line {self.line})", scope)
 
-        match self.addressing_mode:
-            case -1: # no operands, easy!
-                assert_operand_count(0)
-            
-            case 1: # single register operand
-                assert_operand_count(1)
+        # if this instruction/addressing mode pair expects a value for ra, add it to the binary
+        encoding = INSTRUCTION_ENCODINGS[self.mnemonic][self.addressing_mode]
+        logger.verbose(f"bytes: encoding is {", ".join([f"{k}: {v}" for k, v in encoding.items()])}")
 
-                # the first register is encoded in the high 4 bits of the byte
-                byte_2 = (operands[0] & 0b00001111) << 4
-                logger.verbose(f"bytes: second byte is {byte_2:08b} (register: {operands[0]:04b})")
-                binary.append(byte_2)
-            
-            case 2: # single 8-bit immediate operand
-                
-                assert_operand_count(1)
-                assert_immediate_size(8, operands[0])
+        rega_bits = operands[encoding[LOC.REGA].value] if encoding[LOC.REGA] is not None else 0
+        regb_bits = operands[encoding[LOC.REGB].value] if encoding[LOC.REGB] is not None else 0
+        imm16_bits = operands[encoding[LOC.IMM16].value] if encoding[LOC.IMM16] is not None else None
 
-                # second byte is unused
-                binary.append(0b00000000)
-                logger.verbose(f"bytes: second byte is {0b00000000:08b} (unused)")
+        assert_bit_length(4, rega_bits)
+        assert_bit_length(4, regb_bits)
 
-                # third byte is the immediate value
-                byte_3 = operands[0]
-                logger.verbose(f"bytes: third byte is {byte_3:08b} (imm8)")
-                binary.append(byte_3)
+        reg_byte = (rega_bits << 4) | regb_bits
+        logger.verbose(f"bytes: reg byte is {pretty_byte_1_string(reg_byte)}")
+        binary.append(reg_byte)
 
-            case 3: # two register operands
-                
-                assert_operand_count(2)
-
-                # the first register is encoded in the high 4 bits of the second byte
-                # and the second register is encoded in the low 4 bits
-                byte_2 = (operands[0] & 0b00001111) << 4 | (operands[1] & 0b00001111)
-                logger.verbose(f"bytes: second byte is {byte_2:08b} (register: {operands[0]:04b}, register: {operands[1]:04b})")
-                binary.append(byte_2)
-
-            case 4: # register and 8-bit immediate operand
-                
-                assert_operand_count(2)
-                assert_immediate_size(8, operands[1])
-
-                # the register is encoded in the high 4 bits of the second byte
-                byte_2 = (operands[0] & 0b00001111) << 4
-                logger.verbose(f"bytes: second byte is {byte_2:08b} (register: {operands[0]:04b})")
-                binary.append(byte_2)
-
-                # third byte is the immediate value
-                byte_3 = operands[1]
-                logger.verbose(f"bytes: third byte is {byte_3:08b} (imm8)")
-                binary.append(byte_3)
-
-            case 5: # register and 16-bit immediate operand
-                
-                assert_operand_count(2)
-                assert_immediate_size(16, operands[1])
-
-                # the register is encoded in the high 4 bits of the second byte
-                byte_2 = (operands[0] & 0b00001111) << 4
-                logger.verbose(f"bytes: second byte is {byte_2:08b} (register: {(operands[0] & 0b00001111):04b})")
-                binary.append(byte_2)
-
-                # 16-bit immediate is little endian encoded in bytes 3 and 4
-                # low 8 bits of the immediate is encoded in the third byte
-                byte_3 = operands[1] & 0b0000000011111111
-                logger.verbose(f"bytes: third byte is {byte_3:08b} (imm16 low byte)")
-                binary.append(byte_3)
-
-                # high 8 bits of the immediate is encoded in the fourth byte
-                byte_4 = operands[1] >> 8
-                logger.verbose(f"bytes: fourth byte is {byte_4:08b} (imm16 high byte)")
-                binary.append(byte_4)
-
-            case 6: # register and register pair operand
-                assert_operand_count(2)
-
-                # lonely register is encoded in the high 4 bits of the second byte
-                byte_2 = (operands[0] & 0b00001111) << 4
-                logger.verbose(f"bytes: second byte is {byte_2:08b} (register: {(operands[0] & 0b00001111):04b})")
-                binary.append(byte_2)
-
-                # register pair is encoded in the third byte little-endian style,
-                # i.e. pair A:B (L:H) is encoded as AAAABBBB
-
-                byte_3 = operands[1] # pair is already encoded as a single integer in get_integer_value()
-                logger.verbose(f"bytes: third byte is {byte_3:08b} (register pair: {operands[1] >> 4:04b}, {operands[1] & 0b00001111:04b})")
-                binary.append(byte_3)
-
-            case 7: # 16-bit immediate operand
-               
-                assert_operand_count(1)
-                assert_immediate_size(16, operands[0])
-
-                # byte 2 is unused
-                binary.append(0b00000000)
-                logger.verbose(f"bytes: second byte is {0b00000000:08b} (unused)")
-
-                # 16-bit immediate is little endian encoded in bytes 3 and 4
-                # low 8 bits if the immediate
-                byte_3 = operands[0] & 0b0000000011111111
-                logger.verbose(f"bytes: third byte is {byte_3:08b} (imm16 low byte)")
-                binary.append(byte_3)
-
-                # high 8 bits if the immediate
-                byte_4 = operands[0] >> 8
-                logger.verbose(f"bytes: fourth byte is {byte_4:08b} (imm16 high byte)")
-                binary.append(byte_4)
-
-            case _:
-                logger.fatal(f"{self.mnemonic} has no defined addressing mode (line {self.line})", scope)
+        if imm16_bits is not None:
+            assert_bit_length(16, imm16_bits)
+            imm16_bytes = imm16_bits.to_bytes(2, byteorder="big")
+            binary.extend(imm16_bytes)
+            logger.verbose(f"bytes: imm16 bytes are {self.pretty_bit_string(imm16_bytes)}")
 
         logger.verbose(f"bytes: final binary: {self.pretty_bit_string(binary)}")
         return binary   
