@@ -17,7 +17,7 @@ def assemble(file: str, output: str):
     ir = generate_ir(file)
 
     # expand macros (to be added in a later release)
-    ir = expand_macros(ir)
+    expand_macros(ir)
 
     # resolve labels
     resolve_labels(ir)

@@ -1,11 +1,11 @@
 
-# JASM SPECIFICATION
+# jasm specification
 
-To make programming easier, extensions for [VSCode](https://github.com/josiahbergen/jasm), [Cursor](https://github.com/josiahbergen/jasm), and [Zed](https://github.com/josiahbergen/zed-jasm) are available.
+to make programming easier, extensions for [VSCode](https://github.com/josiahbergen/jasm), [Cursor](https://github.com/josiahbergen/jasm), and [Zed](https://github.com/josiahbergen/zed-jasm) are available.
 
-For a list of all instructions, see the table in the [spec](spec.md). You can also view the [language EBNF](ebnf.txt).
+for a list of all instructions, see the table in the [spec](spec.md). you can also view the [language EBNF](ebnf.txt).
 
-Keep in mind that proficiency in at least one assembly language is assumed when reading this document. JASM is very similar to other assembly programming languages, and you will find that most aspects come naturally!
+keep in mind that proficiency in at least one assembly language is assumed when reading this document. JASM is very similar to other assembly programming languages, and you will find that most aspects come naturally!
 
 ## The Basics
 
@@ -40,18 +40,20 @@ DATA "hello, world!", 0 ; putting a string literal in memory
 Macros are supported, as well as inline expressions.
 
 ```jasm
-; a macro to load a 16-bit address into register pair X:Y
-MACRO load_address %addr
-    MOVE X, (%addr & 0x00FF) ; inline expressions are notated with parentheses
-    MOVE Y, (%addr >> 4)
+; a macro to check if some address is in rom
+; puts 1 in A if the address is in ROM, 0 if it is in RAM
+MACRO ISROM %address
+    CMP %address, 0x8000
+    MOV A, F
+    AND A, b10000000
+    RSH A, 7
 END MACRO
 
 ; to invoke:
-load_address 0xC000 ; X <- 0x00, Y <- 0xC0
-
-; we can now use the address in X:Y like so:
-MOVE A, 0xFF
-STORE A, X:Y ; note the register pair notation
+ISROM 0xC000 ; A <- 0
 ```
 
-That's it!
+## instruction set
+
+1: HALT
+immediately halts execution

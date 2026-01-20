@@ -45,3 +45,5 @@ start:
     PRINTC A
     TEST_MACRO 0x10, A
     HALT
+
+    DATA "hello, world again!"

@@ -70,21 +70,6 @@ class OperandNode(IRNode):
             logger.verbose(f"get_integer_value: register {self.value} -> {reg}")
             return reg
 
-        elif self.type == OPERAND_TYPES["REGISTER_PAIR"]:
-            regs = self.value.split(":")
-            if len(regs) != 2:
-                logger.fatal(f"invalid register pair on line {self.line}: {self.value}", scope)
-
-            reg1 = REGISTERS.get(regs[0].upper())
-            reg2 = REGISTERS.get(regs[1].upper())
-
-            if reg1 is None or reg2 is None:
-                logger.fatal(f"unknown register on line {self.line}: {regs[0]} or {regs[1]}", scope)
-            logger.verbose(f"get_integer_value: register pair {self.value} -> {reg1}, {reg2}")
-            
-            # insane hack to encode the register pair as a single integer
-            return (reg1 & 0b00001111) << 4 | (reg2 & 0b00001111)
-
         elif self.type == OPERAND_TYPES["NUMBER"]:
             value = self.value.strip().lower()
 
@@ -136,12 +121,12 @@ class InstructionNode(IRNode):
         self.size: int = self.get_size()
 
     def validate_instruction_semantics(self) -> None:
-        scope = "ir.py:InstructionNode.validate_instruction_semantics()"
 
         def assert_num_operands(required_num: int):
             scope = "ir.py:InstructionNode.assert_num_operands()"
             if len(self.operands) != required_num:
                 logger.fatal(f"instruction {self.mnemonic} on line {self.line} requires {required_num} operands (got {len(self.operands)})", scope)
+
 
         def assert_operand_types(expected_types: list[list[int]]):
             scope = "ir.py:InstructionNode.assert_operand_types()"
@@ -149,25 +134,30 @@ class InstructionNode(IRNode):
                 if op.type not in expected_types[i]:
                     logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {', '.join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
 
-        match self.mnemonic:
-            case "RET" | "IRET" | "HALT" | "NOP":
-                assert_num_operands(0)
-            case "POP" | "INC" | "DEC" | "NOT":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
-            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "INT" | "PUSH":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"]]])
-            case "PUT" | "OUTB":
-                assert_num_operands(2)
-                assert_operand_types([[OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"]], [OPERAND_TYPES["REGISTER"]]])
-            case "GET" | "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB":
-                assert_num_operands(2)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]]])
-            case _:
-                logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
 
-        return
+            match self.mnemonic:            
+                # RA
+                case "POP" | "INC" | "DEC" | "NOT":
+                    assert_num_operands(1)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
+
+                # RA/IMM8 and [IMM16]/[RA]
+                case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
+                    assert_num_operands(1)
+                    assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
+
+                # RA/IMM16, RB and [RA]/[IMM16], RB
+                case "OUTB" | "STORE":
+                    assert_num_operands(2)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
+
+                # RA, RB/IMM16 and RA, [RB]/[IMM16]
+                case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
+                    assert_num_operands(2)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
+
+                case _:
+                    logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
 
 
     def get_addressing_mode(self) -> int:
@@ -186,32 +176,53 @@ class InstructionNode(IRNode):
         match self.mnemonic:
             # No operands
             case "RET" | "IRET" | "HALT" | "NOP":
-                return ADDRESSING_MODES["NO_OPERANDS"]
+                return ADDRESSING_MODES["NULL"]
 
-            # Single register operand
+            # RA
             case "POP" | "INC" | "DEC" | "NOT":
                 return ADDRESSING_MODES["REGISTER"]
 
-            # single operand (either immediate or register)
-            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "INT" | "PUSH":
+            # RA/IMM8
+            case "PUSH" | "CALL" | "INT":
                 if optypes[0] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["IMMEDIATE"]
                 else:
                     return ADDRESSING_MODES["REGISTER"]
 
-            # two operands but the choice is made by the first operand
-            case "PUT" | "OUTB":
+            # [IMM16]/[RA]
+            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
                 if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["REGISTER_IMMEDIATE"]
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
                 else:
-                    return ADDRESSING_MODES["REGISTER_REGISTER"]
+                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
 
-            # two operands but the choice is made by the second operand
-            case "GET" | "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "CMP" | "INB":
+            # RA/IMM16, RB
+            case "OUTB":
                 if optypes[1] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["REGISTER_IMMEDIATE"]
+                    return ADDRESSING_MODES["IMMEDIATE"]
                 else:
-                    return ADDRESSING_MODES["REGISTER_REGISTER"]
+                    return ADDRESSING_MODES["REGISTER"]
+
+            # RA, RB/IMM16
+            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP":
+                if optypes[1] == OPERAND_TYPES["NUMBER"]:
+                    return ADDRESSING_MODES["IMMEDIATE"]
+                else:
+                    return ADDRESSING_MODES["REGISTER"]
+
+            # [RA]/[IMM16], RB
+            case "STORE":
+                if optypes[0] == OPERAND_TYPES["NUMBER"]:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
+
+            # RA, [RB]/[IMM16]
+            case "LOAD":
+                if optypes[1] == OPERAND_TYPES["NUMBER"]:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
 
             case _:
                 logger.fatal(f"{self.mnemonic} has no defined addressing mode", scope)
@@ -264,7 +275,7 @@ class InstructionNode(IRNode):
                 logger.fatal(f"immediate value {value} is too large for a{'n' if required == 8 else 'n'} {required}-bit immediate (line {self.line})", scope)
 
         match self.addressing_mode:
-            case 0: # no operands, easy!
+            case -1: # no operands, easy!
                 assert_operand_count(0)
             
             case 1: # single register operand

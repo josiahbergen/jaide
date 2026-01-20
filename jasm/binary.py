@@ -9,7 +9,6 @@ from .util.logger import logger
 
 def generate_binary(ir: list[IRNode]) -> bytearray:
     """ Generate a binary string from the IR. """
-    # scope = "binary.py:generate_binary()"
     
     binary = bytearray()
 

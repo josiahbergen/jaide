@@ -3,37 +3,37 @@
 # josiah bergen, december 2025
 
 OPCODES = {
-    "GET": 0,
-    "PUT": 1,
-    "MOV": 2,
-    "PUSH": 3,
-    "POP": 4,
-    "ADD": 5,
-    "ADC": 6,
-    "SUB": 7,
-    "SBC": 8,
-    "INC": 9,
-    "DEC": 10,
-    "LSH": 11,
-    "RSH": 12,
-    "AND": 13,
-    "OR": 14,
-    "NOR": 15,
-    "NOT": 16,
-    "XOR": 17,
-    "INB": 18,
-    "OUTB": 19,
-    "CMP": 20,
-    "JMP": 21,
-    "JZ": 22,
-    "JNZ": 23,
-    "JC": 24,
-    "JNC": 25,
-    "CALL": 26,
-    "RET": 27,
-    "INT": 28,
-    "IRET": 29,
-    "HALT": 30,
+    "HALT": 0,
+    "LOAD": 1,
+    "STORE": 2,
+    "MOV": 3,
+    "PUSH": 4,
+    "POP": 5,
+    "ADD": 6,
+    "ADC": 7,
+    "SUB": 8,
+    "SBC": 9,
+    "INC": 10,
+    "DEC": 11,
+    "LSH": 12,
+    "RSH": 13,
+    "AND": 14,
+    "OR": 15,
+    "NOR": 16,
+    "NOT": 17,
+    "XOR": 18,
+    "INB": 19,
+    "OUTB": 20,
+    "CMP": 21,
+    "JMP": 22,
+    "JZ": 23,
+    "JNZ": 24,
+    "JC": 25,
+    "JNC": 26,
+    "CALL": 27,
+    "RET": 28,
+    "INT": 29,
+    "IRET": 30,
     "NOP": 31,
 }
 
@@ -71,17 +71,49 @@ OPERAND_TYPE_TO_STRING = {
 }
 
 ADDRESSING_MODES = {
-    "NO_OPERANDS": 0,
-    "REGISTER": 1,
-    "IMMEDIATE": 2,
-    "REGISTER_REGISTER": 3,
-    "REGISTER_IMMEDIATE": 4,
+    "REGISTER": 0,
+    "IMMEDIATE": 1,
+    "IMMEDIATE_ADDRESS": 2,
+    "REGISTER_ADDRESS": 3,
+    "NULL": -1,
 }
 
 ADDRESSING_MODE_TO_SIZE = {
-    ADDRESSING_MODES["NO_OPERANDS"]: 1,
+    ADDRESSING_MODES["NULL"]: 2,
     ADDRESSING_MODES["REGISTER"]: 2,
     ADDRESSING_MODES["IMMEDIATE"]: 4,
-    ADDRESSING_MODES["REGISTER_REGISTER"]: 2,
-    ADDRESSING_MODES["REGISTER_IMMEDIATE"]: 4,
+    ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: 4,
+    ADDRESSING_MODES["REGISTER_ADDRESS"]: 2,
+}
+
+ENCODING_MODES = {
+    "R": 0
+    "RI": 1
+    "RI_R": 2
+    
+
+                match self.mnemonic:            
+                # RA
+                case "POP" | "INC" | "DEC" | "NOT":
+                    assert_num_operands(1)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
+
+                # RA/IMM8 and [IMM16]/[RA]
+                case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
+                    assert_num_operands(1)
+                    assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
+
+                # RA/IMM16, RB and [RA]/[IMM16], RB
+                case "OUTB" | "STORE":
+                    assert_num_operands(2)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
+
+                # RA, RB/IMM16 and RA, [RB]/[IMM16]
+                case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
+                    assert_num_operands(2)
+                    assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
+
+                case _:
+                    logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
+
 }

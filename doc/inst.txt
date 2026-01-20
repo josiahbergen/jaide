@@ -44,14 +44,14 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 21    CMP^      RA       imm16    1     010101 01 AAAA ---- XXXXXXXX XXXXXXXX  compare                       Z, C, O, N <- RA - imm16
 22    JMP       RA                3     010110 11 AAAA ---- -------- --------  unconditional, absolute jump  PC <- [RA]
 22    JMP       [imm16]           2     010110 10 ---- ---- XXXXXXXX XXXXXXXX  unconditional, absolute jump  PC <- [imm16]
-23    JZ        RA                3     010111 11 AAAA ---- -------- --------  jump if zero                  PC <- [RA]  if Z == 1 else NOP
-23    JZ        [imm16]           2     010111 10 ---- ---- XXXXXXXX XXXXXXXX  jump if zero                  PC <- [imm16]  if Z == 1 else NOP
-24    JNZ       RA                3     011000 11 AAAA ---- -------- --------  jump of not zero              PC <- [RA] if Z == 0 else NOP
-24    JNZ       [imm16]           2     011000 10 ---- ---- XXXXXXXX XXXXXXXX  jump of not zero              PC <- [imm16] if Z == 0 else NOP
-25    JC        RA                3     011001 11 AAAA ---- -------- --------  jump if carry                 PC <- [RA] if C == 1 else NOP
-25    JC        [imm16]           2     011001 10 ---- ---- XXXXXXXX XXXXXXXX  jump if carry                 PC <- [imm16] if C == 1 else NOP
-26    JNC       RA                3     011010 11 AAAA ---- -------- --------  jump if not carry             PC <- [RA] if C == 0 else NOP
-26    JNC       [imm16]           2     011010 10 ---- ---- XXXXXXXX XXXXXXXX  jump if not carry             PC <- [imm16] if C == 0 else NOP
+23    JZ        RA                3     010111 11 AAAA ---- -------- --------  absolute jump if zero         PC <- [RA]  if Z == 1 else NOP
+23    JZ        [imm16]           2     010111 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if zero         PC <- [imm16]  if Z == 1 else NOP
+24    JNZ       RA                3     011000 11 AAAA ---- -------- --------  absolute jump of not zero     PC <- [RA] if Z == 0 else NOP
+24    JNZ       [imm16]           2     011000 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump of not zero     PC <- [imm16] if Z == 0 else NOP
+25    JC        RA                3     011001 11 AAAA ---- -------- --------  absolute jump if carry        PC <- [RA] if C == 1 else NOP
+25    JC        [imm16]           2     011001 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if carry        PC <- [imm16] if C == 1 else NOP
+26    JNC       RA                3     011010 11 AAAA ---- -------- --------  absolute jump if not carry    PC <- [RA] if C == 0 else NOP
+26    JNC       [imm16]           2     011010 10 ---- ---- XXXXXXXX XXXXXXXX  absolute jump if not carry    PC <- [imm16] if C == 0 else NOP
 27    CALL      RA                3     011011 11 AAAA ---- -------- --------  call a function               [SP--] <- pc + 1, pc <- RA
 27    CALL      [imm16]           2     011011 10 ---- ---- XXXXXXXX XXXXXXXX  call a function               [SP--] <- pc + 1, pc <- imm16
 28    RET                         -     011100 -- ---- ---- -------- --------  return from a function        PC <- [++SP]
@@ -64,4 +64,63 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 
 ALL INSTRUCTIONS ARE 16 BITS IN LENGTH. SOME INSTRUCTIONS MAY DEFINE A 16-BIT WORD IMMEDIATELY AFTER THE INSTRUCTION.
 SEE THE SPECIFICATION FOR INFORMATION ABOUT INSTRUCTION FORMATS AND ADDRESSING MODES.
-ALL JUMP INSTRUCTIONS DEFINE ABSOLUTE MEMORY LOCATIONS.
+
+
+
+CODE  MNEMONIC  OPERAND  OPERAND         MODE   ENCODING                             
+0     HALT                               -      000000 -- ---- ---- -------- --------
+1     LOAD      RA       [RB] / [imm16]  2 / 3  000001 11 AAAA BBBB -------- --------
+1     LOAD      RA                2             000001 10 AAAA ---- XXXXXXXX XXXXXXXX
+2     STORE     [RA]     RB              3      000010 11 AAAA BBBB -------- --------
+2     STORE     [imm16]  RB              2      000010 10 ---- BBBB XXXXXXXX XXXXXXXX 
+3     MOV       RA       RB              0      000011 00 AAAA BBBB -------- --------
+3     MOV       RA       imm16           1      000011 01 AAAA ---- XXXXXXXX XXXXXXXX
+4     PUSH      RA                       0      000100 00 AAAA ---- -------- --------
+4     PUSH      imm16                    1      000100 01 ---- ---- XXXXXXXX XXXXXXXX
+5     POP       RA                       -      000101 -- AAAA ---- -------- --------
+6     ADD^      RA       RB              0      000110 00 AAAA BBBB -------- --------
+6     ADD^      RA       imm16           1      000110 01 AAAA ---- XXXXXXXX XXXXXXXX
+7     ADC^      RA       RB              0      000111 00 AAAA BBBB -------- --------
+7     ADC^      RA       imm16           1      000111 01 AAAA ---- XXXXXXXX XXXXXXXX
+8     SUB^      RA       RB              0      001000 00 AAAA BBBB -------- --------
+8     SUB^      RA       imm16           1      001000 01 AAAA ---- XXXXXXXX XXXXXXXX
+9     SBC^      RA       RB              0      001001 00 AAAA BBBB -------- --------
+9     SBC^      RA       imm16           1      001001 01 AAAA ---- XXXXXXXX XXXXXXXX
+10    INC^      RA                       -      001010 -- AAAA ---- -------- --------
+11    DEC^      RA                       -      001011 -- AAAA ---- -------- --------
+12    LSH^      RA       RB              0      001100 -- AAAA BBBB -------- --------
+12    LSH^      RA       imm16           1      001100 01 AAAA ---- XXXXXXXX XXXXXXXX
+13    RSH^      RA       RB              0      001101 00 AAAA BBBB -------- --------
+13    RSH^      RA       imm16           1      001101 01 AAAA ---- XXXXXXXX XXXXXXXX
+14    AND^      RA       RB              0      001110 00 AAAA BBBB -------- --------
+14    AND^      RA       imm16           1      001110 01 AAAA ---- XXXXXXXX XXXXXXXX
+15    OR^       RA       RB              0      001111 00 AAAA BBBB -------- --------
+15    OR^       RA       imm16           1      001111 01 AAAA ---- XXXXXXXX XXXXXXXX
+16    NOR^      RA       RB              0      010000 00 AAAA BBBB -------- --------
+16    NOR^      RA       imm16           1      010000 01 AAAA ---- XXXXXXXX XXXXXXXX
+17    NOT^      RA                       -      010001 -- AAAA ---- -------- --------
+18    XOR^      RA       RB              0      010010 00 AAAA BBBB -------- --------
+18    XOR^      RA       imm16           1      010010 01 AAAA ---- XXXXXXXX XXXXXXXX
+19    INB^      RA       RB              0      010011 00 AAAA BBBB -------- --------
+19    INB^      RA       imm16           1      010011 01 AAAA ---- XXXXXXXX XXXXXXXX
+20    OUTB      RA       RB              0      010100 00 AAAA BBBB -------- --------
+20    OUTB      imm16    RB              1      010100 01 ---- BBBB XXXXXXXX XXXXXXXX
+21    CMP^      RA       RB              0      010101 00 AAAA BBBB -------- --------
+21    CMP^      RA       imm16           1      010101 01 AAAA ---- XXXXXXXX XXXXXXXX
+22    JMP       RA                       3      010110 11 AAAA ---- -------- --------
+22    JMP       [imm16]                  2      010110 10 ---- ---- XXXXXXXX XXXXXXXX
+23    JZ        RA                       3      010111 11 AAAA ---- -------- -------- 
+23    JZ        [imm16]                  2      010111 10 ---- ---- XXXXXXXX XXXXXXXX
+24    JNZ       RA                       3      011000 11 AAAA ---- -------- --------
+24    JNZ       [imm16]                  2      011000 10 ---- ---- XXXXXXXX XXXXXXXX
+25    JC        RA                       3      011001 11 AAAA ---- -------- --------
+25    JC        [imm16]                  2      011001 10 ---- ---- XXXXXXXX XXXXXXXX
+26    JNC       RA                       3      011010 11 AAAA ---- -------- --------
+26    JNC       [imm16]                  2      011010 10 ---- ---- XXXXXXXX XXXXXXXX
+27    CALL      RA                       3      011011 11 AAAA ---- -------- --------
+27    CALL      [imm16]                  2      011011 10 ---- ---- XXXXXXXX XXXXXXXX
+28    RET                                -      011100 -- ---- ---- -------- --------
+29    INT       [RA]                     3      011101 11 AAAA ---- -------- -------- 
+29    INT       [imm16]                  2      011101 10 ---- ---- XXXXXXXX XXXXXXXX
+30    IRET                               -      011110 -- ---- ---- -------- --------
+31    NOP                                -      011111 -- ---- ---- -------- --------
