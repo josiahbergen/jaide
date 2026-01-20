@@ -10,51 +10,47 @@ from .util.logger import logger
 from .constants import MNEMONICS, ADDRESSING_MODE_TO_SIZE, ADDRESSING_MODE_TO_STRING, OPCODE_TO_POSSIBLE_MODES
 from .devices.screen import Screen
 
+OP_HALT = 0
+OP_LOAD = 1
+OP_STORE = 2
+OP_MOVE = 3
+OP_PUSH = 4
+OP_POP = 5
+OP_ADD = 6
+OP_ADC = 7
+OP_SUB = 8
+OP_SBC = 9
+OP_INC = 10
+OP_DEC = 11
+OP_SHL = 12
+OP_SHR = 13
+OP_AND = 14
+OP_OR = 15
+OP_NOR = 16
+OP_NOT = 17
+OP_XOR = 18
+OP_INB = 19
+OP_OUTB = 20
+OP_CMP = 21
+OP_JUMP = 22
+OP_JZ = 23
+OP_JNZ = 24
+OP_JC = 25
+OP_JNC = 26
+OP_CALL = 27
+OP_RET = 28
+OP_INT = 29
+OP_IRET = 30
+OP_NOP = 31
 
 MEMORY_SIZE = 0xFFFF + 1
-REGISTERS = ["A", "B", "C", "D", "X", "Y"]
+REGISTERS = ["A", "B", "C", "D", "E", "X", "Y"]
 
 FLAG_C = 0 # carry
 FLAG_Z = 1 # zero
 FLAG_N = 2 # negative
 FLAG_O = 3 # overflow
-
-STS_HALT = 1 << 1
-STS_POWER = 1
-
-# opcodes
-OP_LOAD = 0x0
-OP_STORE = 0x1
-OP_MOVE = 0x2
-OP_PUSH = 0x3
-OP_POP = 0x4
-OP_ADD = 0x5
-OP_ADC = 0x6
-OP_SUB = 0x7
-OP_SBB = 0x8
-OP_INC = 0x9
-OP_DEC = 0xA
-OP_SHL = 0xB
-OP_SHR = 0xC
-OP_AND = 0xD
-OP_OR = 0xE
-OP_NOR = 0xF
-OP_NOT = 0x10
-OP_XOR = 0x11
-OP_INB = 0x12
-OP_OUTB = 0x13
-OP_CMP = 0x14
-OP_SEC = 0x15
-OP_CLC = 0x16
-OP_CLZ = 0x17
-OP_JUMP = 0x18
-OP_JZ = 0x19
-OP_JNZ = 0x1A
-OP_JC = 0x1B
-OP_JNC = 0x1C
-OP_INT = 0x1D
-OP_HALT = 0x1E
-OP_NOP = 0x1F
+FLAG_I = 4 # interrupts enabled
 
 # addressing modes
 MODE_NO_OPERANDS = 0b000
@@ -77,20 +73,28 @@ class EmulatorException(Exception):
         super().__init__(self.message)
 
 
+class Register:
+    def __init__(self, name: str, value: int):
+        self.name = name
+        self.set_value(value)
+
+    def set_value(self, value: int) -> None:
+        self.value = mask16(value)
+
+    def get_value(self) -> int:
+        return mask16(self.value)
+
 class Emulator:
 
     def __init__(self):
 
         # registers
-        self.reg: dict[str, int] = {reg: 0 for reg in REGISTERS}
-
-        self.pc: int = 0 # program counter
-        self.sp: int = 0xFEFF # stack pointer
-        self.f: int = 0 # flags
-        
-        self.mb: int = 0 # memory bank
-        self.st: int = STS_POWER # status
-        self.z: int = 0 # zero
+        self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
+        self.pc: Register = Register("PC", 0) # program counter
+        self.sp: Register = Register("SP", 0xFEFF) # stack pointer
+        self.f: Register = Register("F", 0) # flags
+        self.mb: Register = Register("MB", 0) # memory bank
+        self.z: Register = Register("Z", 0) # zero
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
@@ -105,38 +109,38 @@ class Emulator:
 
 
     def _populate_handlers(self) -> None:
-        self.handlers[OP_LOAD] = self.handle_load
+        self.handlers[OP_HALT]  = self.handle_halt
+        self.handlers[OP_LOAD]  = self.handle_load
         self.handlers[OP_STORE] = self.handle_store
-        self.handlers[OP_MOVE] = self.handle_move
-        self.handlers[OP_PUSH] = self.handle_push
-        self.handlers[OP_POP] = self.handle_pop
-        self.handlers[OP_ADD] = self.handle_add
-        self.handlers[OP_ADC] = self.handle_adc
-        self.handlers[OP_SUB] = self.handle_sub
-        self.handlers[OP_SBB] = self.handle_sbb
-        self.handlers[OP_INC] = self.handle_inc
-        self.handlers[OP_DEC] = self.handle_dec
-        self.handlers[OP_SHL] = self.handle_shl
-        self.handlers[OP_SHR] = self.handle_shr
-        self.handlers[OP_AND] = self.handle_and
-        self.handlers[OP_OR] = self.handle_or
-        self.handlers[OP_NOR] = self.handle_nor
-        self.handlers[OP_NOT] = self.handle_not
-        self.handlers[OP_XOR] = self.handle_xor
-        self.handlers[OP_INB] = self.handle_inb
-        self.handlers[OP_OUTB] = self.handle_outb
-        self.handlers[OP_CMP] = self.handle_cmp
-        self.handlers[OP_SEC] = self.handle_sec
-        self.handlers[OP_CLC] = self.handle_clc
-        self.handlers[OP_CLZ] = self.handle_clz
-        self.handlers[OP_JUMP] = self.handle_jump
-        self.handlers[OP_JZ] = self.handle_jz
-        self.handlers[OP_JNZ] = self.handle_jnz
-        self.handlers[OP_JC] = self.handle_jc
-        self.handlers[OP_JNC] = self.handle_jnc
-        self.handlers[OP_INT] = self.handle_int
-        self.handlers[OP_HALT] = self.handle_halt
-        self.handlers[OP_NOP] = self.handle_nop
+        self.handlers[OP_MOVE]  = self.handle_move
+        self.handlers[OP_PUSH]  = self.handle_push
+        self.handlers[OP_POP]   = self.handle_pop
+        self.handlers[OP_ADD]   = self.handle_add
+        self.handlers[OP_ADC]   = self.handle_adc
+        self.handlers[OP_SUB]   = self.handle_sub
+        self.handlers[OP_SBC]   = self.handle_sbc
+        self.handlers[OP_INC]   = self.handle_inc
+        self.handlers[OP_DEC]   = self.handle_dec
+        self.handlers[OP_SHL]   = self.handle_shl
+        self.handlers[OP_SHR]   = self.handle_shr
+        self.handlers[OP_AND]   = self.handle_and
+        self.handlers[OP_OR]    = self.handle_or
+        self.handlers[OP_NOR]   = self.handle_nor
+        self.handlers[OP_NOT]   = self.handle_not
+        self.handlers[OP_XOR]   = self.handle_xor
+        self.handlers[OP_INB]   = self.handle_inb
+        self.handlers[OP_OUTB]  = self.handle_outb
+        self.handlers[OP_CMP]   = self.handle_cmp
+        self.handlers[OP_JUMP]  = self.handle_jump
+        self.handlers[OP_JZ]    = self.handle_jz
+        self.handlers[OP_JNZ]   = self.handle_jnz
+        self.handlers[OP_JC]    = self.handle_jc
+        self.handlers[OP_JNC]   = self.handle_jnc
+        self.handlers[OP_CALL]  = self.handle_call
+        self.handlers[OP_RET]   = self.handle_ret
+        self.handlers[OP_INT]   = self.handle_int
+        self.handlers[OP_IRET]  = self.handle_iret
+        self.handlers[OP_NOP]   = self.handle_nop
 
 
     # memory helpers
