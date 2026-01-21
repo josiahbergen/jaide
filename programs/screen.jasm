@@ -1,12 +1,16 @@
 start:
     MOV MB, 0x01 ; set the memory bank to vram
-    MOV A, 0x01
-    PUT 0x8000, A
-    PUT 0x8002, A
-    PUT 0x8004, A
-    PUT 0x8006, A
-    PUT 0x8008, A
-    PUT 0x800A, A
-    PUT 0x800C, A
-    PUT 0x800E, A
+    MOV A, 0x01 ; value to write to vram
+    MOV B, 0x8000 ; start address
+
+loop:
+    PUT B, A
+    ADD B, 0x03
+
+    CMP B, 0xA001
+    JZ loop_end
+
+    JMP loop
+
+loop_end:
     HALT

@@ -71,7 +71,6 @@ class Emulator:
         print(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
     
     def read16(self, addr: int) -> int: 
-        print(f"reading 16-bit value from 0x{addr:04X}")
         # fetch a 16-bit little-endian value from memory using word addressing
         bank = self.mb.value % 32
         memory = self.banks[bank - 1] if bank != 0 and 0x8000 <= addr < 0xC000 else self.memory
@@ -79,7 +78,6 @@ class Emulator:
         
         lo = memory[addr * 2]
         hi = memory[addr * 2 + 1]
-        print(f"lo: {lo:02X}, hi: {hi:02X}")
         return (hi << 8) | lo
 
     def write16(self, addr: int, value: int):
@@ -149,8 +147,6 @@ class Emulator:
     def decode(self) -> tuple[int, ...]:
         word = self.fetch()
         regs, instr = self.split_word(word)
-
-        print(f"regs: {regs:04X}, instr: {instr:04X}, word: {word:016b}")
         
         opcode = (instr >> 2) & 0b111111
         mode = instr & 0b11
