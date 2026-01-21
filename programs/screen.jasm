@@ -1,0 +1,12 @@
+start:
+    MOV MB, 0x01 ; set the memory bank to vram
+    MOV A, 0x01
+    PUT 0x8000, A
+    PUT 0x8002, A
+    PUT 0x8004, A
+    PUT 0x8006, A
+    PUT 0x8008, A
+    PUT 0x800A, A
+    PUT 0x800C, A
+    PUT 0x800E, A
+    HALT

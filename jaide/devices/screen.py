@@ -1,32 +1,52 @@
-
 import tkinter as tk
+from PIL import Image, ImageTk
+
+WIDTH  = 128
+HEIGHT = 64      # 128 * 64 = 8192 words
+SCALE  = 5
+FPS_MS = 33      # ~30 FPS
+
 
 class Screen:
-    def __init__(self, width: int=800, height: int=600):
+    def __init__(self, vram: memoryview):
+        self.vram = vram
+        self.framebuf = bytearray(WIDTH * HEIGHT)  # 1 byte per pixel
+        self._last_hash = None
+
         self.root = tk.Tk()
-        self.root.title("rgb screen for the jaide computing system")
-        self.root.geometry(f"{width}x{height}")
-        self.canvas = tk.Canvas(self.root, width=width, height=height, bg="black")
-        self.canvas.pack()
+        self.root.title("jaide video output")
+        self.root.geometry(f"{WIDTH * SCALE}x{HEIGHT * SCALE}")
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
 
-        self.pixels_on = True
-        self._blink_pixels()
-        self.root.mainloop()
+        self.label = tk.Label(self.root, bg="black")
+        self.label.pack()
 
-    def _blink_pixels(self):
-        if self.pixels_on:
-            self.canvas.create_rectangle(0, 0, 10, 20, fill="white") 
-        else:
-            self.clear()
-        
-        self.pixels_on = not self.pixels_on
-        self.root.after(500, self._blink_pixels)
+        self.photo = None
+        self._tick()
 
-    def draw_pixel(self, x: int, y: int, color: str):
-        self.canvas.create_rectangle(x * 10, y * 10, (x + 1) * 10, (y + 1) * 10, fill=color)
+    def _render(self):
+        mem = self.vram
+        out = self.framebuf
 
-    def clear(self):
-        self.canvas.delete("all")
+        # word-addressed: 2 bytes per pixel
+        j = 0
+        for i in range(0, WIDTH * HEIGHT * 2, 2):
+            out[j] = 0 if mem[i] | (mem[i + 1]  << 8) == 0 else 255
+            j += 1
+
+    def _tick(self):
+        self._render()
+        h = hash(bytes(self.framebuf))
+
+        if h != self._last_hash:
+            self._last_hash = h
+            img = Image.frombuffer("L", (WIDTH, HEIGHT), bytes(self.framebuf), "raw", "L", 0, 1)
+            img = img.resize((WIDTH * SCALE, HEIGHT * SCALE), Image.Resampling.NEAREST)
+
+            self.photo = ImageTk.PhotoImage(img)
+            self.label.configure(image=self.photo)
+
+        self.root.after(FPS_MS, self._tick)
 
     def close(self):
         self.root.destroy()

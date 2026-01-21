@@ -161,12 +161,12 @@ class InstructionNode(IRNode):
                 assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
 
             # RA/IMM16, RB and [RA]/[IMM16], RB
-            case "OUTB" | "STORE":
+            case "OUTB" | "PUT":
                 assert_num_operands(2)
                 assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
 
             # RA, RB/IMM16 and RA, [RB]/[IMM16]
-            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "LOAD":
+            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "GET":
                 assert_num_operands(2)
                 assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
 
@@ -205,14 +205,14 @@ class InstructionNode(IRNode):
 
             # [IMM16]/[RA]
             case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-                else:
+                if optypes[0] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
 
             # RA/IMM16, RB
             case "OUTB":
-                if optypes[1] == OPERAND_TYPES["NUMBER"]:
+                if optypes[0] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["IMMEDIATE"]
                 else:
                     return ADDRESSING_MODES["REGISTER"]
@@ -226,14 +226,14 @@ class InstructionNode(IRNode):
                     return ADDRESSING_MODES["REGISTER"]
 
             # [RA]/[IMM16], RB
-            case "STORE":
+            case "PUT":
                 if optypes[0] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
                 else:
                     return ADDRESSING_MODES["REGISTER_ADDRESS"]
 
             # RA, [RB]/[IMM16]
-            case "LOAD":
+            case "GET":
                 if optypes[1] == OPERAND_TYPES["NUMBER"]:
                     return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
                 else:
@@ -288,7 +288,7 @@ class InstructionNode(IRNode):
         logger.verbose(f"bytes: operands are {', '.join([str(val) for val in operands])}")
 
         def assert_bit_length(required: int, value: int):
-            scope = "ir.py:InstructionNode.assert_immediate_size()"
+            scope = "ir.py:InstructionNode.assert_bit_length()"
             if value >= (2 ** required):
                 logger.fatal(f"immediate value {value} is too large for a{'n' if required == 8 else 'n'} {required}-bit immediate (line {self.line})", scope)
 

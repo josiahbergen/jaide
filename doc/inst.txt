@@ -4,10 +4,10 @@ VERSION 0.3
 
 CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               DESCRIPTION                   OPERATION
 0     HALT                        -     000000 -- ---- ---- -------- --------  halt                          machine halts
-1     LOAD      RA       [RB]     3     000001 11 AAAA BBBB -------- --------  load 16-bit word from memory  RA <- [RB]
-1     LOAD      RA       [imm16]  2     000001 10 AAAA ---- XXXXXXXX XXXXXXXX  load 16-bit word from memory  RA <- [imm16]
-2     STORE     [RA]     RB       3     000010 11 AAAA BBBB -------- --------  put 16-bit word into memory   [RA] <- RB
-2     STORE     [imm16]  RB       2     000010 10 ---- BBBB XXXXXXXX XXXXXXXX  put 16-bit word into memory   [imm16] <- RB
+1     GET       RA       [RB]     3     000001 11 AAAA BBBB -------- --------  load 16-bit word from memory  RA <- [RB]
+1     GET       RA       [imm16]  2     000001 10 AAAA ---- XXXXXXXX XXXXXXXX  load 16-bit word from memory  RA <- [imm16]
+2     PUT       [RA]     RB       3     000010 11 AAAA BBBB -------- --------  put 16-bit word into memory   [RA] <- RB
+2     PUT       [imm16]  RB       2     000010 10 ---- BBBB XXXXXXXX XXXXXXXX  put 16-bit word into memory   [imm16] <- RB
 3     MOV       RA       RB       0     000011 00 AAAA BBBB -------- --------  move 16-bit word              RA <- RB
 3     MOV       RA       imm16    1     000011 01 AAAA ---- XXXXXXXX XXXXXXXX  move 16-bit word              RA <- imm16
 4     PUSH      RA                0     000100 00 AAAA ---- -------- --------  push to stack                 [SP--] <- RA
@@ -31,8 +31,8 @@ CODE  MNEMONIC  OPERAND  OPERAND  MODE  ENCODING                               D
 14    AND^      RA       imm16    1     001110 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise and                   RA, Z <- RA & imm16
 15    OR^       RA       RB       0     001111 00 AAAA BBBB -------- --------  bitwise or                    RA, Z <- RA | RB
 15    OR^       RA       imm16    1     001111 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise or                    RA, Z <- RA | imm16
-16    NOR^      RA       RB       0     010000 00 AAAA BBBB -------- --------  bitwise nor                   RA, Z <- RA ~| RB
-16    NOR^      RA       imm16    1     010000 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise nor                   RA, Z <- RA ~| imm16
+16    NOR^      RA       RB       0     010000 00 AAAA BBBB -------- --------  bitwise nor                   RA, Z <- ~(RA | RB)
+16    NOR^      RA       imm16    1     010000 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise nor                   RA, Z <- ~(RA | imm16)
 17    NOT^      RA                0     010001 00 AAAA ---- -------- --------  bitwise not                   RA, Z <- ~RA
 18    XOR^      RA       RB       0     010010 00 AAAA BBBB -------- --------  bitwise xor                   RA, Z <- RA  ^ RB
 18    XOR^      RA       imm16    1     010010 01 AAAA ---- XXXXXXXX XXXXXXXX  bitwise xor                   RA, Z <- RA  ^ imm16
@@ -69,10 +69,10 @@ SEE THE SPECIFICATION FOR INFORMATION ABOUT INSTRUCTION FORMATS AND ADDRESSING M
 
 CODE  MNEMONIC  OPERAND  OPERAND         MODE   ENCODING                             
 0     HALT                               -      000000 -- ---- ---- -------- --------
-1     LOAD      RA       [RB] / [imm16]  2 / 3  000001 11 AAAA BBBB -------- --------
-1     LOAD      RA                2             000001 10 AAAA ---- XXXXXXXX XXXXXXXX
-2     STORE     [RA]     RB              3      000010 11 AAAA BBBB -------- --------
-2     STORE     [imm16]  RB              2      000010 10 ---- BBBB XXXXXXXX XXXXXXXX 
+1     GET       RA       [RB] / [imm16]  2 / 3  000001 11 AAAA BBBB -------- --------
+1     GET       RA                2             000001 10 AAAA ---- XXXXXXXX XXXXXXXX
+2     PUT       [RA]     RB              3      000010 11 AAAA BBBB -------- --------
+2     PUT       [imm16]  RB              2      000010 10 ---- BBBB XXXXXXXX XXXXXXXX 
 3     MOV       RA       RB              0      000011 00 AAAA BBBB -------- --------
 3     MOV       RA       imm16           1      000011 01 AAAA ---- XXXXXXXX XXXXXXXX
 4     PUSH      RA                       0      000100 00 AAAA ---- -------- --------

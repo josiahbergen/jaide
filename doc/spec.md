@@ -105,11 +105,11 @@ _\*this memory can be swapped using the MB register._
 
 _\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._
 
-ROM is protected from writes (`STORE 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
+ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
 
 ### banking
 
-there are up to 256 possible memory banks. MB = 0 indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
+there are up to 32 possible memory banks. MB = 0 indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
 
 ### the stack
 
@@ -121,7 +121,7 @@ stack overflow/underflow behaviour is undefined.
 
 ## interrupts
 
-jaide supports up to 128 programmable interrupts. please note that existing programs are recommended to only take advantage 64, due to potential breaking changes.
+jaide supports up to 128 programmable interrupts.
 
 interrupts 0 to 3 are reserved for hardware interrutps. a programmer must define handlers for each of them.
 
@@ -138,7 +138,7 @@ if a hardware interrupt is not handled, the unhandled fault interrupt will be ca
 
 ### the INT and IRET instructions
 
-when an interrupt `n` is called, jaide saves its state and transfers execution to the address found at the offset `2n` into the interrupt table, starting at `0xFFFF` and moving downwards.
+when an interrupt `n` is called, jaide saves its state and transfers execution to the word found at the offset `n` into the interrupt table, starting at `0xFFFF` and moving downwards.
 
 more specifically, when `INT` is called:
 
@@ -148,7 +148,7 @@ more specifically, when `INT` is called:
 | `[SP--] <- PC`              | program counter is pushed                                |
 | `[SP--] <- F`               | flags are pushed                                         |
 | `I <- 0`                    | ineterrupt mask is cleared                               |
-| `vector = 0xFFFF - (n * 2)` | handler address is computed                              |
+| `vector = 0xFFFF - n`       | handler address is computed                              |
 | `PC <- MEM16[vector]`       | execution jumps to handler                               |
 
 nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
@@ -157,33 +157,9 @@ normal execution can be restored by calling `IRET`. more specifically, when `IRE
 
 | action           | description                                              |
 | ---------------- | -------------------------------------------------------- |
-| `PC++ if I == 0` | if interrupts are masked, jaide will `NOP` and continue. |
 | `F <- [SP++]`    | flags are popped (unmasks interrupts if applicable)      |
 | `PC <- [SP++]`   | program counter is popped                                |
 
-### enhanced interrupts (future plan)
-
-in the future, a more feature-rich interrupt system will be implemented.
-
-in this new system, only 85 interrupts will be available.
-
-interrupts will be defined in the interrupt table, which contains 85 interrupt table entries (each 3 bytes in size).
-
-the interrupt table is located at 0xFEFF, and is defined as follows:
-
-| 0       | 3       | 6       | ... | 252      | 255          |
-| ------- | ------- | ------- | --- | -------- | ------------ |
-| entry 1 | entry 2 | entry 3 | ... | entry 85 | padding byte |
-
-each interrupt table entry is defined as follows:
-
-| 0        | 3            | 4        | 8                | 16                |
-| -------- | ------------ | -------- | ---------------- | ----------------- |
-| priority | maskable bit | reserved | address low byte | address high byte |
-
-priority is a 3-bit value. low values take priority over high ones.
-
-if maskable is 0, then this interrupt will ignore the value if the `I` flag.
 
 ## i/o ports
 

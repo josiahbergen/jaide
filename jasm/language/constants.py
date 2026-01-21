@@ -6,8 +6,8 @@ from enum import Enum
 
 OPCODES = {
     "HALT": 0,
-    "LOAD": 1,
-    "STORE": 2,
+    "GET": 1,
+    "PUT": 2,
     "MOV": 3,
     "PUSH": 4,
     "POP": 5,
@@ -41,19 +41,19 @@ OPCODES = {
 
 REGISTERS = {
     # General purpose registers
-    "A": 0x0, # general purpose / accumulator
-    "B": 0x1,
-    "C": 0x2,
-    "D": 0x3,
-    "E": 0x4,
-    "X": 0x4,
-    "Y": 0x5,
+    "A": 0, # general purpose / accumulator
+    "B": 1,
+    "C": 2,
+    "D": 3,
+    "E": 4,
+    "X": 5,
+    "Y": 6,
     # Memory-mapped registers
-    "PC": 0x8,  # Program Counter (read-only)
-    "SP": 0x9,  # Stack Pointer
-    "MB": 0xA,  # Memory Bank
-    "F": 0x6,  # Flags
-    "Z": 0x7,  # Zero (read-only, always equal to 0x0000)
+    "MB": 7,   # Memory Bank
+    "F":  8,   # Flags
+    "Z":  9,   # Zero (read-only, always equal to 0x0000)
+    "SP": 10,   # Stack Pointer
+    "PC": 11,  # Program Counter (read-only)
 }
 
 OPERAND_TYPES = {
@@ -89,11 +89,12 @@ ADDRESSING_MODE_TO_STRING = {
 }
 
 ADDRESSING_MODE_TO_SIZE = {
-    ADDRESSING_MODES["NULL"]: 2,
-    ADDRESSING_MODES["REGISTER"]: 2,
-    ADDRESSING_MODES["IMMEDIATE"]: 4,
-    ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: 4,
-    ADDRESSING_MODES["REGISTER_ADDRESS"]: 2,
+    # sizes are in words (2 bytes each), matching emulator PC units
+    ADDRESSING_MODES["NULL"]: 1,
+    ADDRESSING_MODES["REGISTER"]: 1,
+    ADDRESSING_MODES["IMMEDIATE"]: 2,
+    ADDRESSING_MODES["IMMEDIATE_ADDRESS"]: 2,
+    ADDRESSING_MODES["REGISTER_ADDRESS"]: 1,
 }
 
 # list of operands, for example reg num or num or reg reg
@@ -116,7 +117,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: None,
         },
     },
-    "LOAD": {
+    "GET": {
         ADDRESSING_MODES["REGISTER_ADDRESS"]: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,
@@ -128,7 +129,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: OPS.SECOND_OPERAND,
         },
     },
-    "STORE": {
+    "PUT": {
         ADDRESSING_MODES["REGISTER_ADDRESS"]: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,

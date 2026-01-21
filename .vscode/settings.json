@@ -13,8 +13,7 @@
         "uv.lock": true,
         "pyproject.toml": true,
         ".gitignore": true,
-
-        "**/.vscode": true,
+        "**/.vscode": true
     },
     "hide-files.files": []
 }

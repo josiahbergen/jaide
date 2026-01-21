@@ -29,7 +29,7 @@ exp_term    = number | macro_arg | expression ;
 operator    = "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~" ;
 
 (* instructions and registers *)
-mnemonic    = "LOAD" | "STORE" | "MOV" | "PUSH" | "POP" | "ADD" | "ADC"
+mnemonic    = "GET" | "PUT" | "MOV" | "PUSH" | "POP" | "ADD" | "ADC"
             | "SUB" | "SBC" | "INC" | "DEC" | "LSH" | "RSH" | "AND"
             | "OR" | "NOR" | "NOT" | "XOR" | "INB" | "OUTB" | "CMP"
             | "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "RET"

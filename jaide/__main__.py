@@ -12,6 +12,7 @@ def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description="JAIDE emulator")
     arg_parser.add_argument("binary", nargs="?", default="", help="a binary file to load")
     arg_parser.add_argument("-r", "--run", action="store_true", help="run the binary file immediately")
+    arg_parser.add_argument("-s", "--screen", action="store_true", help="automatically initialize the screen device")
     return arg_parser.parse_args()
 
 
@@ -44,6 +45,7 @@ def main():
 
     binary = args.binary
     auto_run = args.run
+    auto_screen = args.screen
 
     try:
 
@@ -53,7 +55,10 @@ def main():
         if binary:
             check_files(binary)
             emulator.load_binary(binary)
-            
+
+            if auto_screen:
+                emulator.dev("screen")
+
             if auto_run:
                 emulator.run()
                 return

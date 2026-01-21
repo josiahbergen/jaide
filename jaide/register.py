@@ -2,8 +2,6 @@
 # register class used by the emulator.
 # josiah bergen, january 2026
 
-from .core import mask16
-
 class Register:
 
     def __init__(self, name: str, value: int):
@@ -14,7 +12,7 @@ class Register:
     # java ahh setter
 
     def set(self, value: int) -> None:
-        self.value = mask16(value)
+        self.value = value & 0xFFFF # mask to 16 bits
 
     def __str__(self) -> str:
         return f"{self.name}: 0x{self.value:04X}"

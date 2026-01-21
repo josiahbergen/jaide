@@ -1,3 +1,4 @@
+
 # constants.py
 # constants used by the jaide emulator.
 # josiah bergen, january 2026
@@ -5,10 +6,11 @@
 from enum import Enum
 
 
-MEMORY_SIZE = 0x1FFFF + 1 # 128k (word addressable)
-MEMORY_BANKS = 256
+MEMORY_SIZE = 0x1FFFF + 1 # 128KiB (word addressable)
+BANK_SIZE = 0x4000 # 16KiB
+NUM_BANKS = 31 # 32 banks total, 0 is for built-in RAM
 
-REGISTERS = ["A", "B", "C", "D", "E", "X", "Y"]
+REGISTERS = ["A", "B", "C", "D", "E", "X", "Y", "MB", "F", "Z", "SP", "PC"]
 
 FLAG_C = 0 # carry
 FLAG_Z = 1 # zero
@@ -18,9 +20,9 @@ FLAG_I = 4 # interrupts enabled
 
 # mnemonics
 OP_HALT = 0
-OP_LOAD = 1
-OP_STORE = 2
-OP_MOVE = 3
+OP_GET = 1
+OP_PUT = 2
+OP_MOV = 3
 OP_PUSH = 4
 OP_POP = 5
 OP_ADD = 6
@@ -29,8 +31,8 @@ OP_SUB = 8
 OP_SBC = 9
 OP_INC = 10
 OP_DEC = 11
-OP_SHL = 12
-OP_SHR = 13
+OP_LSH = 12
+OP_RSH = 13
 OP_AND = 14
 OP_OR = 15
 OP_NOR = 16
@@ -52,9 +54,9 @@ OP_NOP = 31
 
 MNEMONICS: dict[int, str] = {
     OP_HALT: "HALT",
-    OP_LOAD: "LOAD",
-    OP_STORE: "STORE",
-    OP_MOVE: "MOV",
+    OP_GET: "GET",
+    OP_PUT: "PUT",
+    OP_MOV: "MOV",
     OP_PUSH: "PUSH",
     OP_POP: "POP",
     OP_ADD: "ADD",
@@ -63,8 +65,8 @@ MNEMONICS: dict[int, str] = {
     OP_SBC: "SBC",
     OP_INC: "INC",
     OP_DEC: "DEC",
-    OP_SHL: "LSH",
-    OP_SHR: "RSH",
+    OP_LSH: "LSH",
+    OP_RSH: "RSH",
     OP_AND: "AND",
     OP_OR: "OR",
     OP_NOR: "NOR",
@@ -127,7 +129,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: None,
         },
     },
-    OP_LOAD: {
+    OP_GET: {
         MODE_MEM_INDIRECT: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,
@@ -139,7 +141,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: OPS.SECOND_OPERAND,
         },
     },
-    OP_STORE: {
+    OP_PUT: {
         MODE_MEM_INDIRECT: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,
@@ -151,7 +153,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: OPS.FIRST_OPERAND,
         },
     },
-    OP_MOVE: {
+    OP_MOV: {
         MODE_REG: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,
@@ -244,7 +246,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: None,
         },
     },
-    OP_SHL: {
+    OP_LSH: {
         MODE_REG: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,
@@ -256,7 +258,7 @@ INSTRUCTION_ENCODINGS = {
             LOC.IMM16: OPS.SECOND_OPERAND,
         },
     },
-    OP_SHR: {
+    OP_RSH: {
         MODE_REG: {
             LOC.REGA: OPS.FIRST_OPERAND,
             LOC.REGB: OPS.SECOND_OPERAND,

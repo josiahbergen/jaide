@@ -11,8 +11,8 @@ keep in mind that proficiency in at least one assembly language is assumed when 
 
 ```jasm
 start: ; label definition
-    MOVE A, 0x10 ; move immediate 0x10 into register A
-    STORE A, 0xC000 ; put contents of register A into memory location 0xC000
+    MOV A, 0x10 ; move immediate 0x10 into register A
+    PUT A, 0xC000 ; put contents of register A into memory location 0xC000
 
     CMP A, B ; compare registers A and B
     JZ equal ; jump if zero (equal)

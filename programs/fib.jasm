@@ -7,7 +7,7 @@ start:
 
 loop:
     MOV D, A      ; save old A
-    ADD A, B       ; A = A + B (new fib number)
+    ADD A, B      ; A = A + B (new fib number)
     MOV B, D      ; B = old A
 
     DEC C ; decrement counter
@@ -16,5 +16,5 @@ loop:
     JMP loop ; otherwise, continue the loop
 
 loop_end:
-    PUT A, 0xC000 ; store the result to memory
+    PUT 0xC000, A  ; store the result to memory
     HALT
