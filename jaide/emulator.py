@@ -14,7 +14,7 @@ from .constants import (
     OP_CMP, OP_JMP, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_CALL, OP_RET, OP_INT, OP_IRET, OP_NOP,
     MODE_NULL, MODE_REG, MODE_IMM16, MODE_MEM_INDIRECT, MODE_MEM_DIRECT,
 )
-from .devices.screen import Screen
+from .devices.graphics import Graphics
 from .exceptions import EmulatorException
 from .register import Register
 from .util.logger import logger
@@ -117,9 +117,9 @@ class Emulator:
     def flag_set(self, bit: int, value: bool) -> None:
         if bit < 0 or bit > 4: 
             raise EmulatorException(f"attempted to set invalid flag bit {bit}.")
-        flag_mask = (1 if value else 0) << bit
-        # resets flag bit to 0 then ors with real value
-        self.f.set((self.f.value & ~flag_mask) | flag_mask)
+        bit_mask = 1 << bit
+        # reset the flag bit, then set it if needed
+        self.f.set((self.f.value & ~bit_mask) | ((1 if value else 0) << bit))
 
     def set_all_flags(self, z: int, c: int, n: int, o: int) -> None:
         self.flag_set(FLAG_Z, bool(z))
@@ -190,11 +190,11 @@ class Emulator:
             return e.message
 
     def dev(self, device: str) -> None:
-        if device == "screen":
+        if device == "graphics":
             vram = memoryview(self.banks[0])
-            self.screen = Screen(vram)
+            self.graphics = Graphics(vram)
         else:
-            logger.error(f"invalid device {device}. valid devices are: screen")
+            logger.error(f"invalid device {device}. valid devices are: graphics")
             return
 
     # repl and shell interface
@@ -349,7 +349,7 @@ class Emulator:
 
                 case "vram":
                     vram = self.banks[0]
-                    for i in range(0, 1024, 32):
+                    for i in range(0, 2000, 32):
                         row = vram[i:i+32]
                         words = [(row[j] | row[j+1] << 8) for j in range(0, len(row), 2)]
                         print(f"0x{i // 2:04X} | {" ".join([f"{w:04X}" for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")

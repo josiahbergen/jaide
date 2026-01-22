@@ -6,8 +6,8 @@
 from enum import Enum
 
 
-MEMORY_SIZE = 0x1FFFF + 1 # 128KiB (word addressable)
-BANK_SIZE = 0x4000 # 16KiB
+MEMORY_SIZE = 0x1FFFF + 1 # 128KiB, word addressable
+BANK_SIZE = 0x4000 # 32KiB, word addressable
 NUM_BANKS = 31 # 32 banks total, 0 is for built-in RAM
 
 REGISTERS = ["A", "B", "C", "D", "E", "X", "Y", "MB", "F", "Z", "SP", "PC"]

@@ -1,16 +1,53 @@
 start:
     MOV MB, 0x01 ; set the memory bank to vram
-    MOV A, 0x01 ; value to write to vram
-    MOV B, 0x8000 ; start address
+    MOV A, 0x00 ; glyph
+    MOV B, 0x8000 ; memory location
+    MOV C, 0x00 ; fore color (0..15)
+    MOV X, 0x8000 ; horizontal offset
+    MOV Y, 0x00 ; vertical offset
 
 loop:
-    PUT B, A
-    ADD B, 0x03
+    CALL draw_glyph
 
-    CMP B, 0xA001
-    JZ loop_end
+    ; increment one row
+    ADD B, 80 
+    INC Y
 
-    JMP loop
+    ; if we have drawn 10 rows, end
+    CMP Y, 25 
+    JZ outer_loop
+    
+    ; otherwise, continue the loop
+    JMP loop 
 
-loop_end:
+outer_loop:
+
+    ; incrementing color
+    INC C
+    CMP C, 0xF
+    JNZ skip_reset_color
+    MOV C, 0x00
+skip_reset_color:
+
+    ; reset row
+    XOR Y, Y
+
+    ; increment one col
+    INC X 
+    MOV B, X
+    
+    CMP X, 0x8050
+    JNZ loop
     HALT
+
+draw_glyph:
+    ; set up word for char
+    XOR A, A
+    ; put fore color in high byte
+    MOV A, C
+    LSH A, 0x08
+    ; put glyph 1 in low byte
+    OR A, 0x01 
+
+    PUT B, A ; put word to vram
+    RET

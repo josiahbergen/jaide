@@ -1,9 +1,9 @@
 [project]
 name = "jaide"
 version = "0.1.0"
-description = "custom 8-bit cpu"
+description = "custom 16-bit cpu"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "colorama>=0.4.6",
     "lark>=1.3.1",

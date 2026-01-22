@@ -197,11 +197,18 @@ class InstructionNode(IRNode):
                 return ADDRESSING_MODES["REGISTER"]
 
             # RA/IMM8
-            case "PUSH" | "CALL" | "INT":
-                if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-                else:
+            case "PUSH" | "INT":
+                if optypes[0] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE"]
+
+            case "CALL":
+                if optypes[0] == OPERAND_TYPES["REGISTER"]:
+                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
+
 
             # [IMM16]/[RA]
             case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":

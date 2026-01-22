@@ -160,7 +160,6 @@ normal execution can be restored by calling `IRET`. more specifically, when `IRE
 | `F <- [SP++]`    | flags are popped (unmasks interrupts if applicable)      |
 | `PC <- [SP++]`   | program counter is popped                                |
 
-
 ## i/o ports
 
 ports can be used to interact with I/O devices. The INB and OUTB instructions exist to facilitate this. jaide supports up to 256 I/O devices.
