@@ -219,32 +219,31 @@ class InstructionNode(IRNode):
 
             # RA/IMM16, RB
             case "OUTB":
-                if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-                else:
+                if optypes[0] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE"]
 
             # RA, RB/IMM16
             case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP":
-                logger.verbose(f"get_addressing_mode: optypes[1] is {optypes[1]}")
-                if optypes[1] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-                else:
+                if optypes[1] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE"]
 
             # [RA]/[IMM16], RB
             case "PUT":
-                if optypes[0] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-                else:
+                if optypes[0] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
 
             # RA, [RB]/[IMM16]
             case "GET":
-                if optypes[1] == OPERAND_TYPES["NUMBER"]:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-                else:
+                if optypes[1] == OPERAND_TYPES["REGISTER"]:
                     return ADDRESSING_MODES["REGISTER_ADDRESS"]
+                else:
+                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
 
             case _:
                 logger.fatal(f"{self.mnemonic} has no defined addressing mode", scope)

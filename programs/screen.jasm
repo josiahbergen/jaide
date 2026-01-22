@@ -47,7 +47,7 @@ draw_glyph:
     MOV A, C
     LSH A, 0x08
     ; put glyph 1 in low byte
-    OR A, 0x01 
+    OR A, 0x02
 
     PUT B, A ; put word to vram
     RET

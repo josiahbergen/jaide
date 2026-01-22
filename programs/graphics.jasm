@@ -1,0 +1,48 @@
+start:
+    MOV MB, 0x01 ; set the memory bank to vram
+
+    MOV C, 0xE ; color
+    MOV A, 0xDB ; glyph
+    CALL fill_screen
+    
+    MOV X, s_test
+    CALL print_string
+    HALT
+
+
+print_string:
+    ; print the string at X to Y with color C
+    MOV Y, 0x82F7
+    MOV C, 0x01 ; white
+    print_string_loop:
+    GET A, X
+    CALL draw_glyph
+    INC X
+    INC Y
+    CMP A, 0
+    JNZ print_string_loop
+    RET
+
+draw_glyph:
+    ; put value in A into vram at Y with color C
+    ; trashes B
+    XOR B, B
+    ; put fore color white in high byte
+    MOV B, C
+    LSH B, 0x08
+    OR B, A ; put char in low byte
+    PUT Y, B ; put word to vram
+    RET
+
+fill_screen:
+    ; fill the screen with the color in C
+    MOV Y, 0x8000
+fill_screen_loop:
+    CALL draw_glyph
+    INC Y
+    CMP Y, 0x87D0
+    JNZ fill_screen_loop
+    RET
+
+s_test: 
+DATA ":3", 0
