@@ -83,12 +83,17 @@ class Emulator:
     def write16(self, addr: int, value: int):
         # write a 16-bit little-endian value to memory using word addressing
         if addr < 0x8000: # writing to ROM
-            logger.warning(f"attempted to write to ROM at address 0x{addr:04X}.")
+            logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
         
         bank = self.mb.value % 32
         memory = self.banks[bank - 1] if bank != 0 and 0x8000 <= addr < 0xC000 else self.memory
         addr = addr - 0x8000 if 0x8000 <= addr < 0xC000 else addr
+
+        if addr * 2 >= len(memory):
+            logger.error(f"attempted to write to out of bounds memory (0x{addr*2:04X} in bank {bank}). halting.")
+            self.halted = True
+            return
  
         memory[addr * 2] = value & 0xFF
         memory[addr * 2 + 1] = (value >> 8) & 0xFF
@@ -288,8 +293,8 @@ class Emulator:
                     print(f"removed {num} breakpoint{'' if num == 1 else 's'}.")
 
                 case "regs" | "r":
-                    line_1 = "  ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):04X}" for reg in REGISTERS[:6]])
-                    line_2 = f"PC: 0x{self.pc.value:04X}  SP: 0x{self.sp.value:04X}  MB: 0x{self.mb.value:04X}  Z:  0x{self.z.value:04X}"
+                    line_1 = "  ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):04X}" for reg in REGISTERS[:8]])
+                    line_2 = f"PC: 0x{self.pc.value:04X}  SP: 0x{self.sp.value:04X}  MB: 0x{self.mb.value:04X}"
                     print(line_1, line_2, sep="\n")  # All addresses displayed as word addresses
 
                 case "flags" | "f":

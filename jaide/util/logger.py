@@ -97,12 +97,10 @@ class Logger:
         """ Print a warning message. Only prints if level is INFO or higher. """
         if not self.warnings:
             return
-        
-        scope = scope or ""
-
+        scope = (scope + ": ") if scope else ""
         # formatted = f"{b.YELLOW} {b.RESET} {f.YELLOW}warn:{f.RESET}{f.BLACK} {scope}: {f.YELLOW}{message}{f.RESET}"
         # formatted = f"{b.YELLOW} {b.RESET} {f.YELLOW}warn: {message}{f.BLACK} at {scope}{f.RESET}"
-        formatted = f"{f.YELLOW}warn: {f.RESET}{scope}: {message}"
+        formatted = f"{f.YELLOW}warn: {f.RESET}{scope}{message}"
         end_char = '' if choice else '\n'
         print(formatted, end=end_char)
         if not choice:

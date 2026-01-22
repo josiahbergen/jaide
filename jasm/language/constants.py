@@ -48,10 +48,10 @@ REGISTERS = {
     "E": 4,
     "X": 5,
     "Y": 6,
+    "Z": 7,
     # Memory-mapped registers
-    "MB": 7,   # Memory Bank
-    "F":  8,   # Flags
-    "Z":  9,   # Zero (read-only, always equal to 0x0000)
+    "MB": 8,   # Memory Bank
+    "F":  9,   # Flags
     "SP": 10,   # Stack Pointer
     "PC": 11,  # Program Counter (read-only)
 }
@@ -60,8 +60,8 @@ OPERAND_TYPES = {
     "NUMBER": 0,
     "REGISTER": 1,
     "LABELNAME": 2,
-    "MACRO_ARG": 2,
-    "EXPRESSION": 3,
+    "MACRO_ARG": 3,
+    "EXPRESSION": 4,
 }
 
 OPERAND_TYPE_TO_STRING = {

@@ -61,7 +61,6 @@ def main():
 
             if auto_run:
                 emulator.run()
-                return
         else:
             logger.warning("no binary file provided, you will need to load one manually.", scope)
         

@@ -1,48 +1,89 @@
+macro generate_attrs %reg, %fore, %back
+    xor %reg, %reg
+    or %reg, %back
+    lsh %reg, 0x04
+    or %reg, %fore
+    lsh %reg, 0x08
+end macro
+
 start:
-    MOV MB, 0x01 ; set the memory bank to vram
+    mov mb, 0x01 ; set the memory bank to vram
+    generate_attrs z, 0x00, 0x0E
+    call clear_screen
 
-    MOV C, 0xE ; color
-    MOV A, 0xDB ; glyph
-    CALL fill_screen
+    xor z, z
+    or z, 0x0F
+    lsh z, 0x04
+    or z, 0x07
+    lsh z, 0x08
+
+    mov x, s_welcome
+    mov y, 0x833D 
+    call print_string
+
+    mov x, s_name
+    mov y, 0x83DC 
+    call print_string
+
+    call fun_colors
+    halt
     
-    MOV X, s_test
-    CALL print_string
-    HALT
-
-
 print_string:
-    ; print the string at X to Y with color C
-    MOV Y, 0x82F7
-    MOV C, 0x01 ; white
-    print_string_loop:
-    GET A, X
-    CALL draw_glyph
-    INC X
-    INC Y
-    CMP A, 0
-    JNZ print_string_loop
-    RET
+    ; print the string at X to Y with attrs in Z
+    ; trashes A
+    get a, x
+    cmp a, 0
+    jz print_string_end
 
-draw_glyph:
-    ; put value in A into vram at Y with color C
-    ; trashes B
-    XOR B, B
-    ; put fore color white in high byte
-    MOV B, C
-    LSH B, 0x08
-    OR B, A ; put char in low byte
-    PUT Y, B ; put word to vram
-    RET
+    and a, 0x00FF ; clear attribute bits
+    or a, z ; set attribute bits
+    put y, a ; put word to vram
 
-fill_screen:
-    ; fill the screen with the color in C
-    MOV Y, 0x8000
-fill_screen_loop:
-    CALL draw_glyph
-    INC Y
-    CMP Y, 0x87D0
-    JNZ fill_screen_loop
-    RET
+    inc x
+    inc y
+    jmp print_string
+print_string_end:
+    ret
 
-s_test: 
-DATA ":3", 0
+clear_screen:
+    ; fill the screen with the background color in z
+    mov y, 0x8000
+    and z, 0xFF00 ; clear glyph bits
+clear_screen_loop:
+    put y, z ; put word to vram
+    inc y
+    cmp y, 0x87D0 ; end of vram
+    jnz clear_screen_loop
+    ret
+
+fun_colors:
+    mov y, 0x8780
+    mov c, 0x00 ; colors
+fun_colors_loop:
+
+    xor z, z
+    or z, c ; but c into background color
+    lsh z, 0x08
+    lsh z, 0x04
+    put y, z
+    inc y
+
+    inc c
+    cmp c, 0x10
+    jnz skip_reset_color
+    mov c, 0x00
+skip_reset_color:
+
+    cmp y, 0x87D0 ; end of vram
+    jnz fun_colors_loop
+    ret
+
+
+
+
+
+
+s_welcome: 
+data "jaide computing system", 0
+s_name:
+data "created by josiah bergen", 0

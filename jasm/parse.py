@@ -252,6 +252,7 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
                 operand_nodes.append(OperandNode(line, arg_type, op_value))
 
             elif isinstance(op, Token):
+                logger.verbose(f"parse: token operand type: {line}: {op.type}: {op.value}")
                 operand_nodes.append(OperandNode(line, op.type, op.value))
             else:
                 logger.fatal(f"bad operand for instruction {mnemonic.value} on line {line}: {str(op)}", scope)

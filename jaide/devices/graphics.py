@@ -17,6 +17,7 @@ COLORS = [
     (0, 255, 255),   # cyan
     (255, 0, 255),   # magenta
     (128, 128, 128), # gray
+    (192, 192, 192), # light gray
     (128, 0, 0),     # dark red
     (0, 128, 0),     # dark green
     (0, 0, 128),     # dark blue
@@ -32,7 +33,7 @@ class Graphics:
         
         # insane hard-coded filepath and glyph count/size but whatever
         with open("jaide/devices/VGA8.F16", "rb") as f:
-            self.glyphs = [int.from_bytes(f.read(16), 'big') for _ in range(256)]
+            self.glyphs = [bytes(f.read(16)) for _ in range(256)]
         print(f"loaded {len(self.glyphs)} glyphs to character rom")
         
         self._last_hash = None
@@ -40,7 +41,7 @@ class Graphics:
         self._closed = False
 
         self.root = tk.Tk()
-        self.root.title("jaide video controller output (80x25 chars)")
+        self.root.title("jaide video controller output")
         self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT }")
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -48,8 +49,7 @@ class Graphics:
         self.label.pack()
 
         self.photo = None
-        # Update the window to ensure Tkinter is fully initialized before PIL tries to use it
-        self.root.update_idletasks()
+        print("graphics controller initialized")
         self._tick()
 
     def _tick(self):
@@ -84,17 +84,18 @@ class Graphics:
             i = char_idx * 2
             lo, hi = self.vram[i], self.vram[i + 1]
             fore, back = self._parse_attrs(hi)
+
+            # if hi != 0:
+            #     print(f"drawing glyph {lo:02X} at {char_idx // WIDTH}, {char_idx % WIDTH}. color: {hi:02X}, fore: {fore}, back: {back}")
             self._draw_glyph(self.glyphs[lo], fore, back, char_idx // WIDTH, char_idx % WIDTH)
 
-    def _draw_glyph(self, glyph: int, fore: tuple[int, int, int], back: tuple[int, int, int], char_row: int, char_col: int):
-        # Convert integer to 16 bytes (big-endian)
-        glyph_bytes = glyph.to_bytes(16, 'big')
-        
+    def _draw_glyph(self, glyph: bytes, fore: tuple[int, int, int], back: tuple[int, int, int], char_row: int, char_col: int):
+        # Convert integer to 16 bytes (big-endian
         base_y = char_row * GLYPH_HEIGHT
         base_x = char_col * GLYPH_WIDTH
-        
+
         for y in range(GLYPH_HEIGHT):
-            row_byte = glyph_bytes[y]
+            row_byte = glyph[y]
             for x in range(GLYPH_WIDTH):
                 # Bit 7 is leftmost pixel, bit 0 is rightmost
                 bit = (row_byte >> (GLYPH_WIDTH - 1 - x)) & 1
@@ -106,9 +107,7 @@ class Graphics:
 
     def _parse_attrs(self, byte: int) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
         fore = byte & 0b1111
-        back = (byte >> 4) & 0b111
-        blink = (byte >> 7) & 1
-        fore = back if blink else fore
+        back = (byte >> 4) & 0b1111
         return (COLORS[fore], COLORS[back])
 
     def close(self):

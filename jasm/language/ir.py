@@ -276,7 +276,7 @@ class InstructionNode(IRNode):
         def pretty_byte_1_string(byte):
             opcode_bits = (byte >> 2) & 0b111111 # retreive opcode and mode from encoded instruction
             addressing_mode_bits = byte & 0b11
-            return f"{byte:08b} | {opcode_bits:06b} ({opcode_bits}) {addressing_mode_bits:02b} ({addressing_mode_bits}) "
+            return f"{byte:08b} | {opcode_bits:06b} {addressing_mode_bits:02b} | {opcode_bits} {addressing_mode_bits}"
 
         logger.verbose(f"bytes: stored opcode is {self.opcode} with addressing mode {ADDRESSING_MODE_TO_STRING[self.addressing_mode]}.")
 
@@ -310,18 +310,17 @@ class InstructionNode(IRNode):
         assert_bit_length(4, regb_bits)
 
         reg_byte = (rega_bits << 4) | regb_bits
-        logger.verbose(f"bytes: reg byte is {pretty_byte_1_string(reg_byte)}")
+        logger.verbose(f"bytes: reg byte is {reg_byte:08b} | {rega_bits:04b} {regb_bits:04b} | {rega_bits} {regb_bits}")
 
         # its gotta be little endian, so the reg byte goes first
         binary.append(reg_byte)
         binary.append(byte_1)
 
-
         if imm16_bits is not None:
             assert_bit_length(16, imm16_bits)
             imm16_bytes = imm16_bits.to_bytes(2, byteorder="little")
             binary.extend(imm16_bytes)
-            logger.verbose(f"bytes: imm16 bytes are {self.pretty_bit_string(imm16_bytes)}")
+            logger.verbose(f"bytes: imm16 bytes are {self.pretty_bit_string(imm16_bytes)} | {imm16_bits}")
 
         logger.verbose(f"bytes: final binary: {self.pretty_bit_string(binary)}")
         return binary   

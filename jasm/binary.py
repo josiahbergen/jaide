@@ -18,7 +18,7 @@ def generate_binary(ir: list[IRNode]) -> bytearray:
             continue
 
         bits = node.get_bytes()
-        logger.debug(f"bytes: generated {len(bits)} bytes for {node.short_string()} on line {node.line}")
+        logger.debug(f"bytes: generated {len(bits)} bytes for {node.short_string()} on line {node.line} (0x{node.pc:04X})")
         binary.extend(bits)
 
     logger.debug(f"binary: generation finished ({len(binary)} bytes)")
