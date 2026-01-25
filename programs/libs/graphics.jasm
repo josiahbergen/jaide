@@ -1,0 +1,49 @@
+
+macro generate_attrs %reg, %fore, %back
+    xor %reg, %reg
+    or %reg, %back
+    lsh %reg, 0x04
+    or %reg, %fore
+    lsh %reg, 0x08
+end macro
+
+macro string_at %string, %address
+    mov x, %string
+    mov y, %address
+    call print_string
+end macro
+
+macro char_at %char, %address
+    ; expects attrs in z
+    mov a, %char
+    or a, z
+    put %address, a
+end macro
+
+clear_screen:
+    ; fill the screen with the background color in z
+    mov y, 0x8000
+    and z, 0xFF00 ; clear glyph bits
+clear_screen_loop:
+    put y, z ; put word to vram
+    inc y
+    cmp y, 0x87D0 ; end of vram
+    jnz clear_screen_loop
+    ret
+
+print_string:
+    ; print the string at X to Y with attrs in Z
+    ; trashes A
+    get a, x
+    cmp a, 0
+    jz print_string_end
+
+    and a, 0x00FF ; clear attribute bits
+    or a, z ; set attribute bits
+    put y, a ; put word to vram
+
+    inc x
+    inc y
+    jmp print_string
+print_string_end:
+    ret

@@ -9,6 +9,17 @@
             "type": "debugpy",
             "request": "launch",
             "module": "jaide"
+        },
+        {
+            "name": "JASM Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "jasm",
+            "args": [
+                "programs/graphics.jasm",
+                "-o",
+                "programs/bin/graphics.bin"
+            ]
         }
     ]
 }

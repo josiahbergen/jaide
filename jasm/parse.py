@@ -39,7 +39,7 @@ def check_file(file: str) -> None:
     logger.verbose(f"parse: checking file {file} (type: {type(file).__name__})...")
 
     if not os.path.exists(file):
-        logger.fatal(f"imported file {file} does not exist", scope)
+        logger.fatal(f"imported file \"{file}\" does not exist", scope)
 
     if not file.endswith(".jasm"):
         logger.warning(f"imported file {file} does not look like a JASM file", scope)

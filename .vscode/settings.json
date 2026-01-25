@@ -1,16 +1,14 @@
 {
     "files.exclude": {
-        ".gitignore": true,
-        // ".python-version": true,
-        "**/__init__.py": true,
-        "**/__pycache__": true,
-        "**/.DS_Store": true,
         "**/.git": true,
-        "**/.hg": true,
         "**/.svn": true,
-        "**/.zed/": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
         "**/Thumbs.db": true,
-        // "pyproject.toml": true,
+        "**/__pycache__": true,
+        ".gitignore": true,
+        "**/__init__.py": true,
+        "**/.zed/": true,
         "requirements.in": true,
         "uv.lock": true
     },

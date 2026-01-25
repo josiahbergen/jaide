@@ -11,12 +11,7 @@ start:
     generate_attrs z, 0x00, 0x0E
     call clear_screen
 
-    xor z, z
-    or z, 0x0F
-    lsh z, 0x04
-    or z, 0x07
-    lsh z, 0x08
-
+    generate_attrs z, 0x00, 0x07
     mov x, s_welcome
     mov y, 0x833D 
     call print_string

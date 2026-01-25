@@ -2,11 +2,11 @@
 
 ## overview
 
-- 32 instructions
+- 32 instructions (with support for up to 64)
 - 16-bit word length
-- 16-bit address bus touches 128k of word-addressable memory (more with banking)
-- 12 registers (7 general-purpose, 5 special), all 16-bit
-- load-store, little-endian, von-neumann architecture
+- 16-bit address bus touches 128Kib of word-addressable memory (~64k unique values, more with banking)
+- 12 registers: 8 general-purpose, 4 special, all 16-bit
+- load-store, little-endian, interrupt-driven, von-neumann architecture
 
 ## programming jaide
 
@@ -40,7 +40,7 @@ _currently, 7 general purpose and 5 special registers are implemented. the four 
 
 ### general purpose registers
 
-`A`, `B`, `C`, `D`, `E`, `X`, and `Y`.
+`A`, `B`, `C`, `D`, `E`, `X`, `Y`, and `Z`.
 
 ### special registers
 
@@ -53,8 +53,6 @@ _currently, 7 general purpose and 5 special registers are implemented. the four 
 `F` flags _(zero, carry, negative, overflow, interrupts enabled)_
 
 the format of the flags register is `C Z N O I - - - - - - - - - - -`.
-
-`Z` zero _(read-only, always equal to 0x0000)_
 
 ## instructions
 
@@ -101,42 +99,55 @@ at this time, only 32 instructions are defined. jaide supports up to 64 unique i
 | `0x8000...0xBFFF` | 16 KiB    | general purpose RAM (banked)\* |
 | `0x0000...0x7FFF` | 32 KiB    | general purpose ROM            |
 
-_\*this memory can be swapped using the MB register._
-
 _\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._
+
+_\*this memory can be swapped using the MB register._
 
 ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
 
-### banking
+### memory banking
 
-there are up to 32 possible memory banks. MB = 0 indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
+there are up to 32 possible memory banks. `MB = 0` indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
 
 ### the stack
 
-`PUSH` and `POP` put/get a word (2 bytes) from the stack.
+`PUSH` and `POP` put/get a word from the stack.
 
-SP must be a multiple of 2 to facilitate this. SP always points to the last used word.
+`CALL` and `RET` utilize the stack to store a return address.
 
 stack overflow/underflow behaviour is undefined.
 
 ## interrupts
 
-jaide supports up to 128 programmable interrupts.
-
-interrupts 0 to 3 are reserved for hardware interrutps. a programmer must define handlers for each of them.
-
-if a hardware interrupt is not handled, the unhandled fault interrupt will be called. if this is not handed, jaide will reset.
+jaide supports up to 256 interrupt vectors. these can be triggered programatically, by external devices, or by the cpu itself.
 
 ### hardware interrupts
 
-| interrupt | description         |
-| --------- | ------------------- |
-| 0         | unhandled fault     |
-| 1         | invalid instruction |
-| 2         | protection fault    |
-| 3         | reserved            |
+jaide checks the `IRQ` (interrupt reqest) line at the end of every instruction cycle, before the next fetch. if `IRQ` is high and the interrupt flag is set:
 
-### the INT and IRET instructions
+1. jaide sets the `INTA` (interrupt acknowledge) line high, and waits.
+
+2. the external device places a desired 16-bit interrupt vector on the data bus. `IRQ` is cleared to communicate that the the vector is ready.
+
+3. the cpu reads the vector, clears `INTA`, and proceeds with the standard interrupt procedure (see below)
+
+interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define handlers for each of them.
+
+### vector allocation
+ 
+| vector | type      |	description                            |
+| ------ | --------- | ----------------------------------------|
+| 0	     | exception | unhandled fault                         |
+| 1	     | exception | invalid instruction                     |
+| 2	     | exception | protection fault                        |
+| 3	     | reserved	 | reserved                                |
+| 4-127  | external  | available for external hardware devices |
+
+### a note on HALT
+
+calling `HALT` puts the cpu in a *non-permanent*, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
+
+### using INT and IRET
 
 when an interrupt `n` is called, jaide saves its state and transfers execution to the word found at the offset `n` into the interrupt table, starting at `0xFFFF` and moving downwards.
 
@@ -160,8 +171,22 @@ normal execution can be restored by calling `IRET`. more specifically, when `IRE
 | `F <- [SP++]`    | flags are popped (unmasks interrupts if applicable)      |
 | `PC <- [SP++]`   | program counter is popped                                |
 
-## i/o ports
+## ports
 
-ports can be used to interact with I/O devices. The INB and OUTB instructions exist to facilitate this. jaide supports up to 256 I/O devices.
+ports can be used to interact with external i/o devices. The `INB` and `OUTB` instructions exist to facilitate this. jaide supports up to 255 custom i/o devices.
 
-all ports have 16-bit data widths. there currently exists no standard for communication to/from jaide's ports.
+all ports have 16-bit data widths. it is recommended that a programmer makes use of the interrupt system, and then uses the i/o instructions to communicate data
+
+### system interface
+
+port `0xFF` is a special port that can be used to control the physical hardware.
+
+the system interface port supports these commands:
+
+| value   | command     | emulator behavior            | hardware behavior    |
+| ------- | ----------- | ---------------------------- | -------------------- |
+| 0x00    | nop         | do nothing                   | do nothing           |
+| 0x01    | reset       | clear ram/regs, set pc = 0   | pull reset pin low   |
+| 0x02    | halt        | set halted = true            | stop the clock       |
+| 0x03    | nop         | shut down emulator process   | disconnect power     |
+| other   | _undefined_ | _undefined_                  | _undefined_          |

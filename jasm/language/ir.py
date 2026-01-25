@@ -2,6 +2,8 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
+import copy
+
 from .constants import ( 
     OPCODES, 
     OPERAND_TYPES, 
@@ -498,7 +500,9 @@ class MacroNode(IRNode):
             args_map[arg.name] = real_args[arg.index]
         logger.verbose(f"macro: args map: {', '.join([f"{k}: {v}" for k, v in args_map.items()])}")
 
-        for instr in self.body:
+        # use a copy of the body to avoid modifying the original macro definition
+        template = copy.deepcopy(self.body)
+        for instr in template:
 
             # error checking
             if isinstance(instr, MacroCallNode):
@@ -515,8 +519,7 @@ class MacroNode(IRNode):
                     logger.verbose(f"macro: replacing macro argument {operand.value} with {args_map[operand.value]}")
                     instr.operands[i] = args_map[operand.value]
             
-
-        return self.body
+        return template
 
     def __str__(self):
         return f"macro definition {self.name} with {len(self.args)} arguments"

@@ -1,5 +1,6 @@
 import tkinter as tk
 from PIL import Image, ImageTk
+import threading
 
 WIDTH  = 80
 HEIGHT = 25
@@ -8,28 +9,31 @@ GLYPH_HEIGHT = 16
 FPS_MS = 33
 
 COLORS = [
-    (0, 0, 0),       # black
-    (255, 255, 255), # white
-    (255, 0, 0),     # red
-    (0, 255, 0),     # green
-    (0, 0, 255),     # blue
-    (255, 255, 0),   # yellow
-    (0, 255, 255),   # cyan
-    (255, 0, 255),   # magenta
-    (128, 128, 128), # gray
-    (192, 192, 192), # light gray
-    (128, 0, 0),     # dark red
-    (0, 128, 0),     # dark green
-    (0, 0, 128),     # dark blue
-    (128, 128, 0),   # dark yellow
-    (0, 128, 128),   # dark cyan
-    (128, 0, 128),   # dark magenta
+    (0, 0, 0),       # 0: black
+    (255, 255, 255), # 1: white
+    (255, 0, 0),     # 2: red
+    (0, 255, 0),     # 3: green
+    (0, 0, 255),     # 4: blue
+    (255, 255, 0),   # 5: yellow
+    (0, 255, 255),   # 6: cyan
+    (255, 0, 255),   # 7: purple
+    (128, 128, 128), # 8: gray
+    (192, 192, 192), # 9: light gray
+    (128, 0, 0),     # 10: dark red
+    (0, 128, 0),     # 11: dark green
+    (0, 0, 128),     # 12: dark blue
+    (128, 128, 0),   # 13: dark yellow
+    (0, 128, 128),   # 14: dark cyan
+    (128, 0, 128),   # 15: dark magenta
 ]
 
-class Graphics:
-    def __init__(self, vram: memoryview):
+class Graphics(threading.Thread):
+    def __init__(self, vram: memoryview, emulator):
+        super().__init__()
         self.vram = vram
+        self.emulator = emulator
         self.framebuf: list[int] = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3) # 3 bytes per pixel (RGB)
+        self.daemon = True # Kill when main thread exits
         
         # insane hard-coded filepath and glyph count/size but whatever
         with open("jaide/devices/VGA8.F16", "rb") as f:
@@ -39,18 +43,31 @@ class Graphics:
         self._last_hash = None
         self._after_id = None
         self._closed = False
+        self.root = None
+        
+        print("graphics controller initialized")
+        self.start()
 
+    def run(self):
         self.root = tk.Tk()
         self.root.title("jaide video controller output")
         self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT }")
         self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.root.bind("<Key>", self._on_key)
 
         self.label = tk.Label(self.root, bg="black")
         self.label.pack()
 
         self.photo = None
-        print("graphics controller initialized")
         self._tick()
+        self.root.mainloop()
+
+    def _on_key(self, event):
+        if event.char:
+            # put key on port 1, trigger interrupt 4
+            self.emulator.ports[1] = ord(event.char)
+            self.emulator.interrupt_request(4)
+
 
     def _tick(self):
         if self._closed:
@@ -109,6 +126,14 @@ class Graphics:
         fore = byte & 0b1111
         back = (byte >> 4) & 0b1111
         return (COLORS[fore], COLORS[back])
+
+    def stop(self):
+        self._closed = True
+        if self.root:
+            try:
+                self.root.after(0, self.close)
+            except Exception:
+                pass
 
     def close(self):
         self._closed = True

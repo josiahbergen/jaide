@@ -1,0 +1,14 @@
+macro persistent_halt
+    jmp permanent_halt_loop
+end macro
+
+macro interrupt_enable %value
+    xor z, z
+    or z, %value
+    lsh z, 11
+    or f, z
+end macro
+
+permanent_halt_loop:
+    halt
+    jmp permanent_halt_loop

@@ -4,6 +4,7 @@
 
 from colorama import Fore as f
 import os
+import time
 from typing import Callable
 
 from .constants import (
@@ -34,7 +35,6 @@ class Emulator:
         self.sp: Register = self.reg["SP"] # stack pointer
         self.f: Register = self.reg["F"] # flags
         self.mb: Register = self.reg["MB"] # memory bank
-        self.z: Register = self.reg["Z"] # zero
 
         self.sp.set(0xFEFF)
 
@@ -42,11 +42,15 @@ class Emulator:
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
         self.ports: list[int] = [0] * 256 # 256 16-bit ports
-
+        
+        # interrupt handling
+        self.pending_interrupts: list[int] = [] # queue of vectors waiting to be handled
+        self.waiting_for_interrupt: bool = False
+        self.flag_set(FLAG_I, True)
+        
         # debugger etc.
         self.breakpoints: set[int] = set[int]()
         self.halted: bool = False
-
         self.handlers: dict[int, Callable[[tuple[int, ...]]]] = {}
         self._populate_handlers()
 
@@ -140,7 +144,45 @@ class Emulator:
         value = mask16(value)
         if port == 0: # port 0 is special and will print the value to the console
             print(chr(value), end="", flush=True)
+
+        if port == 0xFF: # system interface port
+            match value:
+                case 0x01: # reset
+                    self.reset()
+                case 0x02: # halt
+                    self.halted = True
+                case 0x03: # power off
+                    self.shutdown()
+                case _:
+                    pass # undefined behavior, so we'll just do nothing
         self.ports[port] = value
+
+    # interrupt helpers
+    def interrupt_request(self, vector: int) -> None:
+        if self.halted:
+            return
+        if vector < 0 or vector > 0xFF:
+            raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
+        
+        print(f"interrupt request: {vector}")
+        self.pending_interrupts.append(vector)
+        print(f"pending interrupts: {self.pending_interrupts}")
+
+    def interrupts_pending(self) -> bool:
+        return len(self.pending_interrupts) > 0 and self.flag_get(FLAG_I)
+
+    def reset(self) -> None:
+        self.memory[0x8000:] = bytearray(MEMORY_SIZE - 0x8000) # clear ram (0x8000-0xFFFF inclusive)
+        for bank in self.banks: bank[:] = bytearray(BANK_SIZE) # noqa: E701
+        self.ports = [0] * 256 # reset ports
+        self.reg = {reg: Register(reg, 0) for reg in REGISTERS} # re-initialize registers
+        self.sp.set(0xFEFF)
+        self.pc.set(0)
+        self.halted = False
+
+    def shutdown(self) -> None:
+        print("shutting down...")
+        os._exit(0)
 
     # main fetch/decode
     def fetch(self) -> int:
@@ -181,11 +223,29 @@ class Emulator:
                 break
 
     def step(self) -> str | None:
+
+        # check for halt/breakpoints (emulated hardware-level overrides)
         if self.halted:
             return "halted"
         if self.pc in self.breakpoints:
             return f"hit breakpoint at 0x{self.pc:04X}"
 
+        # check for pending irqs
+        if self.interrupts_pending():
+            # if halt was called before, we need to start again after the interrupt 
+            self.waiting_for_interrupt = False 
+            interrupt_id = self.pending_interrupts.pop(0)
+            print(f"processing interrupt {interrupt_id}")
+            self._execute_interrupt(interrupt_id)
+            return None
+
+        # halt was called, we are just idle waiting for an interrupt
+        if self.waiting_for_interrupt:
+            # print("waiting for interrupt")
+            time.sleep(0.02)
+            return
+
+        # normal execution
         decoded = self.decode()
         opcode = decoded[0]
 
@@ -197,7 +257,7 @@ class Emulator:
     def dev(self, device: str) -> None:
         if device == "graphics":
             vram = memoryview(self.banks[0])
-            self.graphics = Graphics(vram)
+            self.graphics = Graphics(vram, self)
         else:
             logger.error(f"invalid device {device}. valid devices are: graphics")
             return
@@ -294,7 +354,7 @@ class Emulator:
 
                 case "regs" | "r":
                     line_1 = "  ".join([f"{reg}:  0x{self.reg_get(REGISTERS.index(reg)):04X}" for reg in REGISTERS[:8]])
-                    line_2 = f"PC: 0x{self.pc.value:04X}  SP: 0x{self.sp.value:04X}  MB: 0x{self.mb.value:04X}"
+                    line_2 = f"PC: 0x{self.pc.value:04X}  SP: 0x{self.sp.value:04X}  MB: 0x{self.mb.value:04X}  F: 0x{self.f.value:04X}"
                     print(line_1, line_2, sep="\n")  # All addresses displayed as word addresses
 
                 case "flags" | "f":
@@ -307,17 +367,10 @@ class Emulator:
                         logger.error("invalid value for 16-bit integer.")
                         continue
                     reg = args[0].upper()
-                    if reg not in REGISTERS:
-                        if reg == "PC": self.pc.set(value) # noqa: E701
-                        elif reg == "SP": self.sp.set(value) # noqa: E701
-                        elif reg == "MB": self.mb.set(value) # noqa: E701
-                        elif reg == "Z": self.z.set(value) # noqa: E701
-                        else: logger.error(f"invalid register (expected one of {', '.join(REGISTERS)}, PC, SP, MB, ST, Z).") # noqa: E701
-                    else:
-                        self.reg_set(REGISTERS.index(reg), value)
+                    self.reg_set(REGISTERS.index(reg), value)
                     print(f"set register {reg} to 0x{value:04X}.")
 
-                case "setm":
+                case "mset":
                     if not assert_num_args(2, opt=0): continue # noqa: E701
                     addr = parse_integer(0, base=16)
                     value = parse_integer(1, base=16)
@@ -383,6 +436,8 @@ class Emulator:
                 
                 case "q" | "quit" | "exit":
                     print("bye!")
+                    if hasattr(self, 'graphics') and self.graphics.is_alive():
+                        self.graphics.stop()
                     break
                 
                 case _:
@@ -400,13 +455,88 @@ class Emulator:
         # decoded is always a tuple of (opcode, mode, *operands)
         return decoded[1]
 
-    # operatioLn handlers
+    # core helpers
+
+    def _add_core(self, a: int, b: int, carry_in: int = 0) -> int:
+        full = a + b + carry_in
+        result = mask16(full)
+        carry = 1 if full > 0xFFFF else 0
+        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
+        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        return result
+
+    def _sub_core(self, a: int, b: int, borrow_in: int = 0) -> int:
+        full = a - b - borrow_in
+        result = mask16(full)
+        carry = 1 if a >= b + borrow_in else 0
+        overflow = 1 if (((a ^ b) & 0x80) != 0 and ((a ^ result) & 0x80) != 0) else 0
+        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        return result
+
+    def _lsh_core(self, a: int, b: int) -> int:
+        # TODO: test
+        full = a << b
+        result = mask16(full)
+        carry = 1 if a & (1 << (16 - b)) else 0
+        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
+        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        return result
+
+    def _rsh_core(self, a: int, b: int) -> int:
+        # TODO: test
+        full = a >> b
+        result = mask16(full)
+        carry = 1 if a & (1 << (b - 1)) else 0
+        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
+        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        return result
+
+    def _push_core(self, value: int) -> None:
+        # decrement sp (put pointer into location of new value)
+        self.sp.set(self.sp.value - 1) 
+        self.write16(self.sp.value, value)
+
+    def _pop_core(self) -> int:
+        value = self.read16(self.sp.value) # read value from stack
+        self.sp.set(self.sp.value + 1) # increment stack pointer
+        self.flag_set(FLAG_Z, value == 0)
+        return value
+
+    def _execute_interrupt(self, vector: int) -> None:
+        if vector < 0 or vector > 0xFF:
+            raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
+        
+        # interrupts gotta be enabled
+        if not self.flag_get(FLAG_I):
+            print(f"interrupt {vector} ignored, mask is {self.flag_get(FLAG_I)}")
+            return
+
+        print(f"executing interrupt {vector}")
+
+        # push pc and flags
+        self._push_core(self.pc.value)
+        self._push_core(self.f.value)
+
+        # clear interrupt mask
+        self.flag_set(FLAG_I, False)
+
+        # get vector (interrupt table is at word addresses 0xFEFF-0xFFFF)
+        # Interrupt vector is at word address 0xFFFF - vector
+        vector_word = 0xFFFF - vector
+        dest = self.read16(vector_word)
+        print(f"jumping to interrupt handler at 0x{dest:04X}")
+        # set program counter to address at vector and unhalt
+
+        self.pc.set(dest)
+
+
+    # operation handlers
 
     def handle_halt(self, decoded: tuple[int, ...]) -> None:
         _, mode, _, _, _ = decoded
         # MODE_NULL: HALT
         if mode == MODE_NULL:
-            self.halted = True
+            self.waiting_for_interrupt = True
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for HALT at 0x{self.pc:04X}.")
 
@@ -562,6 +692,7 @@ class Emulator:
             result = self.reg_get(reg_a) & imm16
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for AND at 0x{self.pc:04X}.")
+        print(f"AND result: {result} ({self.reg_get(reg_a)} & {self.reg_get(reg_b) if mode == MODE_REG else imm16})")
         self.reg_set(reg_a, result)
         self.flag_set(FLAG_Z, result == 0)
 
@@ -753,22 +884,14 @@ class Emulator:
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for INT at 0x{self.pc:04X}.")
         
-        # push pc and flags
-        self._push_core(self.pc.value)
-        self._push_core(self.f.value)
-        # clear interrupt mask
-        self.flag_set(FLAG_I, False)
-        # get vector (interrupt table is at word addresses 0xFEFF-0xFFFF)
-        # Interrupt vector is at word address 0xFFFF - handler
-        vector_word = 0xFFFF - handler
-        # set program counter to address at vector
-        self.pc.set(self.read16(vector_word))
+        self._execute_interrupt(handler)
 
     def handle_iret(self, decoded: tuple[int, ...]) -> None:
         _, mode, _, _, _ = decoded
         if mode == MODE_NULL:
             self.f.set(self._pop_core())
             self.pc.set(self._pop_core())
+            print(f"iret called, mask is now {self.flag_get(FLAG_I)} (from {self.f.value:016b})")
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for IRET at 0x{self.pc:04X}.")
 
@@ -779,82 +902,35 @@ class Emulator:
             raise EmulatorException(f"invalid addressing mode {mode} for NOP at 0x{self.pc:04X}.")
 
     def _populate_handlers(self) -> None:
-        self.handlers[OP_HALT]  = self.handle_halt
-        self.handlers[OP_GET]    = self.handle_get
-        self.handlers[OP_PUT]    = self.handle_put
-        self.handlers[OP_MOV]    = self.handle_mov
-        self.handlers[OP_PUSH]   = self.handle_push
-        self.handlers[OP_POP]    = self.handle_pop
-        self.handlers[OP_ADD]    = self.handle_add
-        self.handlers[OP_ADC]    = self.handle_adc
-        self.handlers[OP_SUB]    = self.handle_sub
-        self.handlers[OP_SBC]    = self.handle_sbc
-        self.handlers[OP_INC]    = self.handle_inc
-        self.handlers[OP_DEC]    = self.handle_dec
-        self.handlers[OP_LSH]    = self.handle_lsh
-        self.handlers[OP_RSH]    = self.handle_rsh
-        self.handlers[OP_AND]    = self.handle_and
-        self.handlers[OP_OR]     = self.handle_or
-        self.handlers[OP_NOR]    = self.handle_nor
-        self.handlers[OP_NOT]    = self.handle_not
-        self.handlers[OP_XOR]    = self.handle_xor
-        self.handlers[OP_INB]    = self.handle_inb
-        self.handlers[OP_OUTB]   = self.handle_outb
-        self.handlers[OP_CMP]    = self.handle_cmp
-        self.handlers[OP_JMP]    = self.handle_jmp
-        self.handlers[OP_JZ]     = self.handle_jz
-        self.handlers[OP_JNZ]    = self.handle_jnz
-        self.handlers[OP_JC]     = self.handle_jc
-        self.handlers[OP_JNC]    = self.handle_jnc
-        self.handlers[OP_CALL]   = self.handle_call
-        self.handlers[OP_RET]    = self.handle_ret
-        self.handlers[OP_INT]    = self.handle_int
-        self.handlers[OP_IRET]   = self.handle_iret
-        self.handlers[OP_NOP]    = self.handle_nop
-
-
-    def _add_core(self, a: int, b: int, carry_in: int = 0) -> int:
-        full = a + b + carry_in
-        result = mask16(full)
-        carry = 1 if full > 0xFFFF else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
-
-        return result
-
-    def _sub_core(self, a: int, b: int, borrow_in: int = 0) -> int:
-        full = a - b - borrow_in
-        result = mask16(full)
-        carry = 1 if a >= b + borrow_in else 0
-        overflow = 1 if (((a ^ b) & 0x80) != 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
-        return result
-
-    def _lsh_core(self, a: int, b: int) -> int:
-        # TODO: test
-        full = a << b
-        result = mask16(full)
-        carry = 1 if a & (1 << (8 - b)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
-        return result
-
-    def _rsh_core(self, a: int, b: int) -> int:
-        # TODO: test
-        full = a >> b
-        result = mask16(full)
-        carry = 1 if a & (1 << (b - 1)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
-        return result
-
-    def _push_core(self, value: int) -> None:
-        # decrement sp (put pointer into location of new value)
-        self.sp.set(self.sp.value - 1) 
-        self.write16(self.sp.value, value)
-
-    def _pop_core(self) -> int:
-        value = self.read16(self.sp.value) # read value from stack
-        self.sp.set(self.sp.value + 1) # increment stack pointer
-        self.flag_set(FLAG_Z, value == 0)
-        return value
+        self.handlers[OP_HALT] = self.handle_halt
+        self.handlers[OP_GET]  = self.handle_get
+        self.handlers[OP_PUT]  = self.handle_put
+        self.handlers[OP_MOV]  = self.handle_mov
+        self.handlers[OP_PUSH] = self.handle_push
+        self.handlers[OP_POP]  = self.handle_pop
+        self.handlers[OP_ADD]  = self.handle_add
+        self.handlers[OP_ADC]  = self.handle_adc
+        self.handlers[OP_SUB]  = self.handle_sub
+        self.handlers[OP_SBC]  = self.handle_sbc
+        self.handlers[OP_INC]  = self.handle_inc
+        self.handlers[OP_DEC]  = self.handle_dec
+        self.handlers[OP_LSH]  = self.handle_lsh
+        self.handlers[OP_RSH]  = self.handle_rsh
+        self.handlers[OP_AND]  = self.handle_and
+        self.handlers[OP_OR]   = self.handle_or
+        self.handlers[OP_NOR]  = self.handle_nor
+        self.handlers[OP_NOT]  = self.handle_not
+        self.handlers[OP_XOR]  = self.handle_xor
+        self.handlers[OP_INB]  = self.handle_inb
+        self.handlers[OP_OUTB] = self.handle_outb
+        self.handlers[OP_CMP]  = self.handle_cmp
+        self.handlers[OP_JMP]  = self.handle_jmp
+        self.handlers[OP_JZ]   = self.handle_jz
+        self.handlers[OP_JNZ]  = self.handle_jnz
+        self.handlers[OP_JC]   = self.handle_jc
+        self.handlers[OP_JNC]  = self.handle_jnc
+        self.handlers[OP_CALL] = self.handle_call
+        self.handlers[OP_RET]  = self.handle_ret
+        self.handlers[OP_INT]  = self.handle_int
+        self.handlers[OP_IRET] = self.handle_iret
+        self.handlers[OP_NOP]  = self.handle_nop

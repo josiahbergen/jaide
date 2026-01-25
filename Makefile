@@ -1,9 +1,9 @@
-PYTHON ?= python3
+PYTHON ?= python
 BIN_DIR := programs/bin
 
 .PHONY: all assemble run clean
 
-all: graphics.jasm
+all: tty.jasm
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
@@ -15,9 +15,9 @@ $(BIN_DIR)/%.bin: programs/%.jasm | $(BIN_DIR)
 	@echo "running $<"
 	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin -g -r
 
-assemble: $(BIN_DIR)/graphics.bin
+assemble: $(BIN_DIR)/tty.bin
 
-run: graphics.jasm
+run: tty.jasm
 
 clean:
 	@rm -f $(BIN_DIR)/*.bin
