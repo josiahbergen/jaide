@@ -42,7 +42,7 @@ class Emulator:
         
         # memory banks and ports
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
-        self.vram: memoryview = memoryview(self.banks[1]) # special reference to VRAM bank
+        self.vram: memoryview = memoryview(self.banks[0]) # special reference to VRAM bank
 
         # 256 16-bit ports
         self.ports: list[int] = [0] * 256 
@@ -92,6 +92,7 @@ class Emulator:
 
     def write16(self, addr: int, value: int):
         # write a 16-bit little-endian value to memory using word addressing
+
         if addr < 0x8000: # writing to ROM
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
@@ -219,7 +220,7 @@ class Emulator:
             try:
                 while True:
                     # normal execution
-                    self.step() 
+                    self.step()
             except EmulatorException as e:
                 # we enter exceptional control flow either if something went wrong,
                 # or if the user interrupts the program
@@ -246,9 +247,8 @@ class Emulator:
             self._execute_interrupt(interrupt_id)
             return # cycle done, go to next instruction
 
-        
         if self.waiting_for_interrupt: # i.e. halt was called, we are simply waiting for an interrupt
-            time.sleep(0.008) # reduce cpu usage a little
+            time.sleep(1 / 60) # reduce cpu usage a little
             return
 
         # normal execution

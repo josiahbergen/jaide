@@ -51,13 +51,16 @@ def main():
 
     # start graphics if requested
     if args.graphics:
-        graphics = Graphics(emulator.vram, emulator)
-        graphics.start()
+        Graphics(emulator.vram, emulator)
+
+    # run the program if requested
+    if args.run:
+        emulator.halted = False
+        emulator.run()
 
     try:
         # start repl
         REPL(emulator)
-
     except KeyboardInterrupt:
         logger.nl()
         logger.kill("keyboard interrupt", "__main__.py:main()")

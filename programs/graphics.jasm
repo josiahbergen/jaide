@@ -22,8 +22,8 @@ start:
 
     call fun_colors
 
-    mov z, 0x02
-    outb 0xff, z ; halt cpu
+    mov z, 0x02 ; halt cpu
+    outb 0xff, z 
     
 print_string:
     ; print the string at X to Y with attrs in Z
