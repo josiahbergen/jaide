@@ -5,7 +5,7 @@
 from colorama import Fore as f
 import os
 import time
-from typing import Callable
+from typing import Callable, Any
 
 from .constants import (
     MNEMONICS, INSTRUCTION_ENCODINGS,
@@ -15,7 +15,6 @@ from .constants import (
     OP_CMP, OP_JMP, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_CALL, OP_RET, OP_INT, OP_IRET, OP_NOP,
     MODE_NULL, MODE_REG, MODE_IMM16, MODE_MEM_INDIRECT, MODE_MEM_DIRECT,
 )
-from .devices.graphics import Graphics
 from .exceptions import EmulatorException
 from .register import Register
 from .util.logger import logger
@@ -23,9 +22,12 @@ from .util.logger import logger
 def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
 
 
+from multiprocessing import shared_memory, Queue
+import queue
+
 class Emulator:
 
-    def __init__(self):
+    def __init__(self, shm_name: str | None, input_queue: Any):
 
         # general purpose registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
@@ -40,8 +42,31 @@ class Emulator:
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
-        self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
+        
+        # Initialize banks
+        self.banks: list[bytearray | memoryview] = []
+        
+        # If shared memory is provided, use it for Bank 0 (VRAM)
+        self.shm = None
+        if shm_name:
+            try:
+                self.shm = shared_memory.SharedMemory(name=shm_name)
+                self.banks.append(self.shm.buf)
+                print(f"attached to shared memory {shm_name} for bank 0")
+            except Exception as e:
+                logger.error(f"failed to attach to shared memory: {e}")
+                self.banks.append(bytearray(BANK_SIZE))
+        else:
+            self.banks.append(bytearray(BANK_SIZE))
+            
+        # Initialize remaining banks
+        for _ in range(NUM_BANKS - 1):
+            self.banks.append(bytearray(BANK_SIZE))
+            
         self.ports: list[int] = [0] * 256 # 256 16-bit ports
+        
+        # Input queue for external events
+        self.input_queue = input_queue
         
         # interrupt handling
         self.pending_interrupts: list[int] = [] # queue of vectors waiting to be handled
@@ -53,6 +78,11 @@ class Emulator:
         self.halted: bool = False
         self.handlers: dict[int, Callable[[tuple[int, ...]]]] = {}
         self._populate_handlers()
+
+    def __del__(self):
+        if self.shm:
+            self.shm.close()
+
 
 
     # memory
@@ -164,9 +194,7 @@ class Emulator:
         if vector < 0 or vector > 0xFF:
             raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
         
-        print(f"interrupt request: {vector}")
         self.pending_interrupts.append(vector)
-        print(f"pending interrupts: {self.pending_interrupts}")
 
     def interrupts_pending(self) -> bool:
         return len(self.pending_interrupts) > 0 and self.flag_get(FLAG_I)
@@ -211,18 +239,32 @@ class Emulator:
         return opcode, mode, reg_a, reg_b, imm16
 
     # main run loop
-    def run(self) -> None:
+    def run(self, step_callback: Callable[[], None] | None = None) -> None:
         while not self.halted:
             try:
                 res = self.step()
                 if res: 
                     print(res)
                     break
+                if step_callback:
+                    step_callback()
             except KeyboardInterrupt:
                 print("keyboard interrupt")
                 break
 
     def step(self) -> str | None:
+        
+        # Check input queue if available
+        if self.input_queue:
+            try:
+                while True:
+                    event_type, data = self.input_queue.get_nowait()
+                    if event_type == "key":
+                        # put key on port 1, trigger interrupt 4
+                        self.ports[1] = ord(data)
+                        self.interrupt_request(4)
+            except queue.Empty:
+                pass
 
         # check for halt/breakpoints (emulated hardware-level overrides)
         if self.halted:
@@ -235,14 +277,13 @@ class Emulator:
             # if halt was called before, we need to start again after the interrupt 
             self.waiting_for_interrupt = False 
             interrupt_id = self.pending_interrupts.pop(0)
-            print(f"processing interrupt {interrupt_id}")
             self._execute_interrupt(interrupt_id)
             return None
 
         # halt was called, we are just idle waiting for an interrupt
         if self.waiting_for_interrupt:
             # print("waiting for interrupt")
-            time.sleep(0.02)
+            time.sleep(0.016) # ~60 updates/sec
             return
 
         # normal execution
@@ -253,14 +294,6 @@ class Emulator:
             self.handlers[opcode](decoded)
         except EmulatorException as e:
             return e.message
-
-    def dev(self, device: str) -> None:
-        if device == "graphics":
-            vram = memoryview(self.banks[0])
-            self.graphics = Graphics(vram, self)
-        else:
-            logger.error(f"invalid device {device}. valid devices are: graphics")
-            return
 
     # repl and shell interface
     def repl(self):
@@ -321,11 +354,6 @@ class Emulator:
                     addr = parse_integer(1, base=16, default=0)
                     self.load_binary(file, addr)
                 
-                case "dev":
-                    if not assert_num_args(1): continue # noqa: E701
-                    device = args[0]
-                    self.dev(device)
-
                 case "run":
                     self.halted = False
                     self.run()
@@ -415,7 +443,6 @@ class Emulator:
                 case "help":
                     print("jaide emulator shell version 0.0.3 command list")
                     print(help_string("load", "<path> [addr]", "load a binary file into memory"))
-                    print(help_string("dev", "<name>", "initialize a device"))
                     print(help_string("run", "", "execute until until a breakpoint or halt"))
                     print(help_string("step", "", "execute one instruction"))
                     print(help_string("break", "<addr>", "set a breakpoint at the given addrezss"))
@@ -436,8 +463,6 @@ class Emulator:
                 
                 case "q" | "quit" | "exit":
                     print("bye!")
-                    if hasattr(self, 'graphics') and self.graphics.is_alive():
-                        self.graphics.stop()
                     break
                 
                 case _:
@@ -511,8 +536,6 @@ class Emulator:
             print(f"interrupt {vector} ignored, mask is {self.flag_get(FLAG_I)}")
             return
 
-        print(f"executing interrupt {vector}")
-
         # push pc and flags
         self._push_core(self.pc.value)
         self._push_core(self.f.value)
@@ -524,7 +547,6 @@ class Emulator:
         # Interrupt vector is at word address 0xFFFF - vector
         vector_word = 0xFFFF - vector
         dest = self.read16(vector_word)
-        print(f"jumping to interrupt handler at 0x{dest:04X}")
         # set program counter to address at vector and unhalt
 
         self.pc.set(dest)
@@ -692,7 +714,6 @@ class Emulator:
             result = self.reg_get(reg_a) & imm16
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for AND at 0x{self.pc:04X}.")
-        print(f"AND result: {result} ({self.reg_get(reg_a)} & {self.reg_get(reg_b) if mode == MODE_REG else imm16})")
         self.reg_set(reg_a, result)
         self.flag_set(FLAG_Z, result == 0)
 
@@ -891,7 +912,6 @@ class Emulator:
         if mode == MODE_NULL:
             self.f.set(self._pop_core())
             self.pc.set(self._pop_core())
-            print(f"iret called, mask is now {self.flag_get(FLAG_I)} (from {self.f.value:016b})")
         else:
             raise EmulatorException(f"invalid addressing mode {mode} for IRET at 0x{self.pc:04X}.")
 

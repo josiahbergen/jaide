@@ -4,9 +4,10 @@
 
 import argparse
 import os
+import multiprocessing
+
 from .emulator import Emulator
 from .util.logger import logger
-
 
 def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description="JAIDE emulator")
@@ -36,41 +37,42 @@ def check_files(file: str):
 
 def main():
     """ main entry point for the emulator. """
+    multiprocessing.set_start_method("spawn", force=True)
     args = get_args()
-    scope = "__main__.py:main()"
-
-    # initialize logger
+    
     logger.title("welcome to the jaide emulator v0.0.1 (copyright 2026 Josiah Bergen)")
     logger.nl()
 
-    binary = args.binary
-    auto_run = args.run
-    auto_graphics = args.graphics
+    shm, q, p = None, None, None
 
     try:
+        if args.graphics:
+            from .devices.graphics import start_graphics
+            p, shm, q = start_graphics()
+            logger.info(f"started graphics process (pid: {p.pid})")
 
-        # create the emulator
-        emulator = Emulator()
+        emulator = Emulator(shm_name=shm.name if shm else None, input_queue=q)
 
-        if binary:
-            check_files(binary)
-            emulator.load_binary(binary)
-
-            if auto_graphics:
-                emulator.dev("graphics")
-
-            if auto_run:
-                emulator.run()
+        if args.binary:
+            check_files(args.binary)
+            emulator.load_binary(args.binary)
+            if args.run: emulator.run()
         else:
-            logger.warning("no binary file provided, you will need to load one manually.", scope)
+            logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
         
-        # pass control to the emulator
         emulator.repl()
 
     except KeyboardInterrupt:
         logger.nl()
-        logger.kill("keyboard interrupt", scope)
-
+        logger.kill("keyboard interrupt", "__main__.py:main()")
+    finally:
+        if p and p.is_alive():
+            p.terminate()
+            p.join()
+        if shm:
+            shm.close()
+            shm.unlink()
+    
     exit(0)
 
 if __name__ == "__main__":

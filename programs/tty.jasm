@@ -4,6 +4,7 @@ start:
     generate_attrs z, 0x01, 0x00
 
     mov y, 0x8000 ; cursor position
+    call tty_prompt
 
 loop:
     ; wait for interrupts
@@ -15,11 +16,16 @@ keyboard_interrupt:
     
     cmp a, 0x0D ; check if enter key
     jz panic
+
     char_at a, y ; draw char at cursor position
 
     ; increment cursor position and return
     inc y
     iret
+
+tty_prompt:
+    string_at s_prompt, y
+    ret
 
 setup_interrupt_vectors:
     ; interrupts 0-3 are reserved for hardware interrupts

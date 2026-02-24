@@ -2,11 +2,11 @@
 
 ## overview
 
-- 32 instructions (with support for up to 64)
-- 16-bit word length
-- 16-bit address bus touches 128Kib of word-addressable memory (~64k unique values, more with banking)
-- 12 registers: 8 general-purpose, 4 special, all 16-bit
 - load-store, little-endian, interrupt-driven, von-neumann architecture
+- 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
+- 32 supported instructions (with support for up to 64)
+- 16-bit word length
+- 12 registers: 8 general-purpose, 4 special, all 16-bit
 
 ## programming jaide
 
@@ -28,9 +28,11 @@ in the jaide emulator, type help to view a list of commands.
 
 ## reset state
 
-on reset, the content of all* registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+on reset, the content of all\* registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
 
-_*it is recommended that SP be set to 0xFEFF on reset._
+thus, the jaide will simply start execution at `0x0000`
+
+_\*it is recommended that SP be set to 0xFEFF on reset._
 
 ## registers
 
@@ -58,7 +60,7 @@ the format of the flags register is `C Z N O I - - - - - - - - - - -`.
 
 jaide uses a little-endian instruction format. instructions are 16 bits (two bytes) long, and may contain a 16-bit immediate located directly after them.
 
-a single 16-bit instruction word is defined as follows: 
+a single 16-bit instruction word is defined as follows:
 
 `CCCC DDDD` `AAAAAA BB` `EEEEEEEE` `EEEEEEEE`
 
@@ -74,12 +76,12 @@ a single 16-bit instruction word is defined as follows:
 
 ### addressing modes:
 
-| value | notation | mode            |
-| ----- | -------- | --------------- |
-| 0     | reg      | register        |
-| 1     | imm16*   | immediate       |
-| 2     | [imm16]* | memory direct   |
-| 3     | [reg]    | memory indirect |
+| value | notation  | mode            |
+| ----- | --------- | --------------- |
+| 0     | reg       | register        |
+| 1     | imm16\*   | immediate       |
+| 2     | [imm16]\* | memory direct   |
+| 3     | [reg]     | memory indirect |
 
 _\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
@@ -87,7 +89,7 @@ _\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented a
 
 see [inst.txt](inst.txt) for the full instruction set specification and encoding.
 
-at this time, only 32 instructions are defined. jaide supports up to 64 unique instructions, and these will eventially all be implemented. 
+at this time, only 32 instructions are defined. jaide supports up to 64 unique instructions, and these will eventially all be implemented.
 
 ## memory
 
@@ -134,18 +136,18 @@ jaide checks the `IRQ` (interrupt reqest) line at the end of every instruction c
 interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define handlers for each of them.
 
 ### vector allocation
- 
-| vector | type      |	description                            |
-| ------ | --------- | ----------------------------------------|
-| 0	     | exception | unhandled fault                         |
-| 1	     | exception | invalid instruction                     |
-| 2	     | exception | protection fault                        |
-| 3	     | reserved	 | reserved                                |
+
+| vector | type      | description                             |
+| ------ | --------- | --------------------------------------- |
+| 0      | exception | unhandled fault                         |
+| 1      | exception | invalid instruction                     |
+| 2      | exception | protection fault                        |
+| 3      | reserved  | reserved                                |
 | 4-127  | external  | available for external hardware devices |
 
 ### a note on HALT
 
-calling `HALT` puts the cpu in a *non-permanent*, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
+calling `HALT` puts the cpu in a _non-permanent_, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
 
 ### using INT and IRET
 
@@ -153,23 +155,23 @@ when an interrupt `n` is called, jaide saves its state and transfers execution t
 
 more specifically, when `INT` is called:
 
-| action                      | description                                              |
-| --------------------------- | -------------------------------------------------------- |
-| `NOP if I == 0`             | if interrupts are masked, jaide will `NOP` and continue. |
-| `[SP--] <- PC`              | program counter is pushed                                |
-| `[SP--] <- F`               | flags are pushed                                         |
-| `I <- 0`                    | ineterrupt mask is cleared                               |
-| `vector = 0xFFFF - n`       | handler address is computed                              |
-| `PC <- MEM16[vector]`       | execution jumps to handler                               |
+| action                | description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `NOP if I == 0`       | if interrupts are masked, jaide will `NOP` and continue. |
+| `[SP--] <- PC`        | program counter is pushed                                |
+| `[SP--] <- F`         | flags are pushed                                         |
+| `I <- 0`              | ineterrupt mask is cleared                               |
+| `vector = 0xFFFF - n` | handler address is computed                              |
+| `PC <- MEM16[vector]` | execution jumps to handler                               |
 
 nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
 
 normal execution can be restored by calling `IRET`. more specifically, when `IRET` is called:
 
-| action           | description                                              |
-| ---------------- | -------------------------------------------------------- |
-| `F <- [SP++]`    | flags are popped (unmasks interrupts if applicable)      |
-| `PC <- [SP++]`   | program counter is popped                                |
+| action         | description                                         |
+| -------------- | --------------------------------------------------- |
+| `F <- [SP++]`  | flags are popped (unmasks interrupts if applicable) |
+| `PC <- [SP++]` | program counter is popped                           |
 
 ## ports
 
@@ -183,10 +185,10 @@ port `0xFF` is a special port that can be used to control the physical hardware.
 
 the system interface port supports these commands:
 
-| value   | command     | emulator behavior            | hardware behavior    |
-| ------- | ----------- | ---------------------------- | -------------------- |
-| 0x00    | nop         | do nothing                   | do nothing           |
-| 0x01    | reset       | clear ram/regs, set pc = 0   | pull reset pin low   |
-| 0x02    | halt        | set halted = true            | stop the clock       |
-| 0x03    | nop         | shut down emulator process   | disconnect power     |
-| other   | _undefined_ | _undefined_                  | _undefined_          |
+| value | command     | emulator behavior          | hardware behavior  |
+| ----- | ----------- | -------------------------- | ------------------ |
+| 0x00  | nop         | do nothing                 | do nothing         |
+| 0x01  | reset       | clear ram/regs, set pc = 0 | pull reset pin low |
+| 0x02  | halt        | set halted = true          | stop the clock     |
+| 0x03  | nop         | shut down emulator process | disconnect power   |
+| other | _undefined_ | _undefined_                | _undefined_        |
