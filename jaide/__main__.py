@@ -4,10 +4,10 @@
 
 import argparse
 import os
-import multiprocessing
 
 from .emulator import Emulator
 from .util.logger import logger
+from .devices.graphics import Graphics
 
 def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description="JAIDE emulator")
@@ -37,43 +37,32 @@ def check_files(file: str):
 
 def main():
     """ main entry point for the emulator. """
-    multiprocessing.set_start_method("spawn", force=True)
     args = get_args()
     
     logger.title("welcome to the jaide emulator v0.0.1 (copyright 2026 Josiah Bergen)")
     logger.nl()
 
-    shm, q, p = None, None, None
+    try: # main block to catch ctrl+c from everywhere
 
-    try:
-        if args.graphics:
-            from .devices.graphics import start_graphics
-            p, shm, q = start_graphics()
-            logger.info(f"started graphics process (pid: {p.pid})")
+        emulator = Emulator()
 
-        emulator = Emulator(shm_name=shm.name if shm else None, input_queue=q)
-
+        # load binary file if provided
         if args.binary:
             check_files(args.binary)
             emulator.load_binary(args.binary)
-            if args.run: emulator.run()
         else:
             logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
         
+        # start graphics if requested
+        if args.graphics:
+            graphics = Graphics(emulator.vram, emulator)
+            graphics.start()
+
         emulator.repl()
 
     except KeyboardInterrupt:
         logger.nl()
         logger.kill("keyboard interrupt", "__main__.py:main()")
-    finally:
-        if p and p.is_alive():
-            p.terminate()
-            p.join()
-        if shm:
-            shm.close()
-            shm.unlink()
     
-    exit(0)
-
 if __name__ == "__main__":
     main()

@@ -1,7 +1,8 @@
 import tkinter as tk
-from multiprocessing import shared_memory, Queue
-from typing import Any
 from PIL import Image, ImageTk
+import threading
+
+from ..emulator import Emulator
 
 WIDTH  = 80
 HEIGHT = 25
@@ -28,58 +29,54 @@ COLORS = [
     (128, 0, 128),   # 15: dark magenta
 ]
 
-from multiprocessing import Process
+class Graphics(threading.Thread):
 
-def start_graphics() -> tuple[Process, shared_memory.SharedMemory, Any]:
-    shm = shared_memory.SharedMemory(create=True, size=0x8000)
-    q = Queue()
-    p = Process(target=run_graphics_process, args=(shm.name, q))
-    p.start()
-    return p, shm, q
+    def __init__(self, vram: memoryview, emulator: Emulator):
+        super().__init__(daemon=True)
+        self.vram = vram # memoryview of vram
+        self.emulator = emulator # emulator instance
 
-def run_graphics_process(shm_name: str, input_queue: Any):
-    """
-    Entry point for the graphics process.
-    """
-    try:
-        shm = shared_memory.SharedMemory(name=shm_name)
-        vram = shm.buf
-        
-        root = tk.Tk()
-        root.title("jaide video controller output")
-        root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
-        
-        # load glyphs. 
+        self.root = tk.Tk()
+        self.root.title("jaide video controller output")
+        self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
+
+        # load glyphs
         # this sucks, ideally we would pass in glyphs as a bytearray or something
         try:
             with open("jaide/devices/VGA8.F16", "rb") as f:
-                glyphs = [bytes(f.read(16)) for _ in range(256)]
+                self.glyphs = [bytes(f.read(16)) for _ in range(256)]
         except FileNotFoundError:
             print("Graphics process: VGA8.F16 not found")
             return
 
-        framebuf = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3)
-        label = tk.Label(root, bg="black")
-        label.pack()
+        self.framebuf = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3)
+        self.label = tk.Label(self.root, bg="black") # what we render to
+        self.label.pack()
         
-        # State
-        state = {
-            "last_hash": None,
-            "photo": None,
-            "closed": False
-        }
+        self.root.bind("<Key>", self.on_key)
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
 
-        def on_key(event):
-            if event.char:
-                input_queue.put(("key", event.char))
+        self.last_hash = None
+        self.photo = None
+        self.closed = False
 
-        root.bind("<Key>", on_key)
-        
-        def close():
-            state["closed"] = True
-            root.destroy()
-            
-        root.protocol("WM_DELETE_WINDOW", close)
+        # run the thing!
+        self.render()
+
+
+    def on_key(self, event):
+        if event.char:
+                self.emulator.ports[1] = ord(event.char)
+                self.emulator.request_interrupt(4)
+
+    def close(self):
+        self.closed = True
+        self.root.destroy()
+
+
+    def render(self):
+        if self.closed:
+            return
 
         def parse_attrs(byte: int):
             fore = byte & 0b1111
@@ -96,38 +93,29 @@ def run_graphics_process(shm_name: str, input_queue: Any):
                     bit = (row_byte >> (GLYPH_WIDTH - 1 - x)) & 1
                     color = fore if bit else back
                     pixel_idx = ((base_y + y) * WIDTH * GLYPH_WIDTH + (base_x + x)) * 3
-                    framebuf[pixel_idx + 0] = color[0]
-                    framebuf[pixel_idx + 1] = color[1]
-                    framebuf[pixel_idx + 2] = color[2]
+                    self.framebuf[pixel_idx + 0] = color[0]
+                    self.framebuf[pixel_idx + 1] = color[1]
+                    self.framebuf[pixel_idx + 2] = color[2]
 
-        def tick():
-            if state["closed"]:
-                return
-
-            # hash to check if VRAM changed
-            current_data = bytes(vram[:WIDTH * HEIGHT * 2]) # read only relevant part
-            h = hash(current_data)
-            
-            if h != state["last_hash"]:
-                state["last_hash"] = h
-                
-                # render
-                for char_idx in range(WIDTH * HEIGHT):
-                    i = char_idx * 2
-                    lo, hi = vram[i], vram[i + 1]
-                    fore, back = parse_attrs(hi)
-                    draw_glyph(glyphs[lo], fore, back, char_idx // WIDTH, char_idx % WIDTH)
-                
-                img = Image.frombuffer("RGB", (WIDTH * GLYPH_WIDTH, HEIGHT * GLYPH_HEIGHT), bytes(framebuf), "raw")
-                photo = ImageTk.PhotoImage(img)
-                label.configure(image=photo)
-                state["photo"] = photo # keep reference
-
-            # tick every 33ms (30fps)
-            root.after(FPS_MS, tick)
-
-        tick()
-        root.mainloop()
+        # hash to check if VRAM changed
+        current_data = bytes(self.vram[:WIDTH * HEIGHT * 2]) # read only relevant part
+        h = hash(current_data)
         
-    except Exception as e:
-        print(f"Graphics process error: {e}")
+        if h != self.last_hash:
+            self.last_hash = h
+            
+            # render
+            for char_idx in range(WIDTH * HEIGHT):
+                i = char_idx * 2
+                lo, hi = self.vram[i], self.vram[i + 1]
+                fore, back = parse_attrs(hi)
+                draw_glyph(self.glyphs[lo], fore, back, char_idx // WIDTH, char_idx % WIDTH)
+            
+            img = Image.frombuffer("RGB", (WIDTH * GLYPH_WIDTH, HEIGHT * GLYPH_HEIGHT), bytes(self.framebuf), "raw")
+            photo = ImageTk.PhotoImage(img)
+            self.label.configure(image=photo)
+            self.photo = photo # keep reference
+
+        # run again in 33ms (30fps)
+        self.root.after(FPS_MS, self.render)
+

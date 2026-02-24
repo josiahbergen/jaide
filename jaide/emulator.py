@@ -4,8 +4,9 @@
 
 from colorama import Fore as f
 import os
+import sys
 import time
-from typing import Callable, Any
+from typing import Callable
 
 from .constants import (
     MNEMONICS, INSTRUCTION_ENCODINGS,
@@ -21,13 +22,9 @@ from .util.logger import logger
 
 def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
 
-
-from multiprocessing import shared_memory, Queue
-import queue
-
 class Emulator:
 
-    def __init__(self, shm_name: str | None, input_queue: Any):
+    def __init__(self):
 
         # general purpose registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
@@ -38,51 +35,31 @@ class Emulator:
         self.f: Register = self.reg["F"] # flags
         self.mb: Register = self.reg["MB"] # memory bank
 
+        # set stack pointer to 0xFEFF as recommended by the spec
         self.sp.set(0xFEFF)
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         
-        # Initialize banks
-        self.banks: list[bytearray | memoryview] = []
-        
-        # If shared memory is provided, use it for Bank 0 (VRAM)
-        self.shm = None
-        if shm_name:
-            try:
-                self.shm = shared_memory.SharedMemory(name=shm_name)
-                self.banks.append(self.shm.buf)
-                print(f"attached to shared memory {shm_name} for bank 0")
-            except Exception as e:
-                logger.error(f"failed to attach to shared memory: {e}")
-                self.banks.append(bytearray(BANK_SIZE))
-        else:
-            self.banks.append(bytearray(BANK_SIZE))
-            
-        # Initialize remaining banks
-        for _ in range(NUM_BANKS - 1):
-            self.banks.append(bytearray(BANK_SIZE))
-            
-        self.ports: list[int] = [0] * 256 # 256 16-bit ports
-        
-        # Input queue for external events
-        self.input_queue = input_queue
-        
+        # memory banks and ports
+        self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
+        self.vram: memoryview = memoryview[int](self.banks[1]) # special reference to VRAM bank
+
+        # 256 16-bit ports
+        self.ports: list[int] = [0] * 256 
+                
         # interrupt handling
         self.pending_interrupts: list[int] = [] # queue of vectors waiting to be handled
         self.waiting_for_interrupt: bool = False
         self.flag_set(FLAG_I, True)
         
         # debugger etc.
-        self.breakpoints: set[int] = set[int]()
-        self.halted: bool = False
+        self.breakpoints: set[int] = set[int]() # empty set of breakpoints
+        self.halted: bool = False # hardware halt (not waiting for interrupt
+        
+        # handlers for each opcode, abstracted elsewhere
         self.handlers: dict[int, Callable[[tuple[int, ...]]]] = {}
         self._populate_handlers()
-
-    def __del__(self):
-        if self.shm:
-            self.shm.close()
-
 
 
     # memory
@@ -188,7 +165,7 @@ class Emulator:
         self.ports[port] = value
 
     # interrupt helpers
-    def interrupt_request(self, vector: int) -> None:
+    def request_interrupt(self, vector: int) -> None:
         if self.halted:
             return
         if vector < 0 or vector > 0xFF:
@@ -210,7 +187,7 @@ class Emulator:
 
     def shutdown(self) -> None:
         print("shutting down...")
-        os._exit(0)
+        sys.exit(0)
 
     # main fetch/decode
     def fetch(self) -> int:
@@ -239,61 +216,46 @@ class Emulator:
         return opcode, mode, reg_a, reg_b, imm16
 
     # main run loop
-    def run(self, step_callback: Callable[[], None] | None = None) -> None:
-        while not self.halted:
-            try:
-                res = self.step()
-                if res: 
-                    print(res)
-                    break
-                if step_callback:
-                    step_callback()
-            except KeyboardInterrupt:
-                print("keyboard interrupt")
-                break
-
-    def step(self) -> str | None:
-        
-        # Check input queue if available
-        if self.input_queue:
+    def run(self) -> None:
             try:
                 while True:
-                    event_type, data = self.input_queue.get_nowait()
-                    if event_type == "key":
-                        # put key on port 1, trigger interrupt 4
-                        self.ports[1] = ord(data)
-                        self.interrupt_request(4)
-            except queue.Empty:
-                pass
+                    # normal execution
+                    self.step() 
+            except EmulatorException as e:
+                # we enter exceptional control flow either if something went wrong,
+                # or if the user interrupts the program
+                print(f"emulator stopped: {e.message}")
+            except KeyboardInterrupt:
+                # this prevents ctrl+c from bubbling up to the __main__() function,
+                # allowing easy program interruption, etc. while allowing the repl to persist
+                print("keyboard interrupt, stopping emulator...")
+            finally:
+                self.halted = True
 
-        # check for halt/breakpoints (emulated hardware-level overrides)
+    def step(self) -> None:
+
+        # hardware-level overrides
         if self.halted:
-            return "halted"
+            raise EmulatorException("halted")
         if self.pc in self.breakpoints:
-            return f"hit breakpoint at 0x{self.pc:04X}"
+            raise EmulatorException(f"hit breakpoint at 0x{self.pc:04X}")
 
-        # check for pending irqs
         if self.interrupts_pending():
-            # if halt was called before, we need to start again after the interrupt 
-            self.waiting_for_interrupt = False 
+            # interrupt called!
+            self.waiting_for_interrupt = False # reset to normal execution state
             interrupt_id = self.pending_interrupts.pop(0)
             self._execute_interrupt(interrupt_id)
-            return None
+            return # cycle done, go to next instruction
 
-        # halt was called, we are just idle waiting for an interrupt
-        if self.waiting_for_interrupt:
-            # print("waiting for interrupt")
-            time.sleep(0.016) # ~60 updates/sec
+        
+        if self.waiting_for_interrupt: # i.e. halt was called, we are simply waiting for an interrupt
+            time.sleep(0.008) # reduce cpu usage a little
             return
 
         # normal execution
-        decoded = self.decode()
+        decoded = self.decode() # decode instruction
         opcode = decoded[0]
-
-        try:
-            self.handlers[opcode](decoded)
-        except EmulatorException as e:
-            return e.message
+        self.handlers[opcode](decoded) # run instruction handler
 
     # repl and shell interface
     def repl(self):
@@ -434,9 +396,8 @@ class Emulator:
                     os.system("cls" if os.name == "nt" else "clear")
 
                 case "vram":
-                    vram = self.banks[0]
-                    for i in range(0, 2000, 32):
-                        row = vram[i:i+32]
+                    for i in range(0, 1000, 32): # only display first 1000 words of vram
+                        row = self.vram[i:i+32]
                         words = [(row[j] | row[j+1] << 8) for j in range(0, len(row), 2)]
                         print(f"0x{i // 2:04X} | {" ".join([f"{w:04X}" for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
                 
