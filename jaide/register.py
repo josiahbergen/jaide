@@ -1,18 +1,21 @@
 # registers.py
-# register class used by the emulator.
+# register utility class used by the emulator.
 # josiah bergen, january 2026
+
+from typing import override
 
 class Register:
 
-    def __init__(self, name: str, value: int):
-        self.name = name
-        self.value = 0
-        self.set(value)
+    # "intro to java" ahh class
 
-    # java ahh setter
+    def __init__(self, name: str, value: int):
+        self.name: str = name
+        self.value: int = 0
+        self.set(value)
 
     def set(self, value: int) -> None:
         self.value = value & 0xFFFF # mask to 16 bits
 
+    @override
     def __str__(self) -> str:
         return f"{self.name}: 0x{self.value:04X}"

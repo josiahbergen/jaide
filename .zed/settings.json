@@ -20,8 +20,8 @@
     ".python-version",
     "pyproject.toml",
     "requirements.in",
-    "uv.lock",
+    "uv.lock"
   ],
 
-  "format_on_save": "on",
+  "format_on_save": "off"
 }

@@ -59,6 +59,7 @@ class Graphics(threading.Thread):
         self.last_hash = None
         self.photo = None
         self.closed = False
+        self._after_callback = None
 
         # run the thing!
         self.render()
@@ -71,8 +72,15 @@ class Graphics(threading.Thread):
 
     def close(self):
         self.closed = True
-        self.root.destroy()
+        if self._after_callback is not None:
+            # cancel any scheduled render callback to prevent tkinter from
+            # attepting to render after the window is destroyed
+            self.root.after_cancel(self._after_callback)
+            self._after_callback = None
 
+        # destroy the window and shutdown the emulator
+        self.root.destroy()
+        self.emulator.shutdown()
 
     def render(self):
         if self.closed:
@@ -116,6 +124,8 @@ class Graphics(threading.Thread):
             self.label.configure(image=photo)
             self.photo = photo # keep reference
 
-        # run again in 33ms (30fps)
-        self.root.after(FPS_MS, self.render)
+        if not self.closed:
+            # run again in 33ms (30fps)
+            # save the callback to a variable so we can cancel it later
+            self._after_callback = self.root.after(FPS_MS, self.render)
 
