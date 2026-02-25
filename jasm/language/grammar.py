@@ -29,6 +29,7 @@ GRAMMAR = r"""
     
     ?macro_stmt: instruction
                | data_directive
+               | label
                | macro_call
 
     # Macro call: name [args]

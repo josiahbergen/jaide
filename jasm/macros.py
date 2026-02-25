@@ -21,7 +21,7 @@ def expand_macros(ir: list[IRNode]) -> None:
                 
                 macro = IRNode.macros[node.name]
                 logger.verbose(f"macros: expanding macro {node.name} on line {node.line} with {len(macro.args)} arguments")
-                expanded = macro.expand(node.args)
+                expanded = macro.expand(node.args, line=node.line)
                 ir.pop(i)
 
                 # this inserts a list of items at some index

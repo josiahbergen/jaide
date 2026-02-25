@@ -191,7 +191,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
 
                 body_nodes = generate_macro_body(body_tree)
 
-                logger.verbose(f"parse: creating full node for macro definition: {name.value} with {len(args)} arguments and {len(body_nodes)} body nodes (line {line})")
+                logger.verbose(f"parse: creating full node for macro {name.value}: {len(args)} args, {len(body_nodes)} body nodes (line {line})")
                 IRNode.macros[name.value] = MacroNode(line, name.value, args, body_nodes)
                 logger.verbose(f"parse: finished parsing definition of macro {name.value}!")
 
@@ -201,7 +201,11 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
 
                 args_raw = next(subtree.find_data("operand_list"), None)
                 args_raw = args_raw.children if args_raw else []
-                logger.verbose(f"parse: tried operand list: {str(args_raw)}")
+
+                if len(args_raw) > 0:
+                    logger.verbose(f"parse: got operand list: {str(args_raw)}")
+                else:
+                    logger.verbose("parse: no arguments given")
 
                 args = []
                 for arg in args_raw:
@@ -211,7 +215,7 @@ def generate_ir_nodes(tree: ParseTree) -> list[IRNode]:
                         logger.fatal(f"unexpected node type in macro call (expected operand): {type(arg)}", scope)
                 
                 opstring = ", ".join([str(op) for op in args]) if args else "no arguments"
-                logger.debug(f"parse: creating macro_call: {name.value} {opstring} (line {line})")
+                logger.debug(f"parse: creating macro_call: {name.value} with {opstring} (line {line})")
                 ir_nodes.append(MacroCallNode(line, name.value, args))
 
             case _:
@@ -229,8 +233,17 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
         if not isinstance(statement, Tree):
             logger.fatal(f"unexpected token in macro body (expected macro statement): {str(statement)}", scope)
         
+        if statement.data == "label":
+            # labels are allowed in macro bodies
+            label = next(statement.find_token("LABELNAME"))
+            line = warn_if_no_line(label, scope)
+            logger.verbose(f"parse: creating node for label \"{label.value}\" in macro body (line {line})")
+            body_nodes.append(LabelNode(line, label.value))
+            continue
+        
+        # nothing else should be here
         if statement.data != "instruction":
-            logger.fatal(f"unexpected statement type in macro body (expected instruction): {str(statement)}", scope)
+            logger.fatal(f"unexpected statement type in macro body (expected instruction or label): {str(statement)}", scope)
         
         mnemonic = next(statement.find_token("MNEMONIC"))
         operand_list = next(statement.find_data("operand_list"), None)

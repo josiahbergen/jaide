@@ -492,7 +492,7 @@ class MacroNode(IRNode):
         self.args: list[MacroArgumentNode] = args
         self.body: list[IRNode] = body
 
-    def expand(self, real_args: list[OperandNode]) -> list[IRNode]:
+    def expand(self, real_args: list[OperandNode], line: int | None = None) -> list[IRNode]:
         scope = "ir.py:MacroNode.expand()"
 
         args_map: dict[str, OperandNode] = {}
@@ -516,17 +516,22 @@ class MacroNode(IRNode):
             elif isinstance(node, LabelNode):
                 # mangle the label name and all its references in the current invocation
                 # we mangle with the macro name and line number
+                if line is None:
+                    logger.fatal(f"macro: line number is required to mangle labels: {self.name} (line {self.line})", scope)
                 old_label = node.label
-                new_label = f"{old_label}__{self.name}__{self.line}"
+                new_label = f"{old_label}__{self.name}__{line}"
 
-                # find all references to the old label and replace them with the new one
-                # lowkey ugly but it works
-                references = [ref for ref in template if isinstance(ref, InstructionNode)]
-
+                # find and update all operands in all instructions that reference the old label
+                references = 0
+                for node_ in template:
+                    if isinstance(node_, InstructionNode) and node_.mnemonic in {"JMP", "JZ", "JNZ", "JC", "JNC"}:
+                        for operand in node_.operands:
+                            if operand.type == OPERAND_TYPES["LABELNAME"] and operand.value == old_label:
+                                operand.value = new_label
+                                references += 1
 
                 node.label = new_label
-                logger.verbose(f"macro: mangled label {old_label} and {len(references)} references to {new_label} on line {self.line}")
-                logger.fatal("macro: mangling is not yet fully supported! aborting...", scope)
+                logger.verbose(f"macro: mangled label {old_label} and {references} references to {new_label} on line {self.line}")
 
             elif isinstance(node, InstructionNode):
 
