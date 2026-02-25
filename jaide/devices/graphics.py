@@ -33,48 +33,53 @@ class Graphics(threading.Thread):
 
     def __init__(self, vram: memoryview, emulator: Emulator):
         super().__init__(daemon=True)
-        self.vram = vram # memoryview of vram
-        self.emulator = emulator # emulator instance
+        self.vram: memoryview = vram # memoryview of vram
+        self.emulator: Emulator = emulator # emulator instance
 
-        self.root = tk.Tk()
-        self.root.title("jaide video controller output")
-        self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
-
-        # load glyphs
-        # this sucks, ideally we would pass in glyphs as a bytearray or something
+        # load glyphs before the thread starts
+        # ideally we would pass in glyphs as a bytearray or something
         try:
             with open("jaide/devices/VGA8.F16", "rb") as f:
                 self.glyphs = [bytes(f.read(16)) for _ in range(256)]
         except FileNotFoundError:
-            print("Graphics process: VGA8.F16 not found")
+            print("graphics: VGA8.F16 not found")
             return
 
+        print("graphics ready.")
+
+
+    def run(self):
+        # runs in the graphics thread. all tk stuff lives here.
+        self.root = tk.Tk()
+        self.root.title("jaide video controller output")
+        self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
+
         self.framebuf = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3)
-        self.label = tk.Label(self.root, bg="black") # what we render to
+        self.label = tk.Label(self.root, bg="black")  # what we render the framebuffer to
         self.label.pack()
-        
+
         self.root.bind("<Key>", self.on_key)
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.root.protocol("WM_DELETE_WINDOW", lambda: None)  # disable close button
 
         self.last_hash = None
         self.photo = None
         self.closed = False
         self._after_callback = None
 
-        # run the thing!
-        self.render()
+        self.render()  # schedules next render via after(); mainloop() processes them
+        self.root.mainloop() # TODO: what does this do?
 
 
     def on_key(self, event):
         if event.char:
-                self.emulator.ports[1] = ord(event.char)
-                self.emulator.request_interrupt(4)
+                self.emulator.ports[1] = ord(event.char) # send key to port 1
+                self.emulator.request_interrupt(4) # send keyboard interrupt
 
     def close(self):
         self.closed = True
         if self._after_callback is not None:
             # cancel any scheduled render callback to prevent tkinter from
-            # attepting to render after the window is destroyed
+            # attempting to render after the window is destroyed
             self.root.after_cancel(self._after_callback)
             self._after_callback = None
 
@@ -83,8 +88,6 @@ class Graphics(threading.Thread):
         self.emulator.shutdown()
 
     def render(self):
-        if self.closed:
-            return
 
         def parse_attrs(byte: int):
             fore = byte & 0b1111
@@ -105,27 +108,30 @@ class Graphics(threading.Thread):
                     self.framebuf[pixel_idx + 1] = color[1]
                     self.framebuf[pixel_idx + 2] = color[2]
 
-        # hash to check if VRAM changed
+        if self.closed:
+            return
+
+        # hash to check if vram changed
         current_data = bytes(self.vram[:WIDTH * HEIGHT * 2]) # read only relevant part
         h = hash(current_data)
         
         if h != self.last_hash:
             self.last_hash = h
             
-            # render
+            # main render to framebuffer
             for char_idx in range(WIDTH * HEIGHT):
                 i = char_idx * 2
                 lo, hi = self.vram[i], self.vram[i + 1]
                 fore, back = parse_attrs(hi)
                 draw_glyph(self.glyphs[lo], fore, back, char_idx // WIDTH, char_idx % WIDTH)
             
+            # convert framebuffer to image to display in the window
             img = Image.frombuffer("RGB", (WIDTH * GLYPH_WIDTH, HEIGHT * GLYPH_HEIGHT), bytes(self.framebuf), "raw")
-            photo = ImageTk.PhotoImage(img)
-            self.label.configure(image=photo)
-            self.photo = photo # keep reference
+            self.photo = ImageTk.PhotoImage(img)
+            self.label.configure(image=self.photo)
 
         if not self.closed:
-            # run again in 33ms (30fps)
-            # save the callback to a variable so we can cancel it later
+            # schedule next render
+            # we save the id here so we can cancel it on close
             self._after_callback = self.root.after(FPS_MS, self.render)
 

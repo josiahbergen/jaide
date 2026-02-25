@@ -500,25 +500,45 @@ class MacroNode(IRNode):
             args_map[arg.name] = real_args[arg.index]
         logger.verbose(f"macro: args map: {', '.join([f"{k}: {v}" for k, v in args_map.items()])}")
 
-        # use a copy of the body to avoid modifying the original macro definition
+        # use a deep copy of the body to avoid modifying the original macro definition
         template = copy.deepcopy(self.body)
-        for instr in template:
+        for node in template:
 
-            # error checking
-            if isinstance(instr, MacroCallNode):
-                logger.fatal(f"macros cannot contain macro calls: {self.name} (line {self.line})", scope)
-            elif isinstance(instr, DataDirectiveNode):
-                logger.fatal(f"macros cannot contain data directives: {self.name} (line {self.line})", scope)
-            elif isinstance(instr, LabelNode):
-                logger.fatal(f"macros cannot contain labels: {self.name} (line {self.line})", scope)
-            elif not isinstance(instr, InstructionNode):
-                logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
+            if isinstance(node, MacroCallNode):
+                # this would involve finding and expanding the def, but that's a lot of work for now
+                # we would have to think about how macro args can be put in the call for another macro, etc.
+                logger.fatal(f"nested macro calls are not yet supported: {self.name} (line {self.line})", scope)
 
-            for i, operand in enumerate[OperandNode](instr.operands):
-                if operand.type == OPERAND_TYPES["MACRO_ARG"]:
-                    logger.verbose(f"macro: replacing macro argument {operand.value} with {args_map[operand.value]}")
-                    instr.operands[i] = args_map[operand.value]
+            elif isinstance(node, DataDirectiveNode):
+                # this won't crash, but it's probably not a good idea
+                logger.warning(f"macro contains data directive: {self.name} (line {self.line})", scope)
+
+            elif isinstance(node, LabelNode):
+                # mangle the label name and all its references in the current invocation
+                # we mangle with the macro name and line number
+                old_label = node.label
+                new_label = f"{old_label}__{self.name}__{self.line}"
+
+                # find all references to the old label and replace them with the new one
+                # lowkey ugly but it works
+                references = [ref for ref in template if isinstance(ref, InstructionNode)]
+
+
+                node.label = new_label
+                logger.verbose(f"macro: mangled label {old_label} and {len(references)} references to {new_label} on line {self.line}")
+                logger.fatal("macro: mangling is not yet fully supported! aborting...", scope)
+
+            elif isinstance(node, InstructionNode):
+
+                for i, operand in enumerate[OperandNode](node.operands):
+                    if operand.type == OPERAND_TYPES["MACRO_ARG"]:
+                        logger.verbose(f"macro: replacing macro argument {operand.value} with {args_map[operand.value]}")
+                        node.operands[i] = args_map[operand.value]
             
+            else:
+                logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
+        
+        # done processing this invocation, return the modified nodes
         return template
 
     def __str__(self):

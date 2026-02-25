@@ -21,6 +21,8 @@ from .util.logger import logger
 
 def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
 
+CLOCK_HZ = 100000
+
 class Emulator:
 
     def __init__(self):
@@ -217,20 +219,20 @@ class Emulator:
 
     # main run loop
     def run(self) -> None:
-            try:
-                while True:
-                    # normal execution
-                    self.step()
-            except EmulatorException as e:
-                # we enter exceptional control flow either if something went wrong,
-                # or if the user interrupts the program
-                print(f"emulator stopped: {e.message}")
-            except KeyboardInterrupt:
-                # this prevents ctrl+c from bubbling up to the __main__() function,
-                # allowing easy program interruption, etc. while allowing the repl to persist
-                print("execution stopped.")
-            finally:
-                self.halted = True
+        try:
+            while True:
+                self.step()
+                time.sleep(1 / CLOCK_HZ) # yield so other threads can run
+        except EmulatorException as e:
+            # we enter exceptional control flow either if something went wrong,
+            # or if the user interrupts the program
+            print(f"emulator stopped: {e.message}")
+        except KeyboardInterrupt:
+            # this prevents ctrl+c from bubbling up to the __main__() function,
+            # allowing easy program interruption, etc. while allowing the repl to persist
+            print("execution stopped.")
+        finally:
+            self.halted = True
 
     def step(self) -> None:
 

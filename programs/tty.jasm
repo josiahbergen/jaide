@@ -1,7 +1,14 @@
+MACRO HANG
+    test_label:
+        jmp test_label
+end macro
+
 start:
     mov mb, 0x01 ; we're gonna be messing with vram
     call setup_interrupt_vectors
     generate_attrs z, 0x01, 0x00
+
+    hang
 
     mov y, 0x8000 ; cursor position
     call tty_prompt

@@ -49,18 +49,19 @@ def main():
     else:
         logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
 
-    # start graphics if requested
     if args.graphics:
-        Graphics(emulator.vram, emulator)
+        graphics = Graphics(emulator.vram, emulator)
+        graphics.start() # graphics runs in its own thread, so start it
 
-    # run the program if requested
     if args.run:
-        emulator.halted = False
-        emulator.run()
+        print("starting execution...")
+        emulator.halted = False # unhalt
+        emulator.run() # auto-run
 
     try:
-        # start repl
+        # start read-eval-print loop
         REPL(emulator)
+    
     except KeyboardInterrupt:
         logger.nl()
         logger.kill("keyboard interrupt", "__main__.py:main()")
