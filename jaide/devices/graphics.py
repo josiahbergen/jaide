@@ -3,6 +3,7 @@ from PIL import Image, ImageTk
 import threading
 
 from ..emulator import Emulator
+from ..util.logger import logger
 
 WIDTH  = 80
 HEIGHT = 25
@@ -31,7 +32,10 @@ COLORS = [
 
 class Graphics(threading.Thread):
 
-    def __init__(self, vram: memoryview, emulator: Emulator):
+    def __init__(self, emulator: Emulator, vram: memoryview):
+
+        logger.fatal("graphics controller not supported", "devices/graphics.py:__init__()")
+
         super().__init__(daemon=True)
         self.vram: memoryview = vram # memoryview of vram
         self.emulator: Emulator = emulator # emulator instance
@@ -88,6 +92,10 @@ class Graphics(threading.Thread):
         self.emulator.shutdown()
 
     def render(self):
+        # close window if main thread has exited
+        if not threading.main_thread().is_alive():
+            self.root.destroy()
+            return
 
         def parse_attrs(byte: int):
             fore = byte & 0b1111

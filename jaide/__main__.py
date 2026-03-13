@@ -18,7 +18,7 @@ def get_args() -> argparse.Namespace:
     return arg_parser.parse_args()
 
 
-def check_files(file: str):
+def check_files(file: str) -> None:
     scope = "__main__.py:check_files()"
 
     # check if file is provided
@@ -50,21 +50,23 @@ def main():
         logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
 
     if args.graphics:
-        graphics = Graphics(emulator.vram, emulator)
+        graphics = Graphics(emulator, emulator.vram)
         graphics.start() # graphics runs in its own thread, so start it
 
     if args.run:
-        print("starting execution...")
+        logger.info("starting execution...")
         emulator.halted = False # unhalt
         emulator.run() # auto-run
 
     try:
         # start read-eval-print loop
         REPL(emulator)
-    
+
     except KeyboardInterrupt:
-        logger.nl()
-        logger.kill("keyboard interrupt", "__main__.py:main()")
+        # the user has pressed ctrl+c inside the repl,
+        # so we'll mirror the behavior of the quit command
+        print("\nbye!")
+        os._exit(0)
 
 if __name__ == "__main__":
     main()

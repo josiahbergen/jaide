@@ -1,7 +1,3 @@
-macro persistent_halt
-    jmp permanent_halt_loop
-end macro
-
 macro interrupt_enable %value
     xor z, z
     or z, %value
@@ -9,6 +5,9 @@ macro interrupt_enable %value
     or f, z
 end macro
 
-permanent_halt_loop:
-    halt
-    jmp permanent_halt_loop
+macro tty_out %string
+    ; uses port 0 for output
+    ; trashes y and z
+    mov z, %string ; string address
+    mov y, 0x8000
+end macro

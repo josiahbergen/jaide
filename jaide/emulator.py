@@ -3,6 +3,7 @@
 # josiah bergen, january 2026
 
 import os
+import signal
 import sys
 import time
 from typing import Callable
@@ -20,8 +21,6 @@ from .register import Register
 from .util.logger import logger
 
 def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
-
-CLOCK_HZ = 100000
 
 class Emulator:
 
@@ -108,6 +107,7 @@ class Emulator:
             self.halted = True
             return
  
+        value = mask16(value)
         memory[addr * 2] = value & 0xFF
         memory[addr * 2 + 1] = (value >> 8) & 0xFF
 
@@ -124,7 +124,7 @@ class Emulator:
     def reg_set(self, index: int, value: int) -> None:
         if index < 0 or index >= len(REGISTERS): 
             raise EmulatorException(f"invalid register index {index}.")
-        self.reg[REGISTERS[index]].set(value)
+        self.reg[REGISTERS[index]].set(mask16(value))
 
     # flag helpers
     def flag_get(self, bit: int) -> bool:
@@ -179,13 +179,8 @@ class Emulator:
         return len(self.pending_interrupts) > 0 and self.flag_get(FLAG_I)
 
     def reset(self) -> None:
-        self.memory[0x8000:] = bytearray(MEMORY_SIZE - 0x8000) # clear ram (0x8000-0xFFFF inclusive)
-        for bank in self.banks: bank[:] = bytearray(BANK_SIZE) # noqa: E701
-        self.ports = [0] * 256 # reset ports
-        self.reg = {reg: Register(reg, 0) for reg in REGISTERS} # re-initialize registers
-        self.sp.set(0xFEFF)
-        self.pc.set(0)
-        self.halted = False
+        self.__init__()
+        print("emulator reset")
 
     def shutdown(self) -> None:
         print("shutting down...")
@@ -219,19 +214,18 @@ class Emulator:
 
     # main run loop
     def run(self) -> None:
+        self._interrupted = False
+        prev_handler = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, lambda *_: setattr(self, '_interrupted', True))
         try:
-            while True:
+            while not self._interrupted:
                 self.step()
-                time.sleep(1 / CLOCK_HZ) # yield so other threads can run
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
             print(f"emulator stopped: {e.message}")
-        except KeyboardInterrupt:
-            # this prevents ctrl+c from bubbling up to the __main__() function,
-            # allowing easy program interruption, etc. while allowing the repl to persist
-            print("execution stopped.")
         finally:
+            signal.signal(signal.SIGINT, prev_handler)
             self.halted = True
 
     def step(self) -> None:

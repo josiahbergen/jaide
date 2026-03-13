@@ -42,14 +42,13 @@ class Logger:
     def debug(self, message: str):
         """ Print a debug message. Only prints if level is DEBUG or higher. """
         if self.level >= self.log_level.DEBUG:
-            formatted = f"{f.LIGHTBLACK_EX}{f.RESET}{message}"
-            print(formatted)
+            print(message)
 
 
     def info(self, message: str):
         """ Print an info message. Only prints if level is INFO or higher. """
         if self.level >= self.log_level.INFO:
-            print(f"{message}")
+            print(message)
 
 
     def fatal(self, message: str, scope: str):

@@ -13,8 +13,7 @@ $(BIN_DIR)/%.bin: programs/%.jasm | $(BIN_DIR)
 	@$(PYTHON) -m jasm $< -o $@
 
 %.jasm: programs/%.jasm $(BIN_DIR)/%.bin FORCE
-	@echo "running $<"
-	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin -g -r
+	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin
 
 assemble: $(BIN_DIR)/tty.bin
 

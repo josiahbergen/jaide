@@ -23,34 +23,26 @@ class Logger:
         self.level: int = level
         self.warnings: bool = warnings
 
-
     def set_level(self, level: int):
         self.level = level
-
 
     def set_warnings(self, warnings: bool):
         self.warnings = warnings
 
-
     def verbose(self, message: str):
         """ Print a verbose message. Only prints if level is VERBOSE or higher. """
         if self.level >= self.log_level.VERBOSE:
-            formatted = f"{f.BLACK}----- {message}{f.RESET}"
-            print(formatted)
-
+            print(f"{f.LIGHTBLACK_EX}{f.RESET}{message}")
 
     def debug(self, message: str):
         """ Print a debug message. Only prints if level is DEBUG or higher. """
         if self.level >= self.log_level.DEBUG:
-            formatted = f"{f.BLACK}===== {f.RESET}{message}"
-            print(formatted)
-
+            print(f"{f.LIGHTBLACK_EX}{f.RESET}{message}")
 
     def info(self, message: str):
         """ Print an info message. Only prints if level is INFO or higher. """
         if self.level >= self.log_level.INFO:
-            print(f"{message}")
-
+            print(message)
 
     def error(self, message: str):
         """ Print non-fatal error message. """
