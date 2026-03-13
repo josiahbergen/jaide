@@ -2,8 +2,6 @@
 # register utility class used by the emulator.
 # josiah bergen, january 2026
 
-from typing import override
-
 class Register:
 
     # "intro to java" ahh class
@@ -16,6 +14,5 @@ class Register:
     def set(self, value: int) -> None:
         self.value = value & 0xFFFF # mask to 16 bits
 
-    @override
     def __str__(self) -> str:
         return f"{self.name}: 0x{self.value:04X}"

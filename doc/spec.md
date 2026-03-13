@@ -58,48 +58,39 @@ the format of the flags register is `C Z N O I - - - - - - - - - - -`.
 
 ## instructions
 
-jaide uses a little-endian instruction format. instructions are 16 bits (two bytes) long, and may contain a 16-bit immediate located directly after them.
+instructions are 16 bits long (two bytes, little endian), and may contain a 16-bit immediate located directly after them.
 
 a single 16-bit instruction word is defined as follows:
 
-`CCCC DDDD` `AAAAAA BB` `EEEEEEEE` `EEEEEEEE`
+`CCCC DDDD` `AAAAAAAA` `EEEEEEEE` `EEEEEEEE`
 
-`AAAAAA` defines the opcode of the instruction (bits 8-13 of the word).
-
-`BB` defines the addressing mode of the source operand (bits 14-15 of the word).
+`AAAAAAAA` defines the opcode of the instruction (bits 8-15 of the word). the opcode implies an addressing mode.
 
 `CCCC` defines a source or address register (bits 0-3 of the word).
 
 `DDDD` defines a destination register (bits 4-7 of the word).
 
-`EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset _(little-endian, if applicable)_.
+`EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset.
 
-### addressing modes:
-
-| value | notation  | mode            |
-| ----- | --------- | --------------- |
-| 0     | reg       | register        |
-| 1     | imm16\*   | immediate       |
-| 2     | [imm16]\* | memory direct   |
-| 3     | [reg]     | memory indirect |
 
 _\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
 ### instruction set
 
-see [inst.txt](inst.txt) for the full instruction set specification and encoding.
-
-at this time, only 32 instructions are defined. jaide supports up to 64 unique instructions, and these will eventially all be implemented.
+see the [instruction set](inst.txt) and for a comprehensive list of instructions
 
 ## memory
 
+jaide supports up to 128 Kib of memory.
+
 | Range             | Size      | Purpose                        |
-| ----------------- | --------- | ------------------------------ |
-| `0xFEFF...0xFFFF` | 256 bytes | interrupt table                |
-| `0xFDFF...0xFEFF` | 256 bytes | stack (recommended)\*\*        |
-| `0xC000...0xFDFF` | 15 KiB    | general purpose RAM            |
-| `0x8000...0xBFFF` | 16 KiB    | general purpose RAM (banked)\* |
-| `0x0000...0x7FFF` | 32 KiB    | general purpose ROM            |
+| ----------------- | ----------| ------------------------------ |
+| `0xFF00...0xFFFF` | 512 bytes | interrupt table                |
+| `0xFE00...0xFEFF` | 512 bytes | stack (recommended)\*\*        |
+| `0x4200...0xFDFF` | 94 Kib    | general purpose RAM            |
+| `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked)\* |
+| `0x0000...0x01FF` | 1 KiB     | BIOS ROM (reserved)            |
+
 
 _\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._
 
