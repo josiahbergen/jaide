@@ -50,6 +50,7 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
     scope = "parse.py:parse_file()"
 
     # check if file is valid
+    file = os.path.realpath(file)
     check_file(file)
 
     # open and read the file
@@ -76,16 +77,16 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
 
     for import_node in imports:
         
-        # skip if already parsed
-        if import_node.filename in ir:
-            # TODO: if the file is the same but the path string is different, this will let the same file be parsed multiple times.
-            # ex. IMPORT "programs/import.jasm" and IMPORT ".\programs\import.jasm" will both be parsed as "separate" files,
-            # even though they are actually the same
+        # normalize path
+        import_path = os.path.realpath(import_node.filename)
+
+        if import_path in ir:
+            # skip if already parsed
             logger.warning(f"circular or double import detected: {import_node.filename} already parsed, skipping...", scope)
             continue
         
         # recursively parse import files
-        parse_file(import_node.filename, ir)
+        parse_file(import_path, ir)
     return
 
 
@@ -276,6 +277,7 @@ def generate_macro_body(body_tree: Tree) -> list[IRNode]:
         
     return body_nodes
 
+
 def generate_expression_string(expression_tree: Tree) -> str:
     """ Generate the string representation of an expression. """
     scope = "parse.py:generate_expression_string()"
@@ -299,6 +301,7 @@ def flatten_imports(ir: dict[str, list[IRNode]]) -> list[IRNode]:
     append_ir_nodes(list[str](ir.keys())[0], ir, big_list, added_files)
     return big_list
 
+
 def append_ir_nodes(file: str, ir: dict[str, list[IRNode]], big_list: list[IRNode], added_files: set[str]) -> None:
     """ Recursive function to flatten imports such that they keep their original order. """
     
@@ -313,7 +316,7 @@ def append_ir_nodes(file: str, ir: dict[str, list[IRNode]], big_list: list[IRNod
             append_ir_nodes(node.filename, ir, big_list, added_files)
         else:
             big_list.append(node)
-    
+
 
 def warn_if_no_line(node: Token, scope: str) -> int:
     """ Warn if the node has no line number, and return 0 if so. """

@@ -31,7 +31,7 @@ ADD dest, src           add (updates Z, C, O)
 0b  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src
 0c  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16
 
-ADDC dest, src          add with carry (updates Z, C, O)
+ADC dest, src           add with carry (updates Z, C, O)
 0d  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src + C
 0e  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16 + C
 
@@ -39,7 +39,7 @@ SUB dest, src           subtract (updates Z, C, O, N)
 0f  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - src
 10  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16
 
-SUBC dest, src          subtract with borrow (updates Z, C, O, N)
+SBC dest, src           subtract with borrow (updates Z, C, O, N)
 11  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - reg - C
 12  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16 - C
 
