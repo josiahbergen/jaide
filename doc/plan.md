@@ -1,42 +1,4 @@
----
-name: Assembler Audit and Migration
-overview: A comprehensive audit of the jasm assembler identifying refactoring needs, best-practice violations, the migration path to the v0.4 instruction set encoding, and a plan for adding a linker.
-todos:
-  - id: refactor-shared-state
-    content: Extract IRNode.labels/macros into an AssemblerContext, deduplicate number parsing, normalize import paths
-    status: pending
-  - id: shared-constants
-    content: Create shared ISA definitions (opcodes, registers, encodings) used by both jasm and jaide
-    status: pending
-  - id: migrate-opcodes
-    content: Rewrite OPCODES to v0.4 per-variant scheme (57 unique opcodes, no separate addressing mode bits)
-    status: pending
-  - id: migrate-grammar
-    content: "Update Lark grammar: add memory_operand brackets, ABS keyword, ADDC/SUBC/JN/JNN/JO/JNO, remove NOR"
-    status: pending
-  - id: migrate-parser
-    content: Update parse.py to handle new memory_operand nodes and produce correct IR for bracket operands
-    status: pending
-  - id: migrate-codegen
-    content: Rewrite InstructionNode.get_bytes() to emit 8-bit opcodes directly (no mode packing), update validate/get_addressing_mode
-    status: pending
-  - id: migrate-emulator
-    content: Update jaide emulator to decode new 8-bit opcodes and handle new addressing modes
-    status: pending
-  - id: linker-obj-format
-    content: Define .jo object file format and implement read/write in a shared module
-    status: pending
-  - id: linker-assembler-changes
-    content: Add EXPORT/EXTERN directives, -c flag, relocation table emission, smart JMP label resolution
-    status: pending
-  - id: linker-implementation
-    content: "Create jlink/ package: CLI, object file parser, symbol resolution, relocation patching, binary output"
-    status: pending
-  - id: add-tests
-    content: Add pytest infrastructure with unit tests for encoding, label resolution, and integration tests for end-to-end assembly
-    status: pending
-isProject: false
----
+
 
 # Assembler Audit and Migration Plan
 

@@ -9,7 +9,7 @@ HALT                    halt until interrupt
 
 GET dest, src           load word from memory
 01  reg  [reg]          oooooooo ssss dddd -------- --------  dest <- [src]
-02  reg  [imm16 + pc]   oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
+02  reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
 03  reg  [imm16 + reg]  oooooooo ssss dddd xxxxxxxx xxxxxxxx  dest <- [src + imm16] 
 
 PUT dest, src           put word into memory
@@ -87,32 +87,32 @@ CMP dest, src           non-destructive compare (updates Z, C, O, N)
 JMP src                 unconditional jump
 26  reg                 oooooooo ssss ---- -------- --------  pc <- src
 27  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
-28  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+28  pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 29  [imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
 
 JZ src                  jump if zero
-2a  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2a  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNZ src                 jump if not zero
-2b  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2b  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JC src                  jump if carry
-2c  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2c  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNC src                 jump if not carry
-2d  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2d  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JN src                  jump if negative
-2e  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2e  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNN src                 jump if not negative
-2f  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+2f  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JO src                  jump if oveflow
-30  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+30  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNO src                 jump if not overflow
-31  [imm16 + pc]        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + pc]
+31  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 CALL src                call a subroutine
 32  reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
@@ -132,14 +132,15 @@ NOP                     no operation
 38                      oooooooo  ---- ---- -------- -------- n/a
 
 NOTE: THE ENCODING ABOVE DISPLAYS THE 16-BIT INSTRUCTION WORD IN "LOGICAL" ORDER (OPCODE RA RB IMMEDIATE). 
-THIS IS NOT THE ORDER IN WHICH THE BYTES ARE IN MEMORY.
+THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.
 
 
 ADDRESSING MODE REFERENCE
 -------------------------------------------------------------------------------------
 
-REGISTER           reg            VALUE IN REGISTER
-IMMEDIATE          imm16          IMMEDIATE VALUE
-REGISTER INDIRECT  [reg]          VALUE AT MEMORY LOCATION CONTAINED IN REGISTER
-RELATIVE ADDRESS   [imm16 + pc]   VALUE AT MEMORY LOCATION DEFINED BY PC + IMMEDIATE
-BASE + OFFSET      [imm16 + reg]  VALUE AT MEMORY LOCATION DEFINED BY IMMEDIATE + REG
+name               mode           where does the value come from?
+REGISTER           reg            REGISTER CONTENTS
+IMMEDIATE          imm16          CONTENTS OF IMMEDIATE VALUE
+RELATIVE ADDRESS   pc + imm16     RESULT OF PROGRAM COUNTER + IMMEDIATE
+REGISTER INDIRECT  [reg]          IN MEMORY LOCATION CONTAINED IN REGISTER CONTENTS
+BASE + OFFSET      [imm16 + reg]  IN MEMORY LOCATION DEFINED BY IMMEDIATE VALUE + REGISTER CONTENTS

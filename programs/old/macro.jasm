@@ -44,3 +44,4 @@ start:
     HALT
 
     DATA "hello, again!"
+    DATA 0x10, 0x11, b10011101, 1738, "bleh"

@@ -41,13 +41,19 @@ GRAMMAR = r"""
 
     # Operands & Expressions 
     ?generic_operand: operand
+               | pointer_operand
+               | offset_operand
                | macro_arg
                | expression
 
-    ?operand: register_pair
-            | REGISTER
+    ?operand: REGISTER
             | NUMBER
             | LABELNAME
+
+    # memory operands can be in any of these forms:
+    # [reg] + [label + reg]
+    pointer_operand: "[" REGISTER "]"
+    offset_operand: "[" LABELNAME "+" REGISTER "]"
 
     macro_arg: "%" LABELNAME
 
@@ -58,9 +64,6 @@ GRAMMAR = r"""
     ?exp_term: NUMBER
              | macro_arg
              | expression
-
-    # Register pair rule (allows whitespace, e.g., "A : B")
-    register_pair: REGISTER ":" REGISTER
 
     label: LABELNAME ":"
 
@@ -73,7 +76,7 @@ GRAMMAR = r"""
 
     # Mnemonics
     # Priority 100 ensures these are matched before generic LABELNAMEs
-    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|INC|DEC|LSH|RSH|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|CALL|RET|INT|IRET|HALT|NOP)\b/i
+    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|MUL|MOD|INC|DEC|LSH|RSH|AND|OR|NOT|XOR|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|JN|JNN|JO|JNO|CALL|RET|INT|IRET|HALT|NOP)\b/i
 
     # Directives (priority 95 ensures these are matched before LABELNAME)
     DATA.95: /DATA\b/i

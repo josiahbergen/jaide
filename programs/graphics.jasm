@@ -75,11 +75,6 @@ skip_reset_color:
     jnz fun_colors_loop
     ret
 
-
-
-
-
-
 s_welcome: 
 data "jaide computing system", 0
 s_name:

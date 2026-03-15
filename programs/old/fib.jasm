@@ -16,5 +16,6 @@ loop:
     JMP loop ; otherwise, continue the loop
 
 loop_end:
-    PUT 0xC000, A  ; store the result to memory
+    MOV D, 0xC000 ; destination address
+    PUT [D], A    ; store the result to memory
     HALT

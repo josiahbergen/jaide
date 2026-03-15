@@ -5,21 +5,22 @@
 # lowkey gonna be a tough go
 
 from .language.ir import IRNode, LabelNode
+from .language.context import AssemblyContext
 from .util.logger import logger
 
-def generate_binary(ir: list[IRNode]) -> bytearray:
+def generate_binary(context: AssemblyContext) -> bytearray:
     """ Generate a binary string from the IR. """
     
     binary = bytearray()
-
-    for node in ir:
+    for node in context.ir:
 
         if isinstance(node, LabelNode):
+            # no machine code to generate!
             continue
 
-        bits = node.get_bytes()
-        logger.debug(f"bytes: generated {len(bits)} bytes for {node.short_string()} on line {node.line} (0x{node.pc:04X})")
-        binary.extend(bits)
+        ml = node.get_bytes()
+        binary.extend(ml)
+        logger.debug(f"bytes: finished generating {len(ml)} bytes for {node} on line {node.line} (0x{node.pc:04X})")
 
     logger.debug(f"binary: generation finished ({len(binary)} bytes)")
 

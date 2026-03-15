@@ -2,550 +2,198 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
-import copy
+import os
+from enum import IntEnum
 
-from .constants import ( 
-    OPCODES, 
-    OPERAND_TYPES, 
-    OPERAND_TYPE_TO_STRING, 
-    REGISTERS, 
-    ADDRESSING_MODES, 
-    ADDRESSING_MODE_TO_SIZE, 
-    ADDRESSING_MODE_TO_STRING, 
-    INSTRUCTION_ENCODINGS, 
-    LOC
-)
 from ..util.logger import logger
-
+from .isa import INSTRUCTIONS, REGISTERS, MODES
 
 class IRNode:
-    """ Really simple base node class for the IR. """
+    """ Super simple base node class for the IR. """
     
-    # class variable to store resolved labels
-    labels: dict[str, int] = {}
-    # class variable to store macro definitions
-    macros: dict[str, 'MacroNode'] = {}
-
     def __init__(self, line: int):
         self.line = line
         self.pc = 0 # where the instruction will be placed in the binary
 
-
     def get_size(self) -> int:
         scope = "ir.py:IRNode.get_size()"
-        logger.warning(f"get_size() not implemented for node type {type(self)}", scope)
+        logger.warning(f"get_size() not implemented for {type(self)}", scope)
         return 0
 
-
     def get_bytes(self) -> bytearray:
+        scope = "ir.py:IRNode.get_bytes()"
+        logger.warning(f"get_bytes() not implemented for {type(self)}", scope)
         return bytearray()
 
-
-    def pretty_bit_string(self, bytes: bytearray):
-        return " ".join([f"{i:08b}" for i in bytes])
-
-
-    def short_string(self) -> str:
-        return f"generic IRNode at line {self.line}"
-
-
     def __str__(self) -> str:
-        return f"Base IRNode at line {self.line}"
+        scope = "ir.py:IRNode.__str__()"
+        logger.warning(f"__str__() not implemented for {type(self)}", scope)
+        return f"{type(self).__name__} at line {self.line}"
 
 
-class OperandNode(IRNode):
-    """ A node representing an operand. """
+# operand classes
 
-    def __init__(self, line: int, type_string: str, value: str):
+class Operand(IRNode):
+
+    def __init__(self, line: int):
         super().__init__(line)
-        scope = "ir.py:OperandNode.__init__()"
-
-        self.type: int = OPERAND_TYPES[type_string]
-        self.type_string: str = type_string
-        
-        # stored as a string which is parsed during code generation
-        # this probably sucks
-        self.value: str = value
-
-        # validate the operand type
-        if type_string not in OPERAND_TYPES.keys():
-            logger.fatal(f"invalid operand type on line {line}: {type_string}", scope)
-
 
     def get_integer_value(self) -> int:
-        scope = "ir.py:OperandNode.get_integer_value()"
-
-        if self.type == OPERAND_TYPES["REGISTER"]:
-            reg = REGISTERS.get(self.value.upper())
-            if reg is None:
-                logger.fatal(f"unknown register on line {self.line}: {reg}", scope)
-            logger.verbose(f"get_integer_value: register {self.value} -> {reg}")
-            return reg
-
-        elif self.type == OPERAND_TYPES["NUMBER"]:
-            value = self.value.strip().lower()
-
-            if value.startswith("0x"):
-                final_value = int(value, base=16) # hex
-            elif value.startswith("b"):
-                final_value = int(value[1:], base=2) # binary
-            elif value.isdigit():
-                final_value = int(value) # decimal
-            else:
-                logger.fatal(f"invalid number string on line {self.line}: \"{self.value}\"", scope)
-
-            logger.verbose(f"get_integer_value: number {self.value} -> {final_value}")
-            return final_value
-
-        elif self.type == OPERAND_TYPES["LABELNAME"]:
-            label = self.value.lower()
-            if label not in IRNode.labels.keys():
-                logger.fatal(f"unknown label on line {self.line}: {label}", scope)
-            
-            logger.verbose(f"get_integer_value: label {self.value} -> {IRNode.labels[label]}")
-            return IRNode.labels[label]
-
-        logger.fatal(f"invalid operand type on line {self.line}: {self.type_string}", scope)
-
-
-    def get_size(self) -> int:
+        scope = "ir.py:Operand.get_integer_value()"
+        logger.warning(f"get_integer_value() not implemented for {type(self)}", scope)
         return 0
 
 
-    def short_string(self) -> str:
-        return f"{OPERAND_TYPE_TO_STRING[self.type]} {self.value}"
+class RegisterOperand(Operand):
 
-
-    def __str__(self):
-        return f"{OPERAND_TYPE_TO_STRING[self.type]} {self.value}"
-
-
-class InstructionNode(IRNode):
-    """ A node representing an instruction. """
-
-    def __init__(self, line: int, mnemonic: str, operands: list[OperandNode]):
+    def __init__(self, line: int, register: REGISTERS):
         super().__init__(line)
+        self.register: REGISTERS = register
 
-        self.mnemonic = mnemonic.upper()
-        self.opcode = OPCODES[self.mnemonic]
-        self.operands = operands
-        self.addressing_mode: int | None = None
-        self.size: int | None = None
-
-    def validate_instruction_semantics(self) -> None:
-        scope = "ir.py:InstructionNode.validate_instruction_semantics()"
-
-        def assert_num_operands(required_num: int):
-            scope = "ir.py:InstructionNode.assert_num_operands()"
-            if len(self.operands) != required_num:
-                logger.fatal(f"instruction {self.mnemonic} on line {self.line} requires {required_num} operands (got {len(self.operands)})", scope)
+    def __str__(self) -> str:
+        return f"{self.register}"
 
 
-        def assert_operand_types(expected_types: list[list[int]]):
-            scope = "ir.py:InstructionNode.assert_operand_types()"
-            for i, op in enumerate[OperandNode](self.operands):
-                if op.type not in expected_types[i]:
-                    logger.fatal(f"{self.mnemonic} operand {i} ({op.type_string}) is not of type {', '.join([OPERAND_TYPE_TO_STRING[t] for t in expected_types[i]])} (line {self.line})", scope)
-        
-        match self.mnemonic:  
-            # No operands
-            case "HALT" | "NOP" | "RET" | "IRET":
-                assert_num_operands(0)
+class Constant(Operand):
 
-            # RA
-            case "POP" | "INC" | "DEC" | "NOT":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"]]])
-
-            # RA/IMM8 and [IMM16]/[RA]
-            case "PUSH" | "CALL" | "INT" | "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                assert_num_operands(1)
-                assert_operand_types([[OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER"], OPERAND_TYPES["LABELNAME"]]])
-
-            # RA/IMM16, RB and [RA]/[IMM16], RB
-            case "OUTB" | "PUT":
-                assert_num_operands(2)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]], [OPERAND_TYPES["REGISTER"]]])
-
-            # RA, RB/IMM16 and RA, [RB]/[IMM16]
-            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP" | "GET":
-                assert_num_operands(2)
-                assert_operand_types([[OPERAND_TYPES["REGISTER"]], [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["LABELNAME"]]])
-
-            case _:
-                logger.fatal(f"unknown instruction {self.mnemonic} on line {self.line}", scope)
-
-
-    def get_addressing_mode(self) -> int:
-        """
-        Get the addressing mode for an instruction.
-        """
-        scope = "language.py:get_addressing_mode()"
-
-        if self.mnemonic not in OPCODES.keys():
-            logger.fatal(f"unknown mnemonic on line {self.line}: {self.mnemonic}", scope)
-        
-        optypes = [op.type for op in self.operands]
-        if not all(op_type in OPERAND_TYPES.values() for op_type in optypes):
-            logger.fatal(f"invalid operands on line {self.line}: {self.operands}", scope)
-
-        match self.mnemonic:
-            # No operands
-            case "RET" | "IRET" | "HALT" | "NOP":
-                return ADDRESSING_MODES["NULL"]
-
-            # RA
-            case "POP" | "INC" | "DEC" | "NOT":
-                return ADDRESSING_MODES["REGISTER"]
-
-            # RA/IMM8
-            case "PUSH" | "INT":
-                if optypes[0] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-
-            case "CALL":
-                if optypes[0] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-
-
-            # [IMM16]/[RA]
-            case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-                if optypes[0] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-
-            # RA/IMM16, RB
-            case "OUTB":
-                if optypes[0] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-
-            # RA, RB/IMM16
-            case "MOV" | "ADD" | "ADC" | "SUB" | "SBC" | "LSH" | "RSH" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "CMP":
-                if optypes[1] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE"]
-
-            # [RA]/[IMM16], RB
-            case "PUT":
-                if optypes[0] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-
-            # RA, [RB]/[IMM16]
-            case "GET":
-                if optypes[1] == OPERAND_TYPES["REGISTER"]:
-                    return ADDRESSING_MODES["REGISTER_ADDRESS"]
-                else:
-                    return ADDRESSING_MODES["IMMEDIATE_ADDRESS"]
-
-            case _:
-                logger.fatal(f"{self.mnemonic} has no defined addressing mode", scope)
-
-
-    def get_size(self) -> int:
-        scope = "ir.py:InstructionNode.get_size()"
-        if self.addressing_mode is None:
-            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no addressing mode", scope)
-        return ADDRESSING_MODE_TO_SIZE[self.addressing_mode]
-
-
-    def get_bytes(self) -> bytearray:
-        scope = "ir.py:InstructionNode.get_bytes()"
-
-        logger.verbose(f"bytes: starting generation of {self.mnemonic} {" ".join([op.value for op in self.operands])} (line {self.line})")
-
-        self.validate_instruction_semantics()
-        
-        if self.addressing_mode is None:
-            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no addressing mode", scope)
-        if self.size is None:
-            logger.fatal(f"instruction {self.mnemonic} on line {self.line} has no size", scope)
-
-        binary = bytearray()
-
-        # format for the first byte is always AAAAABBB where
-        # AAAAA is the opcode and BBB is the addressing mode
-
-        def pretty_byte_1_string(byte):
-            opcode_bits = (byte >> 2) & 0b111111 # retreive opcode and mode from encoded instruction
-            addressing_mode_bits = byte & 0b11
-            return f"{byte:08b} | {opcode_bits:06b} {addressing_mode_bits:02b} | {opcode_bits} {addressing_mode_bits}"
-
-        logger.verbose(f"bytes: stored opcode is {self.opcode} with addressing mode {ADDRESSING_MODE_TO_STRING[self.addressing_mode]}.")
-
-        opcode_bits = (self.opcode & 0b00111111) << 2 # mask to low 6 bits and shift two to the left
-        addressing_mode_bits = (0 if (self.addressing_mode == -1) else self.addressing_mode) & 0b00000011 # mask to low 2 bits
-        byte_1 = opcode_bits | addressing_mode_bits
-
-        logger.verbose(f"bytes: first byte is {pretty_byte_1_string(byte_1)}")
-
-        # this is where the "simple" part ends
-        # see the instruction format section in spec.md for more details on the addressing modes
-
-        # get integer values of the operands
-        operands: list[int] = [op.get_integer_value() for op in self.operands]
-        logger.verbose(f"bytes: operands are {', '.join([str(val) for val in operands])}")
-
-        def assert_bit_length(required: int, value: int):
-            scope = "ir.py:InstructionNode.assert_bit_length()"
-            if value >= (2 ** required):
-                logger.fatal(f"immediate value {value} is too large for a{'n' if required == 8 else 'n'} {required}-bit immediate (line {self.line})", scope)
-
-        # if this instruction/addressing mode pair expects a value for ra, add it to the binary
-        encoding = INSTRUCTION_ENCODINGS[self.mnemonic][self.addressing_mode]
-        logger.verbose(f"bytes: encoding is {", ".join([f"{k}: {v}" for k, v in encoding.items()])}")
-
-        rega_bits = operands[encoding[LOC.REGA].value] if encoding[LOC.REGA] is not None else 0
-        regb_bits = operands[encoding[LOC.REGB].value] if encoding[LOC.REGB] is not None else 0
-        imm16_bits = operands[encoding[LOC.IMM16].value] if encoding[LOC.IMM16] is not None else None
-
-        assert_bit_length(4, rega_bits)
-        assert_bit_length(4, regb_bits)
-
-        reg_byte = (rega_bits << 4) | regb_bits
-        logger.verbose(f"bytes: reg byte is {reg_byte:08b} | {rega_bits:04b} {regb_bits:04b} | {rega_bits} {regb_bits}")
-
-        # its gotta be little endian, so the reg byte goes first
-        binary.append(reg_byte)
-        binary.append(byte_1)
-
-        if imm16_bits is not None:
-            assert_bit_length(16, imm16_bits)
-            imm16_bytes = imm16_bits.to_bytes(2, byteorder="little")
-            binary.extend(imm16_bytes)
-            logger.verbose(f"bytes: imm16 bytes are {self.pretty_bit_string(imm16_bytes)} | {imm16_bits}")
-
-        logger.verbose(f"bytes: final binary: {self.pretty_bit_string(binary)}")
-        return binary   
-
-
-    def short_string(self) -> str:
-        return f"instruction {self.mnemonic}"
-
-
-    def __str__(self):
-        # return f"instruction: {self.mnemonic} (line {self.line}) with {len(self.operands)} operands: {", ".join([str(op) for op in self.operands])}"
-        return f"instruction {self.mnemonic} (line {self.line})"
- 
-
-class ImportDirectiveNode(IRNode):
-    """ A node representing an import directive. """
-
-    def __init__(self, line: int, filename: str):
+    def __init__(self, line: int, value: str):
         super().__init__(line)
-        self.filename = filename
+        self.value: str = value
 
-        # remove quotes from the beginning and end of the filename
-        if self.filename.startswith('"') and self.filename.endswith('"'):
-            self.filename = self.filename[1:-1]
+class ImmediateOperand(Constant):
 
+    def __init__(self, line: int, value: str):
+        super().__init__(line, value)
+        self.value: str = self.value.strip().lower()
+        self.base: int = 16 if self.value.startswith("0x") else 2 if self.value.startswith("b") else 10
 
-    def __str__(self):
-        return f"import directive: {self.filename}"
-
-
-class DataDirectiveNode(IRNode):
-    """ A node representing a data directive. """
-
-    def __init__(self, line: int, data: list[tuple[str, str]]):
-        super().__init__(line)
-
-        self.data_raw = data
-        self.data = self.parse_bytes()
-        self.size: int = self.get_size()
+    def __str__(self) -> str:
+        return f"{self.value}"
 
 
-    def parse_bytes(self) -> list[int]:
-        scope = "ir.py:DataDirectiveNode.parse_bytes()"
-        bytes: list[int] = []
-
-        for type_string, value_string in self.data_raw:
-
-            if type_string == "NUMBER":
-                logger.verbose(f"parse_bytes: parsing number {value_string}")
-                bytes.append(self.get_number_value(value_string))
-
-            elif type_string == "STRING":
-                if len(value_string) >= 2:
-                    value_string = value_string[1:-1] # remove quotes
-                logger.verbose(f"parse_bytes: parsing string {value_string}")
-                bytes.extend(self.get_string_value(value_string))
-
-            else:
-                logger.fatal(f"invalid data type on line {self.line}: {type_string}", scope)
-
-        return bytes
-
-
-    def get_number_value(self, number_str: str) -> int:
-        scope = "ir.py:DataDirectiveNode.get_number_value()"
-        # turn number string into an integer (hex, binary, or decimal)
-
-        value = number_str.strip().lower()
-        if value.startswith("0x"):
-            final_value = int(value, base=16) # hex
-        elif value.startswith("b"):
-            final_value = int(value[1:], base=2) # binary
-        elif value.isdigit():
-            final_value = int(value) # decimal
-        else:
-            logger.fatal(f"invalid number string on line {self.line}: \"{number_str}\"", scope)
-
-        if final_value > 0xFFFF:
-            logger.fatal(f"number {number_str} ({final_value}) is too large for a 16-bit value (line {self.line})", scope)
-
-        logger.verbose(f"parse_bytes: \"{number_str}\" -> {final_value}")
-        return final_value
-
-
-    def get_string_value(self, string: str) -> list[int]:
-        # get the bytes of a string
-        bytes: list[int] = [ord(char) for char in string]
-        logger.verbose(f"parse_bytes: got bytes of string \"{string}\": {', '.join([str(byte) for byte in bytes])}")
-        return bytes
-
-
-    def get_size(self) -> int:
-        logger.verbose(f"data directive: got size {len(self.data)} (raw: {', '.join([str(byte) for byte in self.data])})")
-        return len(self.data)
-
-
-    def get_bytes(self) -> bytearray:
-        bits = bytearray()
-        for word in self.data:
-            bits.append(word & 0xFF)
-            bits.append((word >> 8) & 0xFF)
-        logger.verbose(f"get_bytes: {self.pretty_bit_string(bits)} (from {self.readable_data_string()})")
-        return bits
-
-
-    def readable_data_string(self):
-        return ", ".join([f"{value}" for _, value in self.data_raw])
-
-
-    def short_string(self) -> str:
-        return f"data {self.readable_data_string()}"
-
-
-    def __str__(self):
-        return f"data directive: {self.readable_data_string()}"
-
-
-class LabelNode(IRNode):
+class LabelOperand(Operand):
     def __init__(self, line: int, label: str):
         super().__init__(line)
         self.label: str = label
 
-    def __str__(self):
-        return f"label: {self.label} at pc {self.pc}"
+    def __str__(self) -> str:
+        return f"{self.label}"
 
 
-class ExpressionNode(IRNode):
+class PointerOperand(RegisterOperand):
+    """ A node representing a memory operand, i.e. [reg]"""
+    def __init__(self, line: int, register: REGISTERS):
+        super().__init__(line, register)
+
+    def __str__(self) -> str:
+        return f"[{self.register}]"
+
+
+class OffsetAddressOperand(Operand):
+    """ A node representing a offset address operand, i.e. [imm16 + reg]"""
+    def __init__(self, line: int, label: str, register: REGISTERS):
+        super().__init__(line)
+        self.label: str = label
+        self.register: REGISTERS = register
+
+    def __str__(self) -> str:
+        return f"[{self.label} + {self.register}]"
+
+class MacroArgumentOperand(Operand):
+    """Only valid inside macro body; refers to a parameter by name."""
+    def __init__(self, line: int, name: str):
+        super().__init__(line)
+        self.name: str = name
+
+    def __str__(self) -> str:
+        return f"%{self.name}"
+
+
+class ExpressionOperand(Operand):
+    """Future: an expression operand. Not yet supported."""
     def __init__(self, line: int, expression: str):
         super().__init__(line)
         self.expression: str = expression
 
-    def evaluate(self) -> int:
-        scope = "ir.py:ExpressionNode.evaluate()"
-        logger.warning(f"expression evaluation is not yet supported: skipping evaluation of {self.expression} on line {self.line}", scope)
-        return 0
+    def __str__(self) -> str:
+        return f"({self.expression})"
 
-    def __str__(self):
-        return f"expression: {self.expression}"
+# top-level nodes
 
+class InstructionNode(IRNode):
+    """ A node representing an instruction. """
 
-class MacroCallNode(IRNode):
-    def __init__(self, line: int, name: str, args: list[OperandNode]):
+    def __init__(self, line: int, mnemonic: str, operands: list[Operand]):
+        super().__init__(line)
+
+        self.mnemonic: INSTRUCTIONS = INSTRUCTIONS[mnemonic.upper()]
+        self.operands: list[Operand] = operands
+
+        # set later by a semantic pass
+        self.addressing_mode: int | None = None
+        self.size: int | None = None
+ 
+    def __str__(self) -> str:
+        return f"{self.mnemonic.name} {', '.join([str(op) for op in self.operands])}"
+
+class LabelNode(IRNode):
+
+    def __init__(self, line: int, name: str):
         super().__init__(line)
         self.name: str = name
-        self.args: list[OperandNode] = args
 
-    def __str__(self):
-        return f"macro call to {self.name} with {len(self.args)} arguments"
+    def __str__(self) -> str:
+        return f"{self.name}:"
+
+class ImportDirectiveNode(IRNode):
+
+    def __init__(self, line: int, filename: str):
+        super().__init__(line)
+        scope = "ir.py:ImportDirectiveNode.__init__()"
+
+        try:
+            # normalize to improve robustness of circular import detection
+            filename = os.path.normcase(os.path.realpath(filename))
+        except Exception as e:
+            logger.fatal(f"invalid filename: {e}", scope)
+        self.filename: str = filename
+
+    def __str__(self) -> str:
+        return f"import {self.filename}"
 
 
-class MacroArgumentNode(IRNode):
+class DataDirectiveNode(IRNode):
 
-    def __init__(self, line: int, name: str, index: int):
+    class Type(IntEnum):
+        NUMBER = 0
+        STRING = 1
+
+    def __init__(self, line: int, items: list[tuple[Type, str]]):
+        super().__init__(line)
+        self.items: list[tuple[DataDirectiveNode.Type, str]] = items
+
+
+    def __str__(self) -> str:
+        strs = [f"{d[1]}" if d[0] == DataDirectiveNode.Type.NUMBER else f'"{d[1]}"' for d in self.items]
+        return f"data {', '.join(strs)}"
+
+class MacroDefinitionNode(IRNode):
+
+    def __init__(self, line: int, name: str, args: list[str], body: list[IRNode]):
         super().__init__(line)
         self.name: str = name
-        self.value: IRNode | None = None
-        self.index: int = index
-
-    def __str__(self):
-        return f"macro argument: {self.name} (index {self.index})"
-
-
-class MacroNode(IRNode):
-    def __init__(self, line: int, name: str, args: list[MacroArgumentNode], body: list[IRNode]):
-        super().__init__(line)
-        self.name: str = name
-        self.args: list[MacroArgumentNode] = args
+        self.args: list[str] = args # placeholder identifiers for the arguments
         self.body: list[IRNode] = body
 
-    def expand(self, real_args: list[OperandNode], line: int | None = None) -> list[IRNode]:
-        scope = "ir.py:MacroNode.expand()"
+    def __str__(self) -> str:
+        return f"macro {self.name} {', '.join(self.args)} ({len(self.body)} body nodes)"
 
-        args_map: dict[str, OperandNode] = {}
-        for arg in self.args:
-            args_map[arg.name] = real_args[arg.index]
-        logger.verbose(f"macro: args map: {', '.join([f"{k}: {v}" for k, v in args_map.items()])}")
+class MacroCallNode(IRNode):
 
-        # use a deep copy of the body to avoid modifying the original macro definition
-        template = copy.deepcopy(self.body)
-        for node in template:
+    def __init__(self, line: int, name: str, args: list[Operand]):
+        super().__init__(line)
+        self.name: str = name # macro being called
+        self.args: list[Operand] = args # real values to substitute for the placeholders
 
-            if isinstance(node, MacroCallNode):
-                # this would involve finding and expanding the def, but that's a lot of work for now
-                # we would have to think about how macro args can be put in the call for another macro, etc.
-                logger.fatal(f"nested macro calls are not yet supported: {self.name} (line {self.line})", scope)
-
-            elif isinstance(node, DataDirectiveNode):
-                # this won't crash, but it's probably not a good idea
-                logger.warning(f"macro contains data directive: {self.name} (line {self.line})", scope)
-
-            elif isinstance(node, LabelNode):
-                # mangle the label name and all its references in the current invocation
-                # we mangle with the macro name and line number
-                if line is None:
-                    logger.fatal(f"macro: line number is required to mangle labels: {self.name} (line {self.line})", scope)
-                old_label = node.label
-                new_label = f"{old_label}__{self.name}__{line}"
-
-                # find and update all operands in all instructions that reference the old label
-                references = 0
-                for node_ in template:
-                    if isinstance(node_, InstructionNode) and node_.mnemonic in {"JMP", "JZ", "JNZ", "JC", "JNC"}:
-                        for operand in node_.operands:
-                            if operand.type == OPERAND_TYPES["LABELNAME"] and operand.value == old_label:
-                                operand.value = new_label
-                                references += 1
-
-                node.label = new_label
-                logger.verbose(f"macro: mangled label {old_label} and {references} references to {new_label} on line {self.line}")
-
-            elif isinstance(node, InstructionNode):
-
-                for i, operand in enumerate[OperandNode](node.operands):
-                    if operand.type == OPERAND_TYPES["MACRO_ARG"]:
-                        logger.verbose(f"macro: replacing macro argument {operand.value} with {args_map[operand.value]}")
-                        node.operands[i] = args_map[operand.value]
-            
-            else:
-                logger.fatal(f"macros can only contain instructions: {self.name} (line {self.line})", scope)
-        
-        # done processing this invocation, return the modified nodes
-        return template
-
-    def __str__(self):
-        return f"macro definition {self.name} with {len(self.args)} arguments"
-
+    def __str__(self) -> str:
+        return f"macro call: {self.name} with {', '.join([str(op) for op in self.args])}"
