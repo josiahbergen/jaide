@@ -214,15 +214,19 @@ class Emulator:
 
     # main run loop
     def run(self) -> None:
+
+        # set up signal handler, regular KeyboardInterrupt corrupts the
+        # console state on windows :(
         self._interrupted = False
         prev_handler = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, lambda *_: setattr(self, '_interrupted', True))
+        
         try:
             while not self._interrupted:
                 self.step()
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
-            # or if the user interrupts the program
+            # or if the user interrupts the program (see signal handler above)
             print(f"emulator stopped: {e.message}")
         finally:
             signal.signal(signal.SIGINT, prev_handler)

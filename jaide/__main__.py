@@ -65,7 +65,7 @@ def main():
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
         # so we'll mirror the behavior of the quit command
-        print("\nbye!")
+        print("\nbye! (signal from __main__)")
         os._exit(0)
 
 if __name__ == "__main__":
