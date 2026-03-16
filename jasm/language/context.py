@@ -2,12 +2,13 @@
 # holds assembly context information.
 # josiah bergen, march 2026
 
-from .ir.base import IRNode, MacroDefinitionNode
+from .ir.base import MacroDefinitionNode
 from ..util.logger import logger
 
 class AssemblyContext:
 
     def __init__(self, file: str, origin: int = 0):
+        from .ir.base import IRNode, MacroDefinitionNode
 
         self.file: str = file                              # current file
         self.ir: list[IRNode] = []                         # IR
@@ -26,6 +27,7 @@ class AssemblyContext:
         self.labels[label] = pc
 
     def add_macro(self, name: str, macro: MacroDefinitionNode) -> None:
+        
         scope = "context.py:AssemblyContext.add_macro()"
         name = name.upper().strip()
 

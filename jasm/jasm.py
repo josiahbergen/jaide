@@ -9,15 +9,14 @@ from jasm.labels import resolve_labels
 from jasm.binary import generate_binary
 from jasm.language.context import AssemblyContext
 
-import sys
 
 def assemble(file: str, output: str):
     """ Assemble a JASM file and return the binary. """
 
-    logger.info("JASM assembler v0.0.3 (copyright 2026 Josiah Bergen)")
+    logger.info("JASM assembler v0.0.4 (copyright 2026 Josiah Bergen)")
  
     # generate the IR
-    ctx = generate_context(file)
+    ctx: AssemblyContext = generate_context(file)
 
     # expand macros
     expand_macros(ctx)
@@ -26,7 +25,7 @@ def assemble(file: str, output: str):
     resolve_labels(ctx)
 
     # generate binary
-    binary = generate_binary(ctx)
+    binary: bytearray = generate_binary(ctx)
 
     # write binary to output file
     with open(output, "wb") as f:

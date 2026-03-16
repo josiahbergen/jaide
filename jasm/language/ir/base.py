@@ -2,15 +2,12 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
-from jasm.language.isa import MODES
-from jasm.language.context import AssemblyContext
-
 import os
 import copy
 from enum import IntEnum
 
 from ...util.logger import logger
-from ...language.isa import INSTRUCTIONS, MODES, OPCODE_MAP, REGISTER_SEMANTICS, RTYPE
+from ...language.isa import INSTRUCTIONS, MODES, OPCODE_MAP
 
 
 class IRNode:
@@ -30,10 +27,6 @@ class IRNode:
     def get_size(self) -> int:
         scope = "ir.py:IRNode.get_size()"
         logger.fatal(f"get_size() not implemented for {type(self).__name__} on line {self.line}", scope)
-
-    def encode(self, context: AssemblyContext) -> bytearray:
-        scope = "ir.py:IRNode.get_bytes()"
-        logger.fatal(f"get_bytes() not implemented for {type(self).__name__} on line {self.line}", scope)
 
 # top-level nodes
 
@@ -78,22 +71,6 @@ class InstructionNode(IRNode):
         if any((operand.mode in [MODES.IMM, MODES.RELATIVE, MODES.OFF_POINTER, MODES.REL_POINTER] for operand in self.operands)):
             return 2
         return 1 # also catches instructions with no operands
-
-    def encode(self, context: AssemblyContext) -> bytearray:
-        scope = "ir.py:InstructionNode.get_bytes()"
-
-        if self.mnemonic == INSTRUCTIONS.JMP and len(self.operands) == 1 and self.operands[0].mode == MODES.IMM:
-            logger.fatal(f"jump to absolute address on line {self.line}. use --bios-mode to enable low-level functionality.", scope)
-
-        # assemble a 1/2 word bytearry of the form aabb oooo immhi immlo
-        bytes = bytearray()
-        register_semantics = REGISTER_SEMANTICS[self.mnemonic]
-
-        # annotate register arguments with their position in the byte
-        register_modes = [MODES.REG, MODES.REG_POINTER, MODES.REL_POINTER, MODES.OFF_POINTER]
-        register_args = [op for op in self.operands if op.mode in register_modes]
-
-        return bytearray()
 
 
 class LabelNode(IRNode):
@@ -172,7 +149,7 @@ class DataDirectiveNode(IRNode):
         logger.verbose(f"data directive: got size {len(self.data)} (raw: {', '.join([str(byte) for byte in self.data])})")
         return len(self.data)
 
-    def encode(self, context: AssemblyContext) -> bytearray:
+    def encode(self) -> bytearray:
         bits = bytearray()
         for word in self.data:
             bits.append(word & 0xFF)
