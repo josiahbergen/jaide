@@ -2,40 +2,54 @@
 # jasm transformer
 # josiah bergen, march 2026
 
-from jasm.language.ir import Operand
+
+from lark import Transformer, v_args, Token
 
 
-from .ir import (
+from ..util.logger import logger
+
+from .ir.base import (
     IRNode,
+    Operand,
     InstructionNode, 
-    Operand, 
-    Constant,
-    RegisterOperand, 
-    ImmediateOperand, 
-    LabelOperand, 
-    PointerOperand,
-    OffsetAddressOperand,
-    MacroArgumentOperand,
     LabelNode,
     DataDirectiveNode,
     ImportDirectiveNode,
     MacroDefinitionNode,
     MacroCallNode,
 )
-from ..util.logger import logger
-from lark import Transformer, v_args, Token, Tree
+from .ir.operands import (
+    LabelOperand,
+    ImmediateOperand,
+    RegisterOperand,
+    PointerOperand,
+    OffsetPointerOperand,
+    RelativePointerOperand,
+    MacroArgumentOperand,
+)
+from .ir.terminals import (
+    IdentifierTerminal, 
+    StringTerminal, 
+    NumberTerminal,
+    RegisterTerminal,
+    MnemonicTerminal,
+)
 
 
-def line(token: Token) -> int:
-    return token.line or 0
+def line(item: Token | IRNode) -> int:
+    # dynamically get the line number from a token or IRNode. useful.
+    return item.line or 0 if isinstance(item, Token) else item.line
+
 
 def assert_operand_count(operands: tuple[Operand, ...], expected: int, scope: str):
     if len(operands) != expected:
         logger.fatal(f"transformer: {scope} must have {expected} operands", scope)
     return
 
+
 @v_args(inline=True)  # arguments are inlined into the function as *args
 class IRTransformer(Transformer):
+
     
     def start(self, *statements):
         # base level node, return the entire transformed tree.
@@ -44,86 +58,116 @@ class IRTransformer(Transformer):
 
     # instructions
 
-    def instruction(self, mnemonic: Token, *operand_list):
-        operands = operand_list[0] if operand_list else []
+    def instruction(self, mnemonic: MnemonicTerminal, operands: list[Operand] = []):
         return InstructionNode(line(mnemonic), mnemonic.value, operands)
 
+    def operand_list(self, *operands: Operand):
+        if len(operands) == 0:
+            return []
+        return list[Operand](operands)
 
-    # instructions: operands
+ 
 
-    def REGISTER(self, register: Token):
-        return RegisterOperand(line(register), register.value)
+    def operand(self, terminal: IdentifierTerminal | NumberTerminal | RegisterTerminal):
+        # basic terminal operands
+        operand_map = {
+            IdentifierTerminal: LabelOperand,
+            NumberTerminal: ImmediateOperand,
+            RegisterTerminal: RegisterOperand,
+        }
+        return operand_map[type(terminal)](line(terminal), terminal)
 
-    def NUMBER(self, number: Token):
-        return ImmediateOperand(line(number), number.value)
+    def pointer_operand(self, register: RegisterTerminal):
+        # "[" REGISTER "]"
+        return PointerOperand(line(register), register)
 
-    def LABELNAME(self, label: Token):
-        return LabelOperand(line(label), label.value)
+    def offset_operand(self, identifier: IdentifierTerminal, register: RegisterTerminal):
+        # "[" IDENTIFIER "+" REGISTER "]"
+        return OffsetPointerOperand(line(identifier), identifier, register)
 
-    def pointer_operand(self, reg: RegisterOperand):
-        # this function is strange as it essentially mutates the naively parsed RegisterOperand
-        # into a PointerOperand, because we now have the knowledge that this is supposed to be one.
-        return PointerOperand(reg.line, reg.register)
+    def rel_pointer_operand(self, identifier: IdentifierTerminal):
+        # "[" IDENTIFIER "]"
+        return RelativePointerOperand(line(identifier), identifier)
 
-    def offset_operand(self, label: LabelOperand, register: RegisterOperand):
-        line = label.line or register.line # get the line number from wherever
-        return OffsetAddressOperand(register.line, label.label, register.register)
-
-    def macro_arg(self, label: LabelOperand):
-        # macro arguments contain labels, as this is easier to parse.
-        # so, we simply need to convert the LabelOperand back to a MacroArgumentOperand.
-        return MacroArgumentOperand(label.line, label.label)
+    def macro_arg(self, identifier: IdentifierTerminal):
+        # "%" IDENTIFIER
+        return MacroArgumentOperand(line(identifier), identifier)
 
     def expression(self, *operands):
         logger.fatal("transformer: expressions are not yet implemented.", "transformer.py:expression()")
 
     # directives
 
-    def directive(self, directive: IRNode):
+    def directive(self, directive: DataDirectiveNode | ImportDirectiveNode):
+        # receives an already parsed DataDirectiveNode or ImportDirectiveNode,
+        # so just return it.
         return directive
 
-    def data_directive(self, *constants: Constant):
+    def import_directive(self, _import: Token, string: StringTerminal):
+        # "IMPORT" STRING
+        return ImportDirectiveNode(line(string), string.value)
+
+    def data_directive(self, _data: Token, *constants: NumberTerminal | StringTerminal):
+        # we get a bunch of terminals, and gotta convert/annotate them into a list
+        # of tuples of (Type, str) that the DataDirectiveNode expects.
         items: list[tuple[DataDirectiveNode.Type, str]] = []
-
         for constant in constants:
-            if isinstance(constant, ImmediateOperand):
-                # numbers get converted to ImmediateOperands
+            if isinstance(constant, NumberTerminal):
                 items.append((DataDirectiveNode.Type.NUMBER, constant.value))
-            elif isinstance(constant, Constant):
-                # not a number? it's a string.
+            else: # StringTerminal
                 items.append((DataDirectiveNode.Type.STRING, constant.value))
-
-        return DataDirectiveNode(constants[0].line, items)
-
-    def import_directive(self, string: Constant):
-        return ImportDirectiveNode(string.line, string.value)
-
-    def STRING(self, string: Token):
-        return Constant(line(string), string.value[1:-1]) # remove quotes, and return a simple string
-
-    # labels
-
-    def label(self, *operands: LabelOperand):
-        assert_operand_count(operands, 1, "transformer.py:label()")
-
-        # raw labelnames are initially turned into LabelOperand nodes,
-        # so we need to convert them back to a LabelNode.
-        label: LabelOperand = operands[0]
-        return LabelNode(label.line, label.label)
+        
+        # return parsed information!
+        return DataDirectiveNode(line(_data), items)
 
     # macros
 
-    def macro_definition(self, _keyword: Token, name: LabelOperand, args: list[MacroArgumentOperand], body: list[IRNode], *_end_keywords: Token):
-        return MacroDefinitionNode(name.line, name.label, [arg.name for arg in args], body)
- 
+    def macro_definition(self, _macro: Token, name: IdentifierTerminal, args: list[str], body: list[IRNode], _end: Token, _macro_end: Token):
+        return MacroDefinitionNode(line(name), name.value, args, body)
+
     def macro_definition_args(self, *args: MacroArgumentOperand):
-        return list[MacroArgumentOperand](args)
+        return [arg.placeholder for arg in args]
 
     def macro_body(self, *body: IRNode):
-        return list[IRNode](body)
+        return [node for node in body if node is not None]
 
-    def macro_call(self, name: LabelOperand, operands: list[Operand]):
-        return MacroCallNode(name.line, name.label, operands)
-    
-    def operand_list(self, *operands: Operand):
-        return list[Operand](operands)
+    def macro_call(self, name: IdentifierTerminal, args: list[Operand]):
+        return MacroCallNode(line(name), name.value, args)
+
+    # labels
+
+    def label(self, name: IdentifierTerminal):
+        # IDENTIFIER ":"
+        return LabelNode(line(name), name.value)
+
+    # terminals
+
+    def constant(self, constant: NumberTerminal | StringTerminal):
+        return constant
+
+    def IDENTIFIER(self, identifier: Token):
+        return IdentifierTerminal(line(identifier), identifier.value)
+
+    def STRING(self, string: Token):
+        return StringTerminal(line(string), string.value)
+
+    def NUMBER(self, number: Token):
+        return NumberTerminal(line(number), number.value)
+
+    def REGISTER(self, register: Token):
+        return RegisterTerminal(line(register), register.value)
+
+    # def MACRO(self, keyword: Token):
+    #     return KeywordTerminal(line(keyword), keyword.value)
+
+    # def END(self, keyword: Token):
+    #     return KeywordTerminal(line(keyword), keyword.value)
+
+    # def DATA(self, keyword: Token):
+    #     return DirectiveTerminal(line(keyword), keyword.value)
+
+    # def IMPORT(self, keyword: Token):
+    #     return DirectiveTerminal(line(keyword), keyword.value)
+
+    def MNEMONIC(self, mnemonic: Token):
+        return MnemonicTerminal(line(mnemonic), mnemonic.value)

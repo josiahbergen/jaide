@@ -9,6 +9,8 @@ from jasm.labels import resolve_labels
 from jasm.binary import generate_binary
 from jasm.language.context import AssemblyContext
 
+import sys
+
 def assemble(file: str, output: str):
     """ Assemble a JASM file and return the binary. """
 

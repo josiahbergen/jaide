@@ -47,7 +47,7 @@ def main():
     # initialize logger
     logger.set_level(args.verbosity)
     logger.set_warnings(not args.nowarn)
-    logger.title("welcome to the jasm assembler (v1.0.1)")
+    logger.title("welcome to the jasm assembler!")
     logger.nl()
 
     file = args.file

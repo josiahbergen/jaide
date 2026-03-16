@@ -18,32 +18,34 @@ class INSTRUCTIONS(IntEnum):
     ADC  = 7
     SUB  = 8
     SBC  = 9
-    INC  = 10
-    DEC  = 11
-    LSH  = 12
-    RSH  = 13
-    AND  = 14
-    OR   = 15
-    NOT  = 16
-    XOR  = 17
-    INB  = 18
-    OUTB = 19
-    CMP  = 20
-    JMP  = 21
-    JZ   = 22
-    JNZ  = 23
-    JC   = 24
-    JNC  = 25
-    JN   = 26
-    JNN  = 27
-    JO   = 28
-    JNO  = 29
-    CALL = 30
-    RET  = 31
-    INT  = 32
-    IRET = 33
-    NOP  = 34
-
+    MUL  = 10
+    MOD  = 11
+    INC  = 12
+    DEC  = 13
+    LSH  = 14
+    RSH  = 15
+    AND  = 16
+    OR   = 17
+    NOT  = 18
+    XOR  = 19
+    INB  = 20
+    OUTB = 21
+    CMP  = 22
+    JMP  = 23
+    JZ   = 24
+    JNZ  = 25
+    JC   = 26
+    JNC  = 27
+    JN   = 28
+    JNN  = 29
+    JO   = 30
+    JNO  = 31
+    CALL = 32
+    RET  = 33
+    INT  = 34
+    IRET = 35
+    NOP  = 36
+    
 
 class REGISTERS(IntEnum):
     A  = 0
@@ -60,79 +62,115 @@ class REGISTERS(IntEnum):
     PC = 11
 
 
+class RTYPE(IntEnum):
+    SRC = 0
+    DEST = 1
+
+
+REGISTER_SEMANTICS: dict[INSTRUCTIONS, list[RTYPE]] = {
+    INSTRUCTIONS.HALT: [],
+    INSTRUCTIONS.GET:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.PUT:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.MOV:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.PUSH: [ RTYPE.SRC ],
+    INSTRUCTIONS.POP:  [ RTYPE.DEST ],
+    INSTRUCTIONS.ADD:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.ADC:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.SUB:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.SBC:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.MUL:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.MOD:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.INC:  [ RTYPE.DEST ],
+    INSTRUCTIONS.DEC:  [ RTYPE.DEST ],
+    INSTRUCTIONS.LSH:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.RSH:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.AND:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.OR:   [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.NOT:  [ RTYPE.DEST ],
+    INSTRUCTIONS.XOR:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.INB:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.OUTB: [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.CMP:  [ RTYPE.DEST, RTYPE.SRC ],
+    INSTRUCTIONS.JMP:  [ RTYPE.SRC ],
+    INSTRUCTIONS.JZ:   [ RTYPE.SRC ],
+    INSTRUCTIONS.JNZ:  [ RTYPE.SRC ],
+    INSTRUCTIONS.JC:   [ RTYPE.SRC ],
+    INSTRUCTIONS.JNC:  [ RTYPE.SRC ],
+    INSTRUCTIONS.JN:   [ RTYPE.SRC ],
+    INSTRUCTIONS.JNN:  [ RTYPE.SRC ],
+    INSTRUCTIONS.JO:   [ RTYPE.SRC ],
+    INSTRUCTIONS.JNO:  [ RTYPE.SRC ],
+    INSTRUCTIONS.CALL: [ RTYPE.SRC ],
+    INSTRUCTIONS.RET:  [ ],
+    INSTRUCTIONS.INT:  [ RTYPE.SRC ],
+    INSTRUCTIONS.IRET: [ ],
+    INSTRUCTIONS.NOP:  [ ],
+}
+
+
 class MODES(IntEnum):
 
-    REG          = 0  # reg            register
-    IMM          = 1  # imm16          immediate value in instruction word
-    REG_INDIRECT = 2  # [reg]          memory location contained in register
-    REL_ADDRESS  = 3  # [imm16 + pc]   memory location defined by pc + immediate
-    OFF_ADDRESS  = 4  # [imm16 + reg]  memory location defined by immediate + register
+    NULL         = 0
+    REG          = 1  # reg            register value
+    IMM          = 2  # imm16          immediate value
+    RELATIVE     = 3  # pc + imm16     relative value
+    REG_POINTER  = 4  # [reg]          memory at register
+    OFF_POINTER  = 5  # [imm16 + reg]  memory at immediate + register
+    REL_POINTER  = 6  # [pc + imm16]   memory at pc + imm
 
 
-class DATA_DIRECTIVES(IntEnum):
-    DATA = 0
-    IMPORT = 1
+INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
 
-OPCODE_MAPPINGS: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], int] = {
-    # turns "assembly-style" instruction information into an opcode value
+    INSTRUCTIONS.HALT: [ () ],
+    INSTRUCTIONS.GET:  [ (MODES.REG, MODES.REG_POINTER), (MODES.REG, MODES.REL_POINTER), (MODES.REG, MODES.OFF_POINTER) ],
+    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.OFF_POINTER, MODES.REG) ],
+    INSTRUCTIONS.MOV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM), (MODES.REG, MODES.RELATIVE) ],
+    INSTRUCTIONS.PUSH: [ (MODES.REG, ), (MODES.IMM, ) ],
+    INSTRUCTIONS.POP:  [ (MODES.REG, ) ],
+    INSTRUCTIONS.ADD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.ADC:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.SUB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.SBC:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.MUL:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.MOD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.INC:  [ (MODES.REG, ) ],
+    INSTRUCTIONS.DEC:  [ (MODES.REG, ) ],
+    INSTRUCTIONS.LSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.RSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.AND:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.OR:   [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
+    INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
+    INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.JMP:  [ (MODES.REG, ), (MODES.IMM, ), (MODES.RELATIVE, ), (MODES.OFF_POINTER, ) ],
+    INSTRUCTIONS.JZ:   [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JNZ:  [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JC:   [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JNC:  [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JN:   [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JNN:  [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JO:   [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.JNO:  [ (MODES.RELATIVE, ) ],
+    INSTRUCTIONS.CALL: [ (MODES.REG, ), (MODES.RELATIVE, ), (MODES.OFF_POINTER, )],
+    INSTRUCTIONS.RET:  [ () ],
+    INSTRUCTIONS.INT:  [ (MODES.REG, ), (MODES.IMM, ) ],
+    INSTRUCTIONS.IRET: [ () ],
+    INSTRUCTIONS.NOP:  [ () ],
+}
 
-    (INSTRUCTIONS.HALT, ()):                                 0x00,
-    (INSTRUCTIONS.GET,  ( MODES.REG, MODES.REG_INDIRECT )):  0x01,
-    (INSTRUCTIONS.GET,  ( MODES.REG, MODES.REL_ADDRESS  )):  0x02,
-    (INSTRUCTIONS.GET,  ( MODES.REG, MODES.OFF_ADDRESS  )):  0x03,
-    (INSTRUCTIONS.PUT,  ( MODES.REG_INDIRECT, MODES.REG )):  0x04,
-    (INSTRUCTIONS.PUT,  ( MODES.OFF_ADDRESS,  MODES.REG )):  0x05,
-    (INSTRUCTIONS.MOV,  ( MODES.REG, MODES.REG )):           0x06,
-    (INSTRUCTIONS.MOV,  ( MODES.REG, MODES.IMM )):           0x07,
-    (INSTRUCTIONS.PUSH, ( MODES.REG, )):                     0x08,
-    (INSTRUCTIONS.PUSH, ( MODES.IMM, )):                     0x09,
-    (INSTRUCTIONS.POP,  ( MODES.REG, )):                     0x0a,
-    (INSTRUCTIONS.ADD,  ( MODES.REG, MODES.REG )):           0x0b,
-    (INSTRUCTIONS.ADD,  ( MODES.REG, MODES.IMM )):           0x0c,
-    (INSTRUCTIONS.ADC,  ( MODES.REG, MODES.REG )):           0x0d,
-    (INSTRUCTIONS.ADC,  ( MODES.REG, MODES.IMM )):           0x0e,
-    (INSTRUCTIONS.SUB,  ( MODES.REG, MODES.REG )):           0x0f,
-    (INSTRUCTIONS.SUB,  ( MODES.REG, MODES.IMM )):           0x10,
-    (INSTRUCTIONS.SBC,  ( MODES.REG, MODES.REG )):           0x11,
-    (INSTRUCTIONS.SBC,  ( MODES.REG, MODES.IMM )):           0x12,
-    (INSTRUCTIONS.INC,  ( MODES.REG, )):                     0x13,
-    (INSTRUCTIONS.DEC,  ( MODES.REG, )):                     0x14,
-    (INSTRUCTIONS.LSH,  ( MODES.REG, MODES.REG )):           0x15,
-    (INSTRUCTIONS.LSH,  ( MODES.REG, MODES.IMM )):           0x16,
-    (INSTRUCTIONS.RSH,  ( MODES.REG, MODES.REG )):           0x17,
-    (INSTRUCTIONS.RSH,  ( MODES.REG, MODES.IMM )):           0x18,
-    (INSTRUCTIONS.AND,  ( MODES.REG, MODES.REG )):           0x19,
-    (INSTRUCTIONS.AND,  ( MODES.REG, MODES.IMM )):           0x1a,
-    (INSTRUCTIONS.OR,   ( MODES.REG, MODES.REG )):           0x1b,
-    (INSTRUCTIONS.OR,   ( MODES.REG, MODES.IMM )):           0x1c,
-    (INSTRUCTIONS.NOT,  ( MODES.REG, )):                     0x1d,
-    (INSTRUCTIONS.XOR,  ( MODES.REG, MODES.REG )):           0x1e,
-    (INSTRUCTIONS.XOR,  ( MODES.REG, MODES.IMM )):           0x1f,
-    (INSTRUCTIONS.INB,  ( MODES.REG, MODES.REG )):           0x20,
-    (INSTRUCTIONS.INB,  ( MODES.REG, MODES.IMM )):           0x21,
-    (INSTRUCTIONS.OUTB, ( MODES.REG, MODES.REG )):           0x22,
-    (INSTRUCTIONS.OUTB, ( MODES.REG, MODES.IMM )):           0x23,
-    (INSTRUCTIONS.CMP,  ( MODES.REG, MODES.REG )):           0x24,
-    (INSTRUCTIONS.CMP,  ( MODES.REG, MODES.IMM )):           0x25,
-    (INSTRUCTIONS.JMP,  ( MODES.REG, )):                     0x26,
-    (INSTRUCTIONS.JMP,  ( MODES.IMM, )):                     0x27,
-    (INSTRUCTIONS.JMP,  ( MODES.REL_ADDRESS, )):             0x28,
-    (INSTRUCTIONS.JMP,  ( MODES.OFF_ADDRESS, )):             0x29,
-    (INSTRUCTIONS.JZ,   ( MODES.REL_ADDRESS, )):             0x2a,
-    (INSTRUCTIONS.JNZ,  ( MODES.REL_ADDRESS, )):             0x2b,
-    (INSTRUCTIONS.JC,   ( MODES.REL_ADDRESS, )):             0x2c,
-    (INSTRUCTIONS.JNC,  ( MODES.REL_ADDRESS, )):             0x2d,
-    (INSTRUCTIONS.JN,   ( MODES.REL_ADDRESS, )):             0x2e,
-    (INSTRUCTIONS.JNN,  ( MODES.REL_ADDRESS, )):             0x2f,
-    (INSTRUCTIONS.JO,   ( MODES.REL_ADDRESS, )):             0x30,
-    (INSTRUCTIONS.JNO,  ( MODES.REL_ADDRESS, )):             0x31,
-    (INSTRUCTIONS.CALL, ( MODES.REG, )):                     0x32,
-    (INSTRUCTIONS.CALL, ( MODES.IMM, )):                     0x33,
-    (INSTRUCTIONS.RET,  ()):                                 0x34,
-    (INSTRUCTIONS.INT,  ( MODES.REG, )):                     0x35,
-    (INSTRUCTIONS.INT,  ( MODES.IMM, )):                     0x36,
-    (INSTRUCTIONS.IRET, ()):                                 0x37,
-    (INSTRUCTIONS.NOP,  ()):                                 0x38,
+
+OPCODE_MAP_KEYS: list[tuple[INSTRUCTIONS, tuple[MODES, ...]]] = [
+    (instr, modes)
+    for instr, mode_list in INSTRUCTION_MODES.items()
+    for modes in mode_list
+]
+
+
+OPCODE_MAP: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], int] = {
+    (instr, modes): i
+    for i, (instr, modes) in enumerate[tuple[INSTRUCTIONS, tuple[MODES, ...]]](OPCODE_MAP_KEYS)
 }
 
 
@@ -142,16 +180,16 @@ def generate_opcode_string(opcode: int) -> str | None:
     mode_string: dict[MODES, str] = {
         MODES.REG: "reg",
         MODES.IMM: "imm16",
-        MODES.REG_INDIRECT: "[reg]",
-        MODES.REL_ADDRESS: "[pc + imm16]",
-        MODES.OFF_ADDRESS: "[imm16 + reg]",
+        MODES.REG_POINTER: "[reg]",
+        MODES.REL_POINTER: "[pc + imm16]",
+        MODES.OFF_POINTER: "[imm16 + reg]",
     }
 
     mnemonic = None
     operands = None
 
     # reverse lookup on the mappings to get the mnemonic and operands
-    for (mnemonic, operands), code in OPCODE_MAPPINGS.items():
+    for (mnemonic, operands), code in OPCODE_MAP.items():
         if code == opcode:
             mnemonic = mnemonic
             operands = operands
@@ -168,7 +206,7 @@ if __name__ == "__main__":
 
     for mnemonic in INSTRUCTIONS:
         print(f"{mnemonic.name}:")
-        all_encodings = [encoding for encoding in OPCODE_MAPPINGS.keys() if encoding[0] == mnemonic]
+        all_encodings = [encoding for encoding in OPCODE_MAP.keys() if encoding[0] == mnemonic]
         for encoding in all_encodings:
-            print(f"    {generate_opcode_string(OPCODE_MAPPINGS[encoding])}")
+            print(f"    {generate_opcode_string(OPCODE_MAP[encoding])}")
         print()

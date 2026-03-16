@@ -4,12 +4,10 @@
 
 import os
 
-from lark import Lark, ParseTree
-from lark.tree import Tree, Branch
-from lark.lexer import Token
+from lark import Lark
 
 from .language.grammar import GRAMMAR
-from .language.ir import IRNode, InstructionNode, ImportDirectiveNode, DataDirectiveNode, LabelNode
+from .language.ir.base import IRNode, ImportDirectiveNode, MacroDefinitionNode
 from .language.transformer import IRTransformer
 from .util.logger import logger
 from .language.context import AssemblyContext
@@ -25,14 +23,13 @@ def generate_context(file: str) -> AssemblyContext:
     parse_file(file, ir)
 
     # flatten the IR and return
-    ir_nodes = flatten_imports(ir)
-    logger.debug(f"parse: done! generated {len(ir_nodes)} nodes.")
+    context.ir = flatten_imports(context, ir)
+    logger.debug(f"parse: done! generated {len(context.ir)} nodes.")
 
     logger.verbose("parse: all nodes:")
-    for node in ir_nodes:
+    for node in context.ir:
         logger.verbose(f"parse: {str(node)}")
 
-    context.ir = ir_nodes
     return context
 
 
@@ -77,7 +74,8 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
 
     # find all import nodes
     imports = [node for node in ir[file] if isinstance(node, ImportDirectiveNode)]
-    logger.debug(f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}")
+    if len(imports) > 0:
+        logger.debug(f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}")
 
     for import_node in imports:
         
@@ -91,18 +89,18 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
     return
 
 
-def flatten_imports(ir: dict[str, list[IRNode]]) -> list[IRNode]:
+def flatten_imports(context: AssemblyContext, ir: dict[str, list[IRNode]]) -> list[IRNode]:
     """ Flatten the main ir dict into a single list of linear IR nodes. """
 
     logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
     big_list = []
     added_files: set[str] = set[str]()
-    append_ir_nodes(list[str](ir.keys())[0], ir, big_list, added_files)
+    append_ir_nodes(context, list[str](ir.keys())[0], ir, big_list, added_files)
     return big_list
 
 
-def append_ir_nodes(file: str, ir: dict[str, list[IRNode]], big_list: list[IRNode], added_files: set[str]) -> None:
-    """ Recursive function to flatten imports such that they keep their original order. """
+def append_ir_nodes(context: AssemblyContext, file: str, ir: dict[str, list[IRNode]], big_list: list[IRNode], added_files: set[str]) -> None:
+    """ Recursive function to flatten imports such that they keep their original order. Also adds macro definitions to the assembly context. """
     
     for node in ir[file]:
         if isinstance(node, ImportDirectiveNode):
@@ -112,7 +110,13 @@ def append_ir_nodes(file: str, ir: dict[str, list[IRNode]], big_list: list[IRNod
 
             logger.debug(f"parse: adding {node.filename} to main list at index {len(big_list)}")
             added_files.add(node.filename)
-            append_ir_nodes(node.filename, ir, big_list, added_files)
+            append_ir_nodes(context, node.filename, ir, big_list, added_files)
+
+        elif isinstance(node, MacroDefinitionNode):
+            logger.debug(f"parse: adding macro definition {node.name} to assembly context")
+            context.add_macro(node.name, node)
+            # don't need to add macro defs to the ir, they're already saved
+
         else:
             big_list.append(node)
-
+    return

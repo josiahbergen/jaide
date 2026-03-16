@@ -2,9 +2,7 @@
 # binary generation functions.
 # josiah bergen, december 2025
 
-# lowkey gonna be a tough go
-
-from .language.ir import IRNode, LabelNode
+from .language.ir.base import IRNode, LabelNode
 from .language.context import AssemblyContext
 from .util.logger import logger
 
@@ -18,7 +16,7 @@ def generate_binary(context: AssemblyContext) -> bytearray:
             # no machine code to generate!
             continue
 
-        ml = node.get_bytes()
+        ml = node.encode(context)
         binary.extend(ml)
         logger.debug(f"bytes: finished generating {len(ml)} bytes for {node} on line {node.line} (0x{node.pc:04X})")
 

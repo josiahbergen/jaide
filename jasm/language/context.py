@@ -2,7 +2,7 @@
 # holds assembly context information.
 # josiah bergen, march 2026
 
-from .ir import MacroDefinitionNode, IRNode
+from .ir.base import IRNode, MacroDefinitionNode
 from ..util.logger import logger
 
 class AssemblyContext:
@@ -27,7 +27,7 @@ class AssemblyContext:
 
     def add_macro(self, name: str, macro: MacroDefinitionNode) -> None:
         scope = "context.py:AssemblyContext.add_macro()"
-        name = name.lower().strip()
+        name = name.upper().strip()
 
         if name in self.macros.keys():
             logger.warning(f"macro \"{name}\" re-defined! note that macro names are case-insensitive.", scope)

@@ -19,7 +19,7 @@ GRAMMAR = r"""
 
     # Macros 
     # Matches: MACRO name args \n body END MACRO
-    macro_definition: MACRO LABELNAME macro_definition_args? _NL macro_body END MACRO
+    macro_definition: MACRO IDENTIFIER macro_definition_args? _NL macro_body END MACRO
 
     macro_definition_args: macro_arg ("," macro_arg)*
     
@@ -33,7 +33,7 @@ GRAMMAR = r"""
                | macro_call
 
     # Macro call: name [args]
-    macro_call: LABELNAME operand_list?
+    macro_call: IDENTIFIER operand_list?
 
     # Instructions 
     instruction: MNEMONIC operand_list?
@@ -42,20 +42,22 @@ GRAMMAR = r"""
     # Operands & Expressions 
     ?generic_operand: operand
                | pointer_operand
-               | offset_operand
+               | offset_pointer_operand
+               | relative_pointer_operand
                | macro_arg
                | expression
 
-    ?operand: REGISTER
+    operand: REGISTER
             | NUMBER
-            | LABELNAME
+            | IDENTIFIER
 
     # memory operands can be in any of these forms:
-    # [reg] + [label + reg]
+    # [reg] + [label + reg] + [label]
     pointer_operand: "[" REGISTER "]"
-    offset_operand: "[" LABELNAME "+" REGISTER "]"
+    offset_pointer_operand: "[" IDENTIFIER "+" REGISTER "]"
+    relative_pointer_operand: "[" IDENTIFIER "]"
 
-    macro_arg: "%" LABELNAME
+    macro_arg: "%" IDENTIFIER
 
     # EBNF: expression = "(" [ operator ] exp_term { operator exp_term } ")"
     # We allow an optional leading operator for unary contexts (e.g. (- 5))
@@ -65,7 +67,7 @@ GRAMMAR = r"""
              | macro_arg
              | expression
 
-    label: LABELNAME ":"
+    label: IDENTIFIER ":"
 
     ?constant: NUMBER | STRING
 
@@ -75,14 +77,14 @@ GRAMMAR = r"""
     OPERATOR: "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~"
 
     # Mnemonics
-    # Priority 100 ensures these are matched before generic LABELNAMEs
+    # Priority 100 ensures these are matched before generic IDENTIFIERs
     MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|MUL|MOD|INC|DEC|LSH|RSH|AND|OR|NOT|XOR|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|JN|JNN|JO|JNO|CALL|RET|INT|IRET|HALT|NOP)\b/i
 
-    # Directives (priority 95 ensures these are matched before LABELNAME)
+    # Directives (priority 95 ensures these are matched before IDENTIFIER)
     DATA.95: /DATA\b/i
     IMPORT.95: /IMPORT\b/i
     
-    # Macro keywords (priority 95 ensures these are matched before LABELNAME)
+    # Macro keywords (priority 95 ensures these are matched before IDENTIFIER)
     MACRO.95: /MACRO\b/i
     END.95: /END\b/i
 
@@ -92,7 +94,7 @@ GRAMMAR = r"""
 
     # Numbers
     # Hex (0x...), Bin (b...), Dec (0-9...)
-    # Priority 20 ensures numbers are matched before LABELNAME (priority 10)
+    # Priority 20 ensures numbers are matched before IDENTIFIER (priority 10)
     NUMBER.20: /0x[0-9a-fA-F]+/
           | /b[01]+/
           | /[0-9]+/
@@ -102,7 +104,7 @@ GRAMMAR = r"""
 
     # Identifiers (Labels, Macro names)
     # Priority 10 is lower than Keywords/Registers
-    LABELNAME.10: /[A-Za-z_][A-Za-z0-9_]*/
+    IDENTIFIER.10: /[A-Za-z_][A-Za-z0-9_]*/
 
     # Comments (semicolon to end of line)
     COMMENT: /;.*/

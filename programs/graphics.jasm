@@ -7,6 +7,7 @@ macro generate_attrs %reg, %fore, %back
 end macro
 
 start:
+    jmp 0x5000
     mov mb, 0x01 ; set the memory bank to vram
     generate_attrs z, 0x00, 0x0E
     call clear_screen
@@ -28,13 +29,13 @@ start:
 print_string:
     ; print the string at X to Y with attrs in Z
     ; trashes A
-    get a, x
+    get a, [x]
     cmp a, 0
     jz print_string_end
 
     and a, 0x00FF ; clear attribute bits
     or a, z ; set attribute bits
-    put y, a ; put word to vram
+    put [y], a ; put word to vram
 
     inc x
     inc y
@@ -47,7 +48,7 @@ clear_screen:
     mov y, 0x8000
     and z, 0xFF00 ; clear glyph bits
 clear_screen_loop:
-    put y, z ; put word to vram
+    put [y], z ; put word to vram
     inc y
     cmp y, 0x87D0 ; end of vram
     jnz clear_screen_loop
@@ -62,7 +63,7 @@ fun_colors_loop:
     or z, c ; but c into background color
     lsh z, 0x08
     lsh z, 0x04
-    put y, z
+    put [y], z
     inc y
 
     inc c
