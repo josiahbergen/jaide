@@ -93,10 +93,10 @@ GRAMMAR = r"""
     REGISTER.90: /(A|B|C|D|E|X|Y|SP|PC|Z|F|MB)\b/i
 
     # Numbers
-    # Hex (0x...), Bin (b...), Dec (0-9...)
+    # Hex (0x...), Bin (0b...), Dec (0-9...)
     # Priority 20 ensures numbers are matched before IDENTIFIER (priority 10)
     NUMBER.20: /0x[0-9a-fA-F]+/
-          | /b[01]+/
+          | /0b[01]+/
           | /[0-9]+/
 
     # Strings (Double quoted)

@@ -7,7 +7,7 @@ from ..util.logger import logger
 
 class AssemblyContext:
 
-    def __init__(self, file: str, origin: int = 0):
+    def __init__(self, file: str, origin: int = 0, linkable: bool = True):
         from .ir.base import IRNode, MacroDefinitionNode
 
         self.file: str = file                              # current file
@@ -15,6 +15,7 @@ class AssemblyContext:
         self.labels: dict[str, int] = {}                   # labels
         self.macros: dict[str, MacroDefinitionNode] = {}   # macros
         self.origin: int = origin                          # starting PC
+        self.linkable: bool = linkable                     # linkable mode
 
     def add_label(self, label: str, pc: int) -> None:
         scope = "context.py:AssemblyContext.add_label()"

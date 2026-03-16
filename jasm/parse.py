@@ -12,11 +12,11 @@ from .language.transformer import IRTransformer
 from .util.logger import logger
 from .language.context import AssemblyContext
 
-def generate_context(file: str) -> AssemblyContext:
+def generate_context(file: str, linkable: bool) -> AssemblyContext:
     """ Generate the context from the source file. """
 
     # dictionary of lists of IR nodes, one for each file that is parsed
-    context = AssemblyContext(file)
+    context = AssemblyContext(file, linkable)
     ir: dict[str, list[IRNode]] = {}
 
     # recursive function to parse all files

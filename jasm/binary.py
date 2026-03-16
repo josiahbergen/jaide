@@ -42,7 +42,7 @@ def generate_binary(context: AssemblyContext) -> bytearray:
 def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytearray:
     scope = "binary.py:encode_instruction()"
 
-    if node.mnemonic == INSTRUCTIONS.JMP and len(node.operands) == 1 and node.operands[0].mode == MODES.IMM:
+    if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
         logger.fatal(f"jump to absolute address on line {node.line}. use --bios-mode to enable low-level functionality.", scope)
 
     bytes = bytearray()
@@ -75,6 +75,8 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     bytes.append((src_reg << 4) | dest_reg) # register byte
     bytes.append(node.opcode) # opcode byte
 
+    logger.verbose(f"binary: instruction word: {src_reg << 4 | dest_reg:08b} | {src_reg << 4 | dest_reg} | {node.opcode:08b} | {node.opcode}")
+
     if immediate_value is not None:
         bytes.append(immediate_value & 0xFF) # low byte
         bytes.append((immediate_value >> 8) & 0xFF) # high byte 
@@ -85,22 +87,15 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
 def compute_immediate(node: InstructionNode, immediate: Operand, ctx: AssemblyContext) -> int | None:
     next_pc = node.pc + node.size
 
-    # TODO: unit tests for this and figure out how to handle negative numbers and overflows
-
     if isinstance(immediate, ImmediateOperand):
         return immediate.value # plain old immediate constant
     
     if isinstance(immediate, LabelOperand):
         # basic relative offset (jumps, calls, etc.)
-        target_pc = ctx.labels[immediate.name]
-        return (target_pc - next_pc) & 0xFFFF
+        label_address = ctx.labels[immediate.name]
+        return (label_address - next_pc) & 0xFFFF # two's complement offset
 
-    if isinstance(immediate, RelativePointerOperand):
+    if isinstance(immediate, (RelativePointerOperand, OffsetPointerOperand)):
         # [label] i.e. pointer to relative offset
-        target_pc = ctx.labels[immediate.label]
-        return (target_pc - next_pc) & 0xFFFF
-
-    if isinstance(immediate, OffsetPointerOperand):
-        # [label + reg] i.e. pointer to offset offset (not confusing at all trust)
-        base_pc = ctx.labels[immediate.label]
-        return (base_pc - next_pc) & 0xFFFF
+        label_address = ctx.labels[immediate.label]
+        return (label_address - next_pc) & 0xFFFF # two's complement offset

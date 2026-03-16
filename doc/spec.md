@@ -38,7 +38,7 @@ _\*it is recommended that SP be set to 0xFEFF on reset._
 
 the jaide architecture supports up to 16 registers. all registers contain 16 bits.
 
-_currently, 7 general purpose and 5 special registers are implemented. the four unused registers are reserved for future floating-point support._
+_currently, 78general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
 
 ### general purpose registers
 
@@ -89,7 +89,7 @@ jaide supports up to 128 Kib of memory.
 | `0xFE00...0xFEFF` | 512 bytes | stack (recommended)\*\*        |
 | `0x4200...0xFDFF` | 94 Kib    | general purpose RAM            |
 | `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked)\* |
-| `0x0000...0x01FF` | 1 KiB     | BIOS ROM (reserved)            |
+| `0x0000...0x01FF` | 1 KiB     | BIOS ROM                       |
 
 
 _\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._

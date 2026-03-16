@@ -131,14 +131,17 @@ class DataDirectiveNode(IRNode):
 
     def parse_number(self, string: str) -> int:
         scope = "ir.py:DataDirectiveNode.get_number_value()"
-        prefix: str = ("0x" if string.startswith("0x") else
-                        "b" if string.startswith("b") else "")
-        value: int = int(string.removeprefix(prefix), 16 if prefix == "0x" else 2 if prefix == "b" else 10)
+        value = int(string, 0)
         
-        if value > 0xFFFF:
-            logger.fatal(f"number {string} ({value}) is too large for a 16-bit value (line {self.line})", scope)
+        if value < -32768 or value > 0xFFFF:
+            logger.fatal(f"number {string} ({value}) out of range for a 16-bit value (line {self.line})", scope)
+        
+        if value < 0:
+            value = value & 0xFFFF
+        
         logger.verbose(f"parse_bytes: {string} -> {value}")
         return value
+
 
     def parse_string(self, string: str) -> list[int]:
         bytes: list[int] = [ord(char) for char in string]

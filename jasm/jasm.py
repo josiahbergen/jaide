@@ -10,13 +10,13 @@ from jasm.binary import generate_binary
 from jasm.language.context import AssemblyContext
 
 
-def assemble(file: str, output: str):
+def assemble(file: str, output: str, linkable: bool):
     """ Assemble a JASM file and return the binary. """
 
     logger.info("JASM assembler v0.0.4 (copyright 2026 Josiah Bergen)")
  
     # generate the IR
-    ctx: AssemblyContext = generate_context(file)
+    ctx: AssemblyContext = generate_context(file, linkable)
 
     # expand macros
     expand_macros(ctx)

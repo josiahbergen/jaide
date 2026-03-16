@@ -113,10 +113,10 @@ class MODES(IntEnum):
     NULL         = 0
     REG          = 1  # reg            register value
     IMM          = 2  # imm16          immediate value
-    RELATIVE     = 3  # pc + imm16     relative value
+    RELATIVE     = 3  # pc + simm16    relative value (calculated from label)
     REG_POINTER  = 4  # [reg]          memory at register
     OFF_POINTER  = 5  # [imm16 + reg]  memory at immediate + register
-    REL_POINTER  = 6  # [pc + imm16]   memory at pc + imm
+    REL_POINTER  = 6  # [pc + simm16]  memory at pc + simm16 (calculated from label)
 
 
 INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
@@ -179,10 +179,11 @@ def generate_opcode_string(opcode: int) -> str | None:
 
     mode_string: dict[MODES, str] = {
         MODES.REG: "reg",
-        MODES.IMM: "imm16",
+        MODES.IMM: "imm",
+        MODES.RELATIVE: "pc + simm",
         MODES.REG_POINTER: "[reg]",
-        MODES.REL_POINTER: "[pc + imm16]",
-        MODES.OFF_POINTER: "[imm16 + reg]",
+        MODES.OFF_POINTER: "[imm + reg]",
+        MODES.REL_POINTER: "[pc + simm]",
     }
 
     mnemonic = None
@@ -204,9 +205,12 @@ def generate_opcode_string(opcode: int) -> str | None:
 
 if __name__ == "__main__":
 
+    i = 0
     for mnemonic in INSTRUCTIONS:
         print(f"{mnemonic.name}:")
         all_encodings = [encoding for encoding in OPCODE_MAP.keys() if encoding[0] == mnemonic]
-        for encoding in all_encodings:
-            print(f"    {generate_opcode_string(OPCODE_MAP[encoding])}")
+        for encoding in (all_encodings):
+            print(f"{i}\t{generate_opcode_string(OPCODE_MAP[encoding])}")
+            i += 1
         print()
+    print(f"generated opcode map for {len(OPCODE_MAP)} instructions.")

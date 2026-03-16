@@ -43,93 +43,101 @@ SBC dest, src           subtract with borrow (updates Z, C, O, N)
 11  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - reg - C
 12  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16 - C
 
+MUL dest, src           multiply (updates Z, C, O, N)
+13  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest * src
+14  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest * imm16
+
+MOD dest, src           modulo (updates Z, C, O, N)
+15  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest % src
+16  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest % imm16
+
 INC dest                increment (updates Z, C, O)
-13  reg                 oooooooo ---- dddd -------- --------  dest <- dest + 1
+17  reg                 oooooooo ---- dddd -------- --------  dest <- dest + 1
 
 DEC dest                decrement (updates Z, C, O, N)
-14  reg                 oooooooo ---- dddd -------- --------  dest <- dest - 1
+18  reg                 oooooooo ---- dddd -------- --------  dest <- dest - 1
 
 LSH dest, src           bit shift left (updates Z, C, O)
-15  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest << reg
-16  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src << imm16
+19  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest << reg
+20  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src << imm16
 
 RSH dest, src           bit shift right (updates Z, C, O)
-17  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest >> reg
-18  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src >> imm16
+21  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest >> reg
+22  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src >> imm16
 
 AND dest, src           bitwise and (updates Z)
-19  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest & reg
-1a  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src & imm16
+23  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest & reg
+24  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src & imm16
 
 OR dest, src            bitwise or (updates Z)
-1b  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest | reg
-1c  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src | imm16
+25  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest | reg
+26  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src | imm16
 
 NOT dest                bitwise not (updates Z)
-1d  reg                 oooooooo ---- dddd -------- --------  dest <- ~dest
+27  reg                 oooooooo ---- dddd -------- --------  dest <- ~dest
 
 XOR dest, src           bitwise xor (updates Z)
-1e  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest ^ reg
-1f  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src ^ imm16
+28  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest ^ reg
+29  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src ^ imm16
 
 INB dest, src           get word from I/O port
-20  reg  reg            oooooooo ssss dddd -------- --------  dest <- port(src)
-21  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- port(imm16)
+2a  reg  reg            oooooooo ssss dddd -------- --------  dest <- port(src)
+2b  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- port(imm16)
 
 OUTB dest, src          put word on I/O port
-22  reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
-23  imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
+2c  reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
+2d  imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
 
 CMP dest, src           non-destructive compare (updates Z, C, O, N)
-24  reg  reg            oooooooo ssss dddd -------- --------  flags <- src - dest
-25  reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- src - imm16
+2e  reg  reg            oooooooo ssss dddd -------- --------  flags <- src - dest
+2f  reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- src - imm16
 
 JMP src                 unconditional jump
-26  reg                 oooooooo ssss ---- -------- --------  pc <- src
-27  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
-28  pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
-29  [imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
+30  reg                 oooooooo ssss ---- -------- --------  pc <- src
+31  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
+32  pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+33  [imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
 
 JZ src                  jump if zero
-2a  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+34  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNZ src                 jump if not zero
-2b  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+35  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JC src                  jump if carry
-2c  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+36  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNC src                 jump if not carry
-2d  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+37  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JN src                  jump if negative
-2e  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+38  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNN src                 jump if not negative
-2f  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+39  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JO src                  jump if oveflow
-30  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+3a  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 JNO src                 jump if not overflow
-31  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+3b  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
 CALL src                call a subroutine
-32  reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
-33  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
+3c  reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
+3d  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
 
 RET                     return from a subroutine
-34                      oooooooo ---- ---- -------- --------  pc <- [++sp]
+3e                      oooooooo ---- ---- -------- --------  pc <- [++sp]
 
 INT src                 generate an interrupt
-35  reg                 oooooooo ssss ---- -------- --------  see "interrupts" section in the spec
-36  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  
+3f  reg                 oooooooo ssss ---- -------- --------  see "interrupts" section in the spec
+40  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  
 
 IRET                    return from an interrupt subroutine
-37                      oooooooo ---- ---- -------- --------  see "interrupts" section in the spec
+41                      oooooooo ---- ---- -------- --------  see "interrupts" section in the spec
 
 NOP                     no operation
-38                      oooooooo  ---- ---- -------- -------- n/a
+42                      oooooooo  ---- ---- -------- -------- n/a
 
 NOTE: THE ENCODING ABOVE DISPLAYS THE 16-BIT INSTRUCTION WORD IN "LOGICAL" ORDER (OPCODE RA RB IMMEDIATE). 
 THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.
