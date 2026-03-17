@@ -13,7 +13,7 @@ from .language.ir.operands import (
 )
 from .language.context import AssemblyContext
 from .util.logger import logger
-from .language.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
+from .language.isa import INSTRUCTIONS, REGISTERS, MODES, OPCODE_FORMATS
 
 
 def generate_binary(context: AssemblyContext) -> bytearray:
@@ -64,7 +64,7 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
         immediate_value = compute_immediate(node, node.operands[fmt.imm], context)
 
     logger.verbose(f"binary: registers: {reg_a << 4 | reg_b:08b} | {reg_a:04b} {reg_b:04b} | {reg_a} {reg_b}")
-    logger.verbose(f"binary: opcode:    {node.opcode:08b} | 0x{node.opcode:02X}      |")
+    logger.verbose(f"binary: opcode:    {node.opcode:08b} | 0x{node.opcode:02X}      | {fmt.mnemonic.name}")
     
     if immediate_value is not None:
         logger.verbose(f"binary: immediate: {immediate_value & 0xFF:08b} | {(immediate_value >> 8) & 0xFF:08b}  | 0x{immediate_value:04X}")

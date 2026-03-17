@@ -5,6 +5,7 @@
 
 from .base import IRNode
 
+from ...util.logger import logger
 
 class Terminal(IRNode):
 
@@ -27,6 +28,7 @@ class NormalizedTerminal(Terminal):
         # normalize case to uppercase. useful for keywords, 
         # directives, and mnemonics that should be case-insensitive.
         super().__init__(line, value)
+        logger.verbose(f"normalized terminal: {value} -> {value.strip().upper()}")
         self.value: str = value.strip().upper()
 
 

@@ -13,7 +13,7 @@ $(BIN_DIR)/%.bin: programs/%.jasm | $(BIN_DIR)
 	@$(PYTHON) -m jasm $< -o $@
 
 %.jasm: programs/%.jasm $(BIN_DIR)/%.bin FORCE
-	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin
+	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin -r -g
 
 assemble: $(BIN_DIR)/tty.bin
 

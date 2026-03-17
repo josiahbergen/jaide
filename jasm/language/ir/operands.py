@@ -30,10 +30,8 @@ class ImmediateOperand(Operand):
     def __init__(self, line: int, number: NumberTerminal):
         super().__init__(line, MODES.IMM)
         self.string: str = number.value # string representation
-        self.prefix: str = ("0x" if self.string.startswith("0x") else
-                            "b" if self.string.startswith("b") else "")
-        self.value: int = int(self.string.removeprefix(self.prefix), 16 if self.prefix == "0x" else 2 if self.prefix == "b" else 10)
-
+        self.value: int = int(self.string, 0)
+        
     def __str__(self) -> str:
         return f"{self.string}"
 

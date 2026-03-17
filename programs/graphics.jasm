@@ -1,18 +1,40 @@
-macro generate_attrs %reg, %fore, %back
+; Pack attribute byte as described in doc/graphics.md:
+;   bits 0..3 = foreground (FFFF)
+;   bits 4..6 = background (BBB)
+;   bit  7    = blink (B)
+; Result ends up in low byte of %reg; caller typically ORs into a glyph word.
+;
+; Uses %tmp as scratch (clobbered).
+macro generate_attrs %reg, %tmp, %fore, %back, %blink
+    ; %reg = fore & 0x0F
     xor %reg, %reg
-    or %reg, %back
-    lsh %reg, 0x04
-    or %reg, %fore
+    or  %reg, %fore
+    and %reg, 0x000F
+
+    ; %tmp = (back & 0x07) << 4
+    xor %tmp, %tmp
+    or  %tmp, %back
+    and %tmp, 0x0007
+    lsh %tmp, 0x04
+    or  %reg, %tmp
+
+    ; %tmp = (blink & 0x01) << 7
+    xor %tmp, %tmp
+    or  %tmp, %blink
+    and %tmp, 0x0001
+    lsh %tmp, 0x07
+    or  %reg, %tmp
+
+    ; shift attrs to high byte (glyph lives in low byte)
     lsh %reg, 0x08
 end macro
 
 start:
-    jmp 0x5000
     mov mb, 0x01 ; set the memory bank to vram
-    generate_attrs z, 0x00, 0x0E
+    generate_attrs z, a, 0x00, 0x06, 0x00
     call clear_screen
 
-    generate_attrs z, 0x00, 0x07
+    generate_attrs z, a, 0x00, 0x07, 0x01
     mov x, s_welcome
     mov y, 0x833D 
     call print_string
@@ -21,6 +43,7 @@ start:
     mov y, 0x83DC 
     call print_string
 
+    generate_attrs z, a, 0x00, 0x07, 0x00
     call fun_colors
 
     mov z, 0x02 ; halt cpu
@@ -61,8 +84,10 @@ fun_colors_loop:
 
     xor z, z
     or z, c ; but c into background color
-    lsh z, 0x08
+    and z, 0x0007
     lsh z, 0x04
+    or z, 0x07
+    lsh z, 0x07
     put [y], z
     inc y
 

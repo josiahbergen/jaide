@@ -7,6 +7,9 @@ import signal
 import sys
 import time
 from typing import Callable
+from multiprocessing import shared_memory, Process, Queue
+from multiprocessing.synchronize import Event
+from queue import Empty
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
 from .constants import (
@@ -38,9 +41,14 @@ class Emulator:
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         
+        # VRAM lives in a shared memory segment so graphics can access it
+        self.vram_shm = shared_memory.SharedMemory(create=True, size=BANK_SIZE)
         # memory banks and ports
-        self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
-        self.vram: memoryview = memoryview(self.banks[0]) # special reference to VRAM bank
+        self.banks: list[bytearray | memoryview] = (
+            [memoryview(self.vram_shm.buf)] + 
+            [bytearray(BANK_SIZE) for _ in range(NUM_BANKS - 1)]
+        )
+        self.vram: memoryview = memoryview(self.vram_shm.buf) # special reference to VRAM bank
 
         # 256 16-bit ports
         self.ports: list[int] = [0] * 256 
@@ -57,6 +65,11 @@ class Emulator:
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
         self.handlers: dict[INSTRUCTIONS, Callable[[tuple[int, ...]], None]] = {}
         self._populate_handlers()
+
+        # optional graphics-related attributes (set by __main__ when graphics is enabled)
+        self.key_queue: Queue | None = None
+        self.gfx_stop_event: Event | None = None
+        self.gfx_proc: Process | None = None
 
 
     # memory
@@ -91,7 +104,7 @@ class Emulator:
     def write16(self, addr: int, value: int):
         # write a 16-bit little-endian value to memory using word addressing
 
-        if addr < 0x8000: # writing to ROM
+        if addr < 0x1000: # writing to ROM
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
         
@@ -181,6 +194,22 @@ class Emulator:
 
     def shutdown(self) -> None:
         print("shutting down...")
+
+        # stop graphics process if running
+        if self.gfx_stop_event is not None:
+            self.gfx_stop_event.set()
+        if self.gfx_proc is not None:
+            self.gfx_proc.join(timeout=1.0)
+
+        # release shared VRAM
+        if hasattr(self, "vram_shm"):
+            try:
+                self.vram.release()
+                self.vram_shm.close()
+                self.vram_shm.unlink()
+            except FileNotFoundError:
+                pass
+
         sys.exit(0)
 
     # main fetch/decode
@@ -251,6 +280,16 @@ class Emulator:
         if self.waiting_for_interrupt: # i.e. halt was called, we are simply waiting for an interrupt
             time.sleep(1 / 60) # reduce cpu usage a little
             return
+
+        # poll graphics keyboard input if graphics controller is running
+        if self.key_queue is not None:
+            try:
+                while True:
+                    keycode = self.key_queue.get_nowait()
+                    self.ports[1] = keycode
+                    self.request_interrupt(4)
+            except Empty:
+                pass
 
         # normal execution
         decoded = self.decode()

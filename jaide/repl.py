@@ -91,6 +91,8 @@ class REPL:
             (self.c_mset,   ["mset"],         [("addr", Arg.Type.I16), ("value", Arg.Type.I16)], "set the value of memory at the given address"),
             (self.c_mem,    ["mem", "m"],     [("addr", Arg.Type.I16), ("len", Arg.Type.I16)], "display memory contents at addr or pc"),
             (self.c_disasm, ["disasm", "d"],  [("addr", Arg.Type.I16)], "disassemble instruction at address (pc if no address provided)"),
+            (self.c_disasm_pc, ["disasm_pc", "dp"],  [], "disassemble instruction at pc"),
+            (self.c_vram,   ["vram"],        [], "display the vram"),
             (self.c_ports,  ["ports"],        [], "display non-zero port values"),
             (self.c_reset,  ["reset"],        [], "reset the emulator"),
             (self.c_clear,  ["clear"],        [], "clear the screen"),
@@ -110,14 +112,17 @@ class REPL:
 
             if name in ["q", "quit", "exit"]:
                 logger.info("bye!")
-                break
+                self.emulator.shutdown()
 
             if self.special_command(name):
                 continue
 
             for cmd in self.commands:
                 if name == cmd.name or name in cmd.aliases:
-                    cmd.execute(args)
+                    try:
+                        cmd.execute(args)
+                    except ReplException as e:
+                        logger.error(f"{name}: {e}")
                     break
             else:
                 logger.info(f"invalid command: {name}")
@@ -202,6 +207,18 @@ class REPL:
 
     def c_disasm(self, addr: int):
         logger.info(self.disasm_at(addr))
+
+    def c_disasm_pc(self):
+        logger.info(self.disasm_at(self.emulator.pc.value))
+
+    def c_vram(self):
+        chunk = self.emulator.vram[:32]
+        for i in range(0, len(chunk), 32):
+            for i in range(0, len(chunk), 32):
+                row = chunk[i:i+32]
+                words: list[int] = [(row[j] | row[j+1] << 8) for j in range(0, len(row), 2)]
+                word_offset = i // 2  # convert byte offset to word offset
+                logger.info(f"0x{word_offset:04X} | {" ".join([f"{w:04X}" for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
 
     def c_ports(self):
         non_zero = [i for i in range(len(self.emulator.ports)) if self.emulator.ports[i] != 0]

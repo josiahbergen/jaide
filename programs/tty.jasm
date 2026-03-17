@@ -1,16 +1,9 @@
-MACRO HANG
-    test_label:
-        jmp test_label
-end macro
-
 start:
     mov mb, 0x01 ; we're gonna be messing with vram
     call setup_interrupt_vectors
-    generate_attrs z, 0x01, 0x00
 
-    hang
-
-    mov y, 0x8000 ; cursor position
+    mov x, 1 ; row
+    mov y, 1 ; column
     call tty_prompt
 
 loop:
@@ -24,36 +17,25 @@ keyboard_interrupt:
     cmp a, 0x0D ; check if enter key
     jz panic
 
-    char_at a, y ; draw char at cursor position
-
     ; increment cursor position and return
     inc y
     iret
 
 tty_prompt:
-    string_at s_prompt, y
+    xy_to_vram_in_z x, y
+    prepare_vram_word z, 0x23, 0x0A, 0x00, 0x00
+    put [z], z
     ret
 
 setup_interrupt_vectors:
     ; interrupts 0-3 are reserved for hardware interrupts
-    mov z, panic
-    put 0xffff, z
-    put 0xfffe, z
-    put 0xfffd, z
-    put 0xfffc, z
-    mov z, keyboard_interrupt ; keyboard interrupt is vector 4
-    put 0xfffb, z
+    mov x, 0xfffb
+    mov z, keyboard_interrupt
+    put [x], z
     ret
 
 panic:
-    generate_attrs z, 0x01, 0x0A
-    call clear_screen
+    halt
+    jmp panic
 
-    string_at s_panic, 0x8000
-    string_at s_panic_message, 0x8050
-    persistent_halt
-
-
-import "programs/strings.jasm"
 import "programs/libs/graphics.jasm"
-import "programs/libs/standard.jasm"

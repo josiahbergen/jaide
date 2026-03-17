@@ -16,4 +16,9 @@ the controller exepects each word to consist of a certain structure:
 | --------- | ---------------- | ---------------- | ----- |
 | 0..8      | 9..12            | 13..15           | 16    |
 
+low byte: glyph
+high byte: attrs
+
+in memory this is expressed little-endian, i.e.
+
 note that this controller only reads from the first 8,000 words in vram (addresses 0x0000 -  1F3F inclusive).

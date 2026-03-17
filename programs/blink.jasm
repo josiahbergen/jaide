@@ -1,0 +1,33 @@
+start:
+    mov mb, 0x01
+    ; white on black, blink on
+
+    mov x, s_hello
+    mov y, 0x8000
+    call print_string
+
+    vram_word z, a, 0x20, 0x01, 0x00, 0x01
+    put [y], z
+    halt
+
+
+print_string:
+    get a, [x]
+    cmp a, 0
+    jz print_string_end
+
+    vram_word b, z, a, 0x01, 0x00, 0x00
+    rsh a, 0x08
+    or a, b
+
+    put [y], a
+    inc x
+    inc y
+    jmp print_string
+print_string_end:
+    ret
+
+s_hello:
+data "hi marko!", 0
+
+import "programs/libs/graphics.jasm"

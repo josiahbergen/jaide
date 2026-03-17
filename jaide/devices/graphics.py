@@ -1,8 +1,7 @@
 import tkinter as tk
+import os
 from PIL import Image, ImageTk
-from multiprocessing import Process
-
-from ..emulator import Emulator
+from multiprocessing import Process, shared_memory
 
 WIDTH  = 80
 HEIGHT = 25
@@ -29,111 +28,121 @@ COLORS = [
     (128, 0, 128),   # 15: dark magenta
 ]
 
-class Graphics(Process):
 
-    def __init__(self, emulator: Emulator, vram: sharedmemory):
-
-        super().__init__(daemon=True)
-        self.vram: memoryview = vram # memoryview of vram
-        self.emulator: Emulator = emulator # emulator instance
-
-        # load glyphs before the thread starts
-        # ideally we would pass in glyphs as a bytearray or something
-        try:
-            with open("jaide/devices/VGA8.F16", "rb") as f:
-                self.glyphs = [bytes(f.read(16)) for _ in range(256)]
-        except FileNotFoundError:
-            print("graphics: VGA8.F16 not found")
-            return
-
-        print("graphics ready.")
+def _load_glyphs() -> list[bytes]:
+    try:
+        with open("jaide/devices/VGA8.F16", "rb") as f:
+            return [bytes(f.read(16)) for _ in range(256)]
+    except FileNotFoundError:
+        print("graphics: VGA8.F16 not found")
+        return []
 
 
-    def run(self):
-        # runs in the graphics thread. all tk stuff lives here.
-        self.root = tk.Tk()
-        self.root.title("jaide video controller output")
-        self.root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
+def graphics_main(vram_name: str, vram_size: int, key_queue, stop_event) -> None:
+    """Entry point for the graphics process."""
 
-        self.framebuf = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3)
-        self.label = tk.Label(self.root, bg="black")  # what we render the framebuffer to
-        self.label.pack()
+    glyphs = _load_glyphs()
+    if not glyphs:
+        return
 
-        self.root.bind("<Key>", self.on_key)
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)  # disable close button
+    shm = shared_memory.SharedMemory(name=vram_name)
+    vram = memoryview(shm.buf)[:vram_size]
 
-        self.last_hash = None
-        self.photo = None
-        self.closed = False
-        self._after_callback = None
+    root = tk.Tk()
+    root.title("jaide video controller output")
+    root.geometry(f"{WIDTH * GLYPH_WIDTH}x{HEIGHT * GLYPH_HEIGHT}")
 
-        self.render()  # schedules next render via after(); mainloop() processes them
-        self.root.mainloop() # TODO: what does this do?
+    framebuf = [0] * (WIDTH * GLYPH_WIDTH * HEIGHT * GLYPH_HEIGHT * 3)
+    blink_timer = 0
+    label = tk.Label(root, bg="black")
+    label.pack()
 
+    last_hash = None
+    photo = None
 
-    def on_key(self, event):
+    def on_key(event):
         if event.char:
-                self.emulator.ports[1] = ord(event.char) # send key to port 1
-                self.emulator.request_interrupt(4) # send keyboard interrupt
+            key_queue.put(ord(event.char))
 
-    def close(self):
-        self.closed = True
-        if self._after_callback is not None:
-            # cancel any scheduled render callback to prevent tkinter from
-            # attempting to render after the window is destroyed
-            self.root.after_cancel(self._after_callback)
-            self._after_callback = None
+    root.bind("<Key>", on_key)
+    root.protocol("WM_DELETE_WINDOW", lambda: stop_event.set())
 
-        # destroy the window and shutdown the emulator
-        self.root.destroy()
-        self.emulator.shutdown()
+    def parse_attrs(byte: int) -> tuple[tuple[int, int, int], tuple[int, int, int], bool]:
+        # doc/graphics.md: attrs byte is `FFFF BBB B`
+        fore = byte & 0b1111
+        back = (byte >> 4) & 0b111
+        blink = bool((byte >> 7) & 0b1)
+        return (COLORS[fore], COLORS[back], blink)
 
-    def render(self):
+    def draw_glyph(glyph: bytes, attrs, blink_on, char_row, char_col):
+        base_y = char_row * GLYPH_HEIGHT
+        base_x = char_col * GLYPH_WIDTH
+        fore, back, blink = attrs
+        
+        if blink and blink_on: # swap fore/back if blink is on
+            fore, back = back, fore
 
+        for y in range(GLYPH_HEIGHT):
+            row_byte = glyph[y]
+            for x in range(GLYPH_WIDTH):
+                bit = (row_byte >> (GLYPH_WIDTH - 1 - x)) & 1
+                color = fore if bit else back
+                pixel_idx = ((base_y + y) * WIDTH * GLYPH_WIDTH + (base_x + x)) * 3
+                framebuf[pixel_idx + 0] = color[0]
+                framebuf[pixel_idx + 1] = color[1]
+                framebuf[pixel_idx + 2] = color[2]
 
-        def parse_attrs(byte: int):
-            fore = byte & 0b1111
-            back = (byte >> 4) & 0b1111
-            return (COLORS[fore], COLORS[back])
+    def render():
+        nonlocal last_hash, photo, blink_timer
 
-        def draw_glyph(glyph: bytes, fore, back, char_row, char_col):
-            base_y = char_row * GLYPH_HEIGHT
-            base_x = char_col * GLYPH_WIDTH
-
-            for y in range(GLYPH_HEIGHT):
-                row_byte = glyph[y]
-                for x in range(GLYPH_WIDTH):
-                    bit = (row_byte >> (GLYPH_WIDTH - 1 - x)) & 1
-                    color = fore if bit else back
-                    pixel_idx = ((base_y + y) * WIDTH * GLYPH_WIDTH + (base_x + x)) * 3
-                    self.framebuf[pixel_idx + 0] = color[0]
-                    self.framebuf[pixel_idx + 1] = color[1]
-                    self.framebuf[pixel_idx + 2] = color[2]
-
-        if self.closed:
+        if stop_event.is_set():
+            root.destroy()
+            try:
+                vram.release()
+            except Exception:
+                pass
+            shm.close()
             return
 
-        # hash to check if vram changed
-        current_data = bytes(self.vram[:WIDTH * HEIGHT * 2]) # read only relevant part
-        h = hash(current_data)
-        
-        if h != self.last_hash:
-            self.last_hash = h
-            
+        blink_timer = (blink_timer + 1) % 6
+        blink_on = blink_timer < 3
+
+        current_data = bytes(vram[:WIDTH * HEIGHT * 2])  # read only relevant part
+        h = hash(current_data + bytes([1 if blink_on else 0]))
+
+        if h != last_hash:
+            last_hash = h
+
             # main render to framebuffer
             for char_idx in range(WIDTH * HEIGHT):
                 i = char_idx * 2
-                lo, hi = self.vram[i], self.vram[i + 1]
-                fore, back = parse_attrs(hi)
-                draw_glyph(self.glyphs[lo], fore, back, char_idx // WIDTH, char_idx % WIDTH)
-            
+                lo, hi = vram[i], vram[i + 1]
+                attrs = parse_attrs(hi)
+
+                draw_glyph(glyphs[lo], attrs, blink_on, char_idx // WIDTH, char_idx % WIDTH)
+
             # convert framebuffer to image to display in the window
-            img = Image.frombuffer("RGB", (WIDTH * GLYPH_WIDTH, HEIGHT * GLYPH_HEIGHT), bytes(self.framebuf), "raw")
-            self.photo = ImageTk.PhotoImage(img)
-            self.label.configure(image=self.photo)
+            img = Image.frombuffer(
+                "RGB",
+                (WIDTH * GLYPH_WIDTH, HEIGHT * GLYPH_HEIGHT),
+                bytes(framebuf),
+                "raw",
+            )
+            photo = ImageTk.PhotoImage(img)
+            label.configure(image=photo)
 
-        if not self.closed:
-            # schedule next render
-            # we save the id here so we can cancel it on close
-            self._after_callback = self.root.after(FPS_MS, self.render)
+        root.after(FPS_MS, render)
 
+    render()
+    root.mainloop()
+
+
+def start_graphics_process(vram_name: str, vram_size: int, key_queue, stop_event) -> Process:
+    """Helper to spawn the graphics process."""
+    proc = Process(
+        target=graphics_main,
+        args=(vram_name, vram_size, key_queue, stop_event),
+        daemon=True,
+    )
+    proc.start()
+    return proc

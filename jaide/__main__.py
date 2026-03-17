@@ -4,10 +4,11 @@
 
 import argparse
 import os
+from multiprocessing import Queue, Event
 
 from .emulator import Emulator
 from .util.logger import logger
-from .devices.graphics import Graphics
+from .devices.graphics import start_graphics_process
 from .repl import REPL
 
 def get_args() -> argparse.Namespace:
@@ -50,8 +51,21 @@ def main():
         logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
 
     if args.graphics:
-        graphics = Graphics(emulator, emulator.vram)
-        graphics.start() # graphics runs in its own thread, so start it
+        # set up IPC for graphics controller
+        key_queue = Queue()
+        gfx_stop_event = Event()
+
+        gfx_proc = start_graphics_process(
+            emulator.vram_shm.name,
+            emulator.vram_shm.size,
+            key_queue,
+            gfx_stop_event,
+        )
+
+        # attach handles to emulator so it can poll input and shut graphics down
+        emulator.key_queue = key_queue
+        emulator.gfx_stop_event = gfx_stop_event
+        emulator.gfx_proc = gfx_proc
 
     if args.run:
         logger.info("starting execution...")
@@ -65,8 +79,8 @@ def main():
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
         # so we'll mirror the behavior of the quit command
-        print("\nbye! (signal from __main__)")
-        os._exit(0)
+        logger.info("bye! (signal from __main__)")
+        emulator.shutdown()
 
 if __name__ == "__main__":
     main()

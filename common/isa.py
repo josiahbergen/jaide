@@ -9,6 +9,10 @@ from enum import IntEnum, auto
 
 class INSTRUCTIONS(IntEnum):
 
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values):
+        return count
+
     NOP  = auto()
     HALT = auto()
     GET  = auto()
@@ -53,6 +57,11 @@ class INSTRUCTIONS(IntEnum):
 
 
 class REGISTERS(IntEnum):
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values):
+        return count
+
     A  = auto()
     B  = auto()
     C  = auto()
