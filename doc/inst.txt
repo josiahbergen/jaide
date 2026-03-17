@@ -4,140 +4,153 @@ VERSION 0.4
 
 ------------------------------------------------------------------------------------
 
-HALT                    halt until interrupt
-00                      oooooooo ---- ---- -------- --------  n/a
+NOP                 no operation
+                    oooooooo  ---- ---- -------- -------- n/a
 
-GET dest, src           load word from memory
-01  reg  [reg]          oooooooo ssss dddd -------- --------  dest <- [src]
-02  reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
-03  reg  [imm16 + reg]  oooooooo ssss dddd xxxxxxxx xxxxxxxx  dest <- [src + imm16] 
+HALT                halt until interrupt
+                    oooooooo ---- ---- -------- --------  n/a
 
-PUT dest, src           put word into memory
-04  [reg]          reg  oooooooo ssss dddd -------- --------  [dest]         <- src
-05  [imm16 + reg]  reg  oooooooo ssss dddd xxxxxxxx xxxxxxxx  [dest + imm16] <- src
+GET dest, src       load word from memory
+reg  [reg]          oooooooo ssss dddd -------- --------  dest <- [src]
+reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
+reg  [imm16 + reg]  oooooooo ssss dddd xxxxxxxx xxxxxxxx  dest <- [src + imm16] 
 
-MOV dest, src           move word
-06  reg  reg            oooooooo ssss dddd -------- --------  dest <- reg
-07  reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  dest <- imm16
+PUT dest, src       put word into memory
+[reg]          reg  oooooooo ssss dddd -------- --------  [dest]         <- src
+[imm16 + reg]  reg  oooooooo ssss dddd xxxxxxxx xxxxxxxx  [dest + imm16] <- src
 
-PUSH src                push value to stack
-08  reg                 oooooooo ssss ---- -------- --------  [--sp] <- src
-09  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- imm16
+MOV dest, src       move word
+reg  reg            oooooooo ssss dddd -------- --------  dest <- reg
+reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  dest <- imm16
 
-POP dest                pop value from stack
-0a  reg                 oooooooo      dddd -------- --------  dest <- [++sp]
+PUSH src            push value to stack
+reg                 oooooooo ssss ---- -------- --------  [--sp] <- src
+imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- imm16
 
-ADD dest, src           add (updates Z, C, O)
-0b  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src
-0c  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16
+POP dest            pop value from stack
+reg                 oooooooo      dddd -------- --------  dest <- [++sp]
 
-ADC dest, src           add with carry (updates Z, C, O)
-0d  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src + C
-0e  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16 + C
+ADD dest, src       add (updates Z, C, O)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16
 
-SUB dest, src           subtract (updates Z, C, O, N)
-0f  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - src
-10  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16
+ADC dest, src       add with carry (updates Z, C, O)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest + src + C
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src + imm16 + C
 
-SBC dest, src           subtract with borrow (updates Z, C, O, N)
-11  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - reg - C
-12  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16 - C
+SUB dest, src       subtract (updates Z, C, O, N)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - src
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16
 
-MUL dest, src           multiply (updates Z, C, O, N)
-13  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest * src
-14  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest * imm16
+SBC dest, src       subtract with borrow (updates Z, C, O, N)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest - reg - C
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src - imm16 - C
 
-MOD dest, src           modulo (updates Z, C, O, N)
-15  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest % src
-16  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest % imm16
+MUL dest, src       multiply (updates Z, C, O, N)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest * src
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest * imm16
 
-INC dest                increment (updates Z, C, O)
-17  reg                 oooooooo ---- dddd -------- --------  dest <- dest + 1
+MOD dest, src       modulo (updates Z, C, O, N)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest % src
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- dest % imm16
 
-DEC dest                decrement (updates Z, C, O, N)
-18  reg                 oooooooo ---- dddd -------- --------  dest <- dest - 1
+INC dest            increment (updates Z, C, O)
+reg                 oooooooo ---- dddd -------- --------  dest <- dest + 1
 
-LSH dest, src           bit shift left (updates Z, C, O)
-19  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest << reg
-20  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src << imm16
+DEC dest            decrement (updates Z, C, O, N)
+reg                 oooooooo ---- dddd -------- --------  dest <- dest - 1
 
-RSH dest, src           bit shift right (updates Z, C, O)
-21  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest >> reg
-22  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src >> imm16
+LSH dest, src       bit shift left (updates Z, C, O)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest << reg
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src << imm16
 
-AND dest, src           bitwise and (updates Z)
-23  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest & reg
-24  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src & imm16
+RSH dest, src       bit shift right (updates Z, C, O)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest >> reg
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src >> imm16
 
-OR dest, src            bitwise or (updates Z)
-25  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest | reg
-26  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src | imm16
+AND dest, src       bitwise and (updates Z)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest & reg
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src & imm16
 
-NOT dest                bitwise not (updates Z)
-27  reg                 oooooooo ---- dddd -------- --------  dest <- ~dest
+OR dest, src        bitwise or (updates Z)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest | reg
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src | imm16
 
-XOR dest, src           bitwise xor (updates Z)
-28  reg  reg            oooooooo ssss dddd -------- --------  dest <- dest ^ reg
-29  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src ^ imm16
+NOT dest            bitwise not (updates Z)
+reg                 oooooooo ---- dddd -------- --------  dest <- ~dest
 
-INB dest, src           get word from I/O port
-2a  reg  reg            oooooooo ssss dddd -------- --------  dest <- port(src)
-2b  reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- port(imm16)
+XOR dest, src       bitwise xor (updates Z)
+reg  reg            oooooooo ssss dddd -------- --------  dest <- dest ^ reg
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src ^ imm16
 
-OUTB dest, src          put word on I/O port
-2c  reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
-2d  imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
+INB dest, src       get word from I/O port
+reg  reg            oooooooo ssss dddd -------- --------  dest <- port(src)
+reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- port(imm16)
 
-CMP dest, src           non-destructive compare (updates Z, C, O, N)
-2e  reg  reg            oooooooo ssss dddd -------- --------  flags <- src - dest
-2f  reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- src - imm16
+OUTB dest, src      put word on I/O port
+reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
+imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
 
-JMP src                 unconditional jump
-30  reg                 oooooooo ssss ---- -------- --------  pc <- src
-31  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
-32  pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
-33  [imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
+CMP dest, src       non-destructive compare (updates Z, C, O, N)
+reg  reg            oooooooo ssss dddd -------- --------  flags <- src - dest
+reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- src - imm16
 
-JZ src                  jump if zero
-34  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JMP src             unconditional jump
+reg                 oooooooo ssss ---- -------- --------  pc <- src
+imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+[imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
 
-JNZ src                 jump if not zero
-35  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JZ src              jump if zero
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JC src                  jump if carry
-36  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JNZ src             jump if not zero
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JNC src                 jump if not carry
-37  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JC src              jump if carry
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JN src                  jump if negative
-38  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JNC src             jump if not carry
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JNN src                 jump if not negative
-39  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JA src              jump if above
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JO src                  jump if oveflow
-3a  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JAE src             jump if above or equal
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-JNO src                 jump if not overflow
-3b  pc + imm16        oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+JB src              jump if below
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-CALL src                call a subroutine
-3c  reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
-3d  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
+JBE src             jump if below or equal
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-RET                     return from a subroutine
-3e                      oooooooo ---- ---- -------- --------  pc <- [++sp]
+JG src              jump if greater
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-INT src                 generate an interrupt
-3f  reg                 oooooooo ssss ---- -------- --------  see "interrupts" section in the spec
-40  imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  
+JGE src             jump if greater or equal
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-IRET                    return from an interrupt subroutine
-41                      oooooooo ---- ---- -------- --------  see "interrupts" section in the spec
+JL src              jump if less
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 
-NOP                     no operation
-42                      oooooooo  ---- ---- -------- -------- n/a
+JLE src             jump if less or equal
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
+
+CALL src            call a subroutine
+reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
+imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
+
+RET                 return from a subroutine
+                    oooooooo ---- ---- -------- --------  pc <- [++sp]
+
+INT src             generate an interrupt
+reg                 oooooooo ssss ---- -------- --------  see "interrupts" section in the spec
+imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  
+
+IRET                return from an interrupt subroutine
+                    oooooooo ---- ---- -------- --------  see "interrupts" section in the spec
+
 
 NOTE: THE ENCODING ABOVE DISPLAYS THE 16-BIT INSTRUCTION WORD IN "LOGICAL" ORDER (OPCODE RA RB IMMEDIATE). 
 THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.

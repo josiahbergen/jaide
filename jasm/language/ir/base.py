@@ -157,7 +157,7 @@ class DataDirectiveNode(IRNode):
         for word in self.data:
             bits.append(word & 0xFF)
             bits.append((word >> 8) & 0xFF)
-        logger.verbose(f"get_bytes: {bits} (from {', '.join([f'{d[1]}' for d in self.items])})")
+        logger.verbose(f"get_bytes: {" ".join([f'{byte:04X}' for byte in bits])[:100]}... ({len(bits)} bytes from {', '.join([f'{d[1]}' for d in self.items])})")
         return bits
 
 

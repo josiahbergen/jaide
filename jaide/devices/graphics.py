@@ -1,9 +1,8 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-import threading
+from multiprocessing import Process
 
 from ..emulator import Emulator
-from ..util.logger import logger
 
 WIDTH  = 80
 HEIGHT = 25
@@ -30,11 +29,9 @@ COLORS = [
     (128, 0, 128),   # 15: dark magenta
 ]
 
-class Graphics(threading.Thread):
+class Graphics(Process):
 
-    def __init__(self, emulator: Emulator, vram: memoryview):
-
-        logger.fatal("graphics controller not supported", "devices/graphics.py:__init__()")
+    def __init__(self, emulator: Emulator, vram: sharedmemory):
 
         super().__init__(daemon=True)
         self.vram: memoryview = vram # memoryview of vram
@@ -92,10 +89,7 @@ class Graphics(threading.Thread):
         self.emulator.shutdown()
 
     def render(self):
-        # close window if main thread has exited
-        if not threading.main_thread().is_alive():
-            self.root.destroy()
-            return
+
 
         def parse_attrs(byte: int):
             fore = byte & 0b1111

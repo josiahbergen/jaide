@@ -11,10 +11,9 @@ from jaide.emulator import Emulator, mask16
 from jaide.exceptions import ReplException
 from jaide.util.logger import logger
 
+from common.isa import OPCODE_FORMATS
 from jaide.constants import (
-    MNEMONICS, INSTRUCTION_ENCODINGS,
-    MODE_IMM16, MODE_MEM_DIRECT,
-    REGISTERS, LOC, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
+    MNEMONICS, REGISTERS, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
 )
 
 
@@ -132,20 +131,22 @@ class REPL:
                 return False
 
     def disasm_at(self, addr: int) -> str:
-        word = self.emulator.read16(addr)
+        word  = self.emulator.read16(addr)
         regs, instr = self.emulator.split_word(word)
-        opcode, mode, reg_a, reg_b, imm16 = (instr >> 2) & 0b111111, instr & 0b11, (regs >> 4) & 0b1111, regs & 0b1111, 0
+        opcode = instr
+        reg_a  = (regs >> 4) & 0xF
+        reg_b  = regs & 0xF
 
-        if mode not in INSTRUCTION_ENCODINGS[opcode]:
-            return f"{MNEMONICS[opcode]} {mode:02X} (invalid addressing mode)"
-        if mode in [MODE_IMM16, MODE_MEM_DIRECT]:
-            imm16 = self.emulator.read16(addr + 1)
+        if opcode not in OPCODE_FORMATS:
+            return f"??? (unknown opcode 0x{opcode:02x})"
 
-        encoding = INSTRUCTION_ENCODINGS[opcode][mode]
-        reg_a_str = f" {REGISTERS[reg_a]}" if encoding[LOC.REGA] is not None else ''
-        reg_b_str = f" {REGISTERS[reg_b]}" if encoding[LOC.REGB] is not None else ''
-        imm16_str = f" {imm16:04X}" if encoding[LOC.IMM16] is not None else ''
-        return f"{MNEMONICS[opcode]}{reg_a_str}{reg_b_str}{imm16_str}"
+        fmt   = OPCODE_FORMATS[opcode]
+        imm16 = self.emulator.read16(addr + 1) if fmt.imm is not None else 0
+
+        reg_a_str = f" {REGISTERS[reg_a]}" if fmt.reg_a is not None else ''
+        reg_b_str = f" {REGISTERS[reg_b]}" if fmt.reg_b is not None else ''
+        imm16_str = f" {imm16:04X}"        if fmt.imm  is not None else ''
+        return f"{fmt.mnemonic.name}{reg_a_str}{reg_b_str}{imm16_str}"
 
     def c_load(self, file: str, addr: int):
         self.emulator.load_binary(file, addr)

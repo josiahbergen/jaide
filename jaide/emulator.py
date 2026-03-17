@@ -8,13 +8,10 @@ import sys
 import time
 from typing import Callable
 
+from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
 from .constants import (
-    MNEMONICS, INSTRUCTION_ENCODINGS,
-    MEMORY_SIZE, BANK_SIZE, NUM_BANKS, REGISTERS, LOC, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
-    OP_HALT, OP_GET, OP_PUT, OP_MOV, OP_PUSH, OP_POP, OP_ADD, OP_ADC, OP_SUB, OP_SBC,
-    OP_INC, OP_DEC, OP_LSH, OP_RSH, OP_AND, OP_OR, OP_NOR, OP_NOT, OP_XOR, OP_INB, OP_OUTB,
-    OP_CMP, OP_JMP, OP_JZ, OP_JNZ, OP_JC, OP_JNC, OP_CALL, OP_RET, OP_INT, OP_IRET, OP_NOP,
-    MODE_NULL, MODE_REG, MODE_IMM16, MODE_MEM_INDIRECT, MODE_MEM_DIRECT,
+    MEMORY_SIZE, BANK_SIZE, NUM_BANKS, REGISTERS,
+    FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
 )
 from .exceptions import EmulatorException
 from .register import Register
@@ -57,8 +54,8 @@ class Emulator:
         self.breakpoints: set[int] = set[int]() # empty set of breakpoints
         self.halted: bool = False # hardware halt (not waiting for interrupt
         
-        # handlers for each opcode, abstracted elsewhere
-        self.handlers: dict[int, Callable[[tuple[int, ...]]]] = {}
+        # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
+        self.handlers: dict[INSTRUCTIONS, Callable[[tuple[int, ...]], None]] = {}
         self._populate_handlers()
 
 
@@ -193,24 +190,28 @@ class Emulator:
         self.pc.set(self.pc.value + 1)
         return value
 
+    @staticmethod
+    def _signed16(x: int) -> int:
+        """ Interpret a 16-bit unsigned value as a signed integer. """
+        return x if x < 0x8000 else x - 0x10000
+
     def decode(self) -> tuple[int, ...]:
-        word = self.fetch()
+        word  = self.fetch()
         regs, instr = self.split_word(word)
-        
-        opcode = (instr >> 2) & 0b111111
-        mode = instr & 0b11
-        reg_a = (regs >> 4) & 0xF
-        reg_b = regs & 0xF
-        imm16 = 0
 
-        if mode not in INSTRUCTION_ENCODINGS[opcode]:
-            logger.error(f"invalid addressing mode {mode} for {MNEMONICS[opcode]} at {self.pc}. halting.")
-            return (0, 0, 0, 0, 0)
+        opcode = instr                      # flat 8-bit opcode
+        reg_a  = (regs >> 4) & 0xF         # ssss — high nibble
+        reg_b  = regs & 0xF                # dddd — low nibble
 
-        if INSTRUCTION_ENCODINGS[opcode][mode][LOC.IMM16] is not None:
-            imm16 = self.fetch()
+        if opcode not in OPCODE_FORMATS:
+            logger.error(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. halting.")
+            self.halted = True
+            return (0, 0, 0, 0)
 
-        return opcode, mode, reg_a, reg_b, imm16
+        fmt   = OPCODE_FORMATS[opcode]
+        imm16 = self.fetch() if fmt.imm is not None else 0
+
+        return opcode, reg_a, reg_b, imm16
 
     # main run loop
     def run(self) -> None:
@@ -252,21 +253,11 @@ class Emulator:
             return
 
         # normal execution
-        decoded = self.decode() # decode instruction
-        opcode = decoded[0]
-        self.handlers[opcode](decoded) # run instruction handler
+        decoded = self.decode()
+        opcode  = decoded[0]
+        self.handlers[OPCODE_FORMATS[opcode].mnemonic](decoded)
 
 
-    def assert_addressing_mode(self, actual: int, expected: int | list[int]) -> None:
-        if isinstance(expected, int):
-            expected = [expected]
-        if actual not in expected:
-            expected_string = "any of " + ", ".join([str(m) for m in expected]) if len(expected) > 1 else str(expected[0])
-            raise EmulatorException(f"invalid addressing mode {actual} at 0x{self.pc:04X} (expected {expected_string}, got {actual}: {actual:08b}).")
-
-    def get_mode(self, decoded: tuple[int, ...]) -> int:
-        # decoded is always a tuple of (opcode, mode, *operands)
-        return decoded[1]
 
     # core helpers
 
@@ -341,404 +332,346 @@ class Emulator:
 
 
     # operation handlers
+    # decoded is always (opcode, reg_a, reg_b, imm16)
+    # reg_a = ssss (high nibble), reg_b = dddd (low nibble)
+    # see OPCODE_FORMATS for which operand each field represents per opcode.
 
     def handle_halt(self, decoded: tuple[int, ...]) -> None:
-        _, mode, _, _, _ = decoded
-        # MODE_NULL: HALT
-        if mode == MODE_NULL:
-            self.waiting_for_interrupt = True
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for HALT at 0x{self.pc:04X}.")
+        self.waiting_for_interrupt = True
 
-    def handle_get(self, decoded: tuple[int, ...]) -> str | None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_MEM_INDIRECT: RA <- [RB]
-        # MODE_MEM_DIRECT: RA <- [IMM16]
-        if mode == MODE_MEM_INDIRECT:
-            self.reg_set(reg_a, self.read16(self.reg_get(reg_b)))
-        elif mode == MODE_MEM_DIRECT:
-            self.reg_set(reg_a, self.read16(imm16))
+    def handle_get(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # reg_a = ssss = src ptr register, reg_b = dddd = dest register
+        if modes == (MODES.REG, MODES.REG_POINTER):
+            # dest <- [src_ptr]
+            self.reg_set(reg_b, self.read16(self.reg_get(reg_a)))
+        elif modes == (MODES.REG, MODES.REL_POINTER):
+            # dest <- [pc + offset]  (imm16 is signed offset to label)
+            addr = mask16(self.pc.value + self._signed16(imm16))
+            self.reg_set(reg_b, self.read16(addr))
+        elif modes == (MODES.REG, MODES.OFF_POINTER):
+            # dest <- [label + ptr_reg]  (imm16 is signed offset to base label)
+            base = mask16(self.pc.value + self._signed16(imm16))
+            self.reg_set(reg_b, self.read16(mask16(base + self.reg_get(reg_a))))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for GET at 0x{self.pc:04X}.")
+            raise EmulatorException(f"unexpected GET variant at 0x{self.pc.value:04x}.")
 
-    def handle_put(self, decoded: tuple[int, ...]) -> str | None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_MEM_INDIRECT: [RA] <- RB
-        # MODE_MEM_DIRECT: [IMM16] <- RB
-        if mode == MODE_MEM_INDIRECT:
-            self.write16(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_MEM_DIRECT:
-            self.write16(imm16, self.reg_get(reg_b))
+    def handle_put(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # reg_a = ssss = src register, reg_b = dddd = dest ptr register
+        if modes == (MODES.REG_POINTER, MODES.REG):
+            # [dest_ptr] <- src
+            self.write16(self.reg_get(reg_b), self.reg_get(reg_a))
+        elif modes == (MODES.OFF_POINTER, MODES.REG):
+            # [label + dest_ptr] <- src
+            base = mask16(self.pc.value + self._signed16(imm16))
+            self.write16(mask16(base + self.reg_get(reg_b)), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for PUT at 0x{self.pc:04X}.")
-    
+            raise EmulatorException(f"unexpected PUT variant at 0x{self.pc.value:04x}.")
+
     def handle_mov(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RB
-        # MODE_IMM16: RA <- IMM16
-        if mode == MODE_REG:
-            self.reg_set(reg_a, self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            # dest(reg_b) <- src(reg_a)
+            self.reg_set(reg_b, self.reg_get(reg_a))
+        elif modes == (MODES.REG, MODES.IMM):
+            # dest(reg_a) <- imm  [dest is in ssss slot for imm variants]
             self.reg_set(reg_a, imm16)
+        elif modes == (MODES.REG, MODES.RELATIVE):
+            # dest(reg_a) <- address of label
+            self.reg_set(reg_a, mask16(self.pc.value + self._signed16(imm16)))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for MOV at 0x{self.pc:04X}.")
+            raise EmulatorException(f"unexpected MOV variant at 0x{self.pc.value:04x}.")
 
     def handle_push(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: [SP--] <- RA
-        # MODE_IMM16: [SP--] <- IMM16
-        if mode == MODE_REG:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG,):
             self._push_core(self.reg_get(reg_a))
-        elif mode == MODE_IMM16:
+        elif modes == (MODES.IMM,):
             self._push_core(imm16)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for PUSH at 0x{self.pc:04X}.")
-    
-    def handle_pop(self, decoded: tuple[int, ...]) -> None: 
-        _, mode, reg_a, _, _ = decoded
-        # MODE_REG: RA <- [++SP]
-        if mode == MODE_REG:
-            self.reg_set(reg_a, self._pop_core())
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for POP at 0x{self.pc:04X}.")
+            raise EmulatorException(f"unexpected PUSH variant at 0x{self.pc.value:04x}.")
+
+    def handle_pop(self, decoded: tuple[int, ...]) -> None:
+        _, reg_a, reg_b, _ = decoded
+        # dest is in dddd slot (reg_b)
+        self.reg_set(reg_b, self._pop_core())
 
     def handle_add(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA + RB
-        # MODE_IMM16: RA <- RA + IMM16
-        if mode == MODE_REG:
-            result = self._add_core(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            result = self._add_core(self.reg_get(reg_a), imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # dest = reg_b (dddd), src = reg_a (ssss) or imm
+        if modes == (MODES.REG, MODES.REG):
+            result = self._add_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for ADD at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._add_core(self.reg_get(reg_b), imm16)
+        self.reg_set(reg_b, result)
 
     def handle_adc(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA + RB + C
-        # MODE_IMM16: RA <- RA + IMM16 + C
-        if mode == MODE_REG:
-            result = self._add_core(self.reg_get(reg_a), self.reg_get(reg_b), self.flag_get(FLAG_C))
-        elif mode == MODE_IMM16:
-            result = self._add_core(self.reg_get(reg_a), imm16, self.flag_get(FLAG_C))
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        carry = int(self.flag_get(FLAG_C))
+        if modes == (MODES.REG, MODES.REG):
+            result = self._add_core(self.reg_get(reg_b), self.reg_get(reg_a), carry)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for ADC at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._add_core(self.reg_get(reg_b), imm16, carry)
+        self.reg_set(reg_b, result)
 
     def handle_sub(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA - RB
-        # MODE_IMM16: RA <- RA - IMM16
-        if mode == MODE_REG:
-            result = self._sub_core(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            result = self._sub_core(self.reg_get(reg_a), imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self._sub_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for SUB at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._sub_core(self.reg_get(reg_b), imm16)
+        self.reg_set(reg_b, result)
 
     def handle_sbc(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA - RB - C
-        # MODE_IMM16: RA <- RA - IMM16 - C
-        if mode == MODE_REG:
-            result = self._sub_core(self.reg_get(reg_a), self.reg_get(reg_b), self.flag_get(FLAG_C))
-        elif mode == MODE_IMM16:
-            result = self._sub_core(self.reg_get(reg_a), imm16, self.flag_get(FLAG_C))
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        borrow = int(self.flag_get(FLAG_C))
+        if modes == (MODES.REG, MODES.REG):
+            result = self._sub_core(self.reg_get(reg_b), self.reg_get(reg_a), borrow)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for SBC at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._sub_core(self.reg_get(reg_b), imm16, borrow)
+        self.reg_set(reg_b, result)
+
+    def handle_mul(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        dest = self.reg_get(reg_b)
+        src  = self.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
+        full   = dest * src
+        result = mask16(full)
+        carry  = 1 if full > 0xFFFF else 0
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, 0)
+        self.reg_set(reg_b, result)
+
+    def handle_mod(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        dest = self.reg_get(reg_b)
+        src  = self.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
+        if src == 0:
+            raise EmulatorException(f"modulo by zero at 0x{self.pc.value:04x}.")
+        result = mask16(dest % src)
+        self.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
+        self.reg_set(reg_b, result)
 
     def handle_inc(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, _ = decoded
-        # MODE_REG: RA <- RA + 1
-        if mode == MODE_REG:
-            result = self._add_core(self.reg_get(reg_a), 1)
-            self.reg_set(reg_a, result)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for INC at 0x{self.pc:04X}.")
+        _, reg_a, reg_b, _ = decoded
+        # dest is in dddd slot (reg_b)
+        result = self._add_core(self.reg_get(reg_b), 1)
+        self.reg_set(reg_b, result)
 
     def handle_dec(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, _ = decoded
-        # MODE_REG: RA <- RA - 1
-        if mode == MODE_REG:
-            result = self._sub_core(self.reg_get(reg_a), 1)
-            self.reg_set(reg_a, result)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for DEC at 0x{self.pc:04X}.")
+        _, reg_a, reg_b, _ = decoded
+        # dest is in dddd slot (reg_b)
+        result = self._sub_core(self.reg_get(reg_b), 1)
+        self.reg_set(reg_b, result)
 
     def handle_lsh(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA << RB
-        # MODE_IMM16: RA <- RA << IMM16
-        if mode == MODE_REG:
-            result = self._lsh_core(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            result = self._lsh_core(self.reg_get(reg_a), imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self._lsh_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for LSH at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._lsh_core(self.reg_get(reg_b), imm16)
+        self.reg_set(reg_b, result)
 
     def handle_rsh(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA >> RB
-        # MODE_IMM16: RA <- RA >> IMM16
-        if mode == MODE_REG:
-            result = self._rsh_core(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            result = self._rsh_core(self.reg_get(reg_a), imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self._rsh_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for RSH at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self._rsh_core(self.reg_get(reg_b), imm16)
+        self.reg_set(reg_b, result)
 
     def handle_and(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA & RB
-        # MODE_IMM16: RA <- RA & IMM16
-        if mode == MODE_REG:
-            result = self.reg_get(reg_a) & self.reg_get(reg_b)
-        elif mode == MODE_IMM16:
-            result = self.reg_get(reg_a) & imm16
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self.reg_get(reg_b) & self.reg_get(reg_a)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for AND at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self.reg_get(reg_b) & imm16
+        self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
 
     def handle_or(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA | RB
-        # MODE_IMM16: RA <- RA | IMM16
-        if mode == MODE_REG:
-            result = self.reg_get(reg_a) | self.reg_get(reg_b)
-        elif mode == MODE_IMM16:
-            result = self.reg_get(reg_a) | imm16
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self.reg_get(reg_b) | self.reg_get(reg_a)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for OR at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
-        self.flag_set(FLAG_Z, result == 0)
-
-    def handle_nor(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- ~(RA | RB)
-        # MODE_IMM16: RA <- ~(RA | IMM16)
-        if mode == MODE_REG:
-            result = ~(self.reg_get(reg_a) | self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            result = ~(self.reg_get(reg_a) | imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for NOR at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self.reg_get(reg_b) | imm16
+        self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
 
     def handle_not(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: RA <- ~RA
-        # MODE_IMM16: RA <- ~IMM16
-        if mode == MODE_REG:
-            result = ~self.reg_get(reg_a)
-        elif mode == MODE_IMM16:
-            result = ~imm16
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for NOT at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+        _, reg_a, reg_b, _ = decoded
+        # dest is in dddd slot (reg_b)
+        result = mask16(~self.reg_get(reg_b))
+        self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
 
     def handle_xor(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- RA ^ RB
-        # MODE_IMM16: RA <- RA ^ IMM16
-        if mode == MODE_REG:
-            result = self.reg_get(reg_a) ^ self.reg_get(reg_b)
-        elif mode == MODE_IMM16:
-            result = self.reg_get(reg_a) ^ imm16
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self.reg_get(reg_b) ^ self.reg_get(reg_a)
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for XOR at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+            result = self.reg_get(reg_b) ^ imm16
+        self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
 
     def handle_inb(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: RA <- port(RB)
-        # MODE_IMM16: RA <- port(IMM16)
-        if mode == MODE_REG:
-            result = self.port_get(self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # dest = reg_b (dddd), port = reg_a (ssss) or imm
+        if modes == (MODES.REG, MODES.REG):
+            result = self.port_get(self.reg_get(reg_a))
+        else:
             result = self.port_get(imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for INB at 0x{self.pc:04X}.")
-        self.reg_set(reg_a, result)
+        self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
-    
-    def handle_outb(self, decoded: tuple[int, ...]) -> str | None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: port(RA) <- RB
-        # MODE_IMM16: port(IMM16) <- RB
-        if mode == MODE_REG:
-            self.port_set(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            self.port_set(imm16, self.reg_get(reg_b))
+
+    def handle_outb(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # src = reg_a (ssss), port = reg_b (dddd) or imm
+        if modes == (MODES.REG, MODES.REG):
+            self.port_set(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for OUTB at 0x{self.pc:04X}.")
+            # OUTB imm, reg: port = imm, src = reg_a
+            self.port_set(imm16, self.reg_get(reg_a))
 
     def handle_cmp(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, reg_b, imm16 = decoded
-        # MODE_REG: Z, C, O, N <- RA - RB
-        # MODE_IMM16: Z, C, O, N <- RA - IMM16
-        if mode == MODE_REG:
-            _ = self._sub_core(self.reg_get(reg_a), self.reg_get(reg_b))
-        elif mode == MODE_IMM16:
-            _ = self._sub_core(self.reg_get(reg_a), imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        # spec: flags <- src - dest
+        # reg+reg: src=reg_a(ssss), dest=reg_b(dddd)
+        # reg+imm: src=imm,  dest=reg_a(ssss) [dest in ssss anomaly]
+        if modes == (MODES.REG, MODES.REG):
+            self._sub_core(self.reg_get(reg_a), self.reg_get(reg_b))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for CMP at 0x{self.pc:04X}.")
+            self._sub_core(imm16, self.reg_get(reg_a))
+
+    def _jump_target(self, imm16: int) -> int:
+        """ Compute absolute jump target from a signed relative offset. """
+        return mask16(self.pc.value + self._signed16(imm16))
 
     def handle_jmp(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA]
-        # MODE_IMM16: PC <- [IMM16]
-        if mode == MODE_MEM_INDIRECT:
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG,):
+            self.pc.set(self.reg_get(reg_a))
+        elif modes == (MODES.IMM,):
             self.pc.set(imm16)
+        elif modes == (MODES.RELATIVE,):
+            self.pc.set(self._jump_target(imm16))
+        elif modes == (MODES.OFF_POINTER,):
+            base = self._jump_target(imm16)
+            self.pc.set(self.read16(mask16(base + self.reg_get(reg_a))))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for JMP at 0x{self.pc:04X}.")
+            raise EmulatorException(f"unexpected JMP variant at 0x{self.pc.value:04x}.")
 
-    def handle_jz(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA] if Z == 1 else NOP
-        # MODE_IMM16: PC <- [IMM16] if Z == 1 else NOP
-        if not self.flag_get(FLAG_Z):
-            return
-        if mode == MODE_MEM_INDIRECT:
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
-            self.pc.set(imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for JZ at 0x{self.pc:04X}.")
+    def _cond_jump(self, condition: bool, decoded: tuple[int, ...]) -> None:
+        if condition:
+            _, reg_a, reg_b, imm16 = decoded
+            self.pc.set(self._jump_target(imm16))
 
-    def handle_jnz(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA] if Z == 0 else NOP
-        # MODE_IMM16: PC <- [IMM16] if Z == 0 else NOP
-        if self.flag_get(FLAG_Z):
-            return
-        if mode == MODE_MEM_INDIRECT:
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
-            self.pc.set(imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for JNZ at 0x{self.pc:04X}.")
-
-    def handle_jc(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA] if C == 1 else NOP
-        # MODE_IMM16: PC <- [IMM16] if C == 1 else NOP
-        if not self.flag_get(FLAG_C):
-            return
-        if mode == MODE_MEM_INDIRECT:
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
-            self.pc.set(imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for JC at 0x{self.pc:04X}.")
-
-    def handle_jnc(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA] if C == 0 else NOP
-        # MODE_IMM16: PC <- [IMM16] if C == 0 else NOP
-        if self.flag_get(FLAG_C):
-            return
-        if mode == MODE_MEM_INDIRECT:
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
-            self.pc.set(imm16)
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for JNC at 0x{self.pc:04X}.")
+    # init tests are for the weak
+    def handle_jz(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_Z), decoded)
+    def handle_jnz(self, decoded: tuple[int, ...]) -> None: self._cond_jump(not self.flag_get(FLAG_Z), decoded)
+    def handle_jc(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_C), decoded)
+    def handle_jnc(self, decoded: tuple[int, ...]) -> None: self._cond_jump(not self.flag_get(FLAG_C), decoded)
+    def handle_ja(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_C) and not self.flag_get(FLAG_Z), decoded)
+    def handle_jae(self, decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_C) or self.flag_get(FLAG_Z), decoded)
+    def handle_jb(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(not self.flag_get(FLAG_C), decoded)
+    def handle_jbe(self, decoded: tuple[int, ...]) -> None: self._cond_jump(not self.flag_get(FLAG_C) or self.flag_get(FLAG_Z), decoded)
+    def handle_jg(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(not self.flag_get(FLAG_Z) and ((self.flag_get(FLAG_N) == self.flag_get(FLAG_O))), decoded)
+    def handle_jge(self, decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_N) ==  self.flag_get(FLAG_O), decoded)
+    def handle_jl(self,  decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_N) !=  self.flag_get(FLAG_O), decoded)
+    def handle_jle(self, decoded: tuple[int, ...]) -> None: self._cond_jump(    self.flag_get(FLAG_Z) or  (self.flag_get(FLAG_N) != self.flag_get(FLAG_O)), decoded)
 
     def handle_call(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA]
-        # MODE_IMM16: PC <- [IMM16]
-        if mode == MODE_MEM_INDIRECT:
-            self._push_core(self.pc.value)
-            self.pc.set(self.read16(self.reg_get(reg_a)))
-        elif mode == MODE_MEM_DIRECT:
-            self._push_core(self.pc.value)
-            self.pc.set(imm16)
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        self._push_core(self.pc.value)
+        if modes == (MODES.REG,):
+            self.pc.set(self.reg_get(reg_a))
+        elif modes == (MODES.RELATIVE,):
+            self.pc.set(self._jump_target(imm16))
+        elif modes == (MODES.OFF_POINTER,):
+            base = self._jump_target(imm16)
+            self.pc.set(self.read16(mask16(base + self.reg_get(reg_a))))
         else:
-            raise EmulatorException(f"invalid addressing mode {mode} for CALL at 0x{self.pc:04X}.")
+            raise EmulatorException(f"unexpected CALL variant at 0x{self.pc.value:04x}.")
 
     def handle_ret(self, decoded: tuple[int, ...]) -> None:
-        _, mode, _, _, _ = decoded
-        # MODE_NULL: PC <- [++SP]
-        if mode == MODE_NULL:
-            self.pc.set(self._pop_core())
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for RET at 0x{self.pc:04X}.")
+        self.pc.set(self._pop_core())
 
     def handle_int(self, decoded: tuple[int, ...]) -> None:
-        _, mode, reg_a, _, imm16 = decoded
-        # MODE_REG: PC <- [RA]
-        # MODE_IMM16: PC <- [IMM16]
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
 
-        # check if interrupts are enabled
         if not self.flag_get(FLAG_I):
             return
 
-        # get handler
-        if mode == MODE_REG:
-            handler = self.reg_get(reg_a)
-        elif mode == MODE_IMM16:
-            handler = imm16
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for INT at 0x{self.pc:04X}.")
-        
-        self._execute_interrupt(handler)
+        vector = self.reg_get(reg_a) if modes == (MODES.REG,) else imm16
+        self._execute_interrupt(vector)
 
     def handle_iret(self, decoded: tuple[int, ...]) -> None:
-        _, mode, _, _, _ = decoded
-        if mode == MODE_NULL:
-            self.f.set(self._pop_core())
-            self.pc.set(self._pop_core())
-        else:
-            raise EmulatorException(f"invalid addressing mode {mode} for IRET at 0x{self.pc:04X}.")
+        self.f.set(self._pop_core())
+        self.pc.set(self._pop_core())
 
-    def handle_nop(self, decoded: tuple[int, ...]) -> None: 
-        _, mode, _, _, _ = decoded
-        # MODE_NULL: NOP
-        if mode != MODE_NULL:
-            raise EmulatorException(f"invalid addressing mode {mode} for NOP at 0x{self.pc:04X}.")
+    def handle_nop(self, decoded: tuple[int, ...]) -> None:
+        pass
 
     def _populate_handlers(self) -> None:
-        self.handlers[OP_HALT] = self.handle_halt
-        self.handlers[OP_GET]  = self.handle_get
-        self.handlers[OP_PUT]  = self.handle_put
-        self.handlers[OP_MOV]  = self.handle_mov
-        self.handlers[OP_PUSH] = self.handle_push
-        self.handlers[OP_POP]  = self.handle_pop
-        self.handlers[OP_ADD]  = self.handle_add
-        self.handlers[OP_ADC]  = self.handle_adc
-        self.handlers[OP_SUB]  = self.handle_sub
-        self.handlers[OP_SBC]  = self.handle_sbc
-        self.handlers[OP_INC]  = self.handle_inc
-        self.handlers[OP_DEC]  = self.handle_dec
-        self.handlers[OP_LSH]  = self.handle_lsh
-        self.handlers[OP_RSH]  = self.handle_rsh
-        self.handlers[OP_AND]  = self.handle_and
-        self.handlers[OP_OR]   = self.handle_or
-        self.handlers[OP_NOR]  = self.handle_nor
-        self.handlers[OP_NOT]  = self.handle_not
-        self.handlers[OP_XOR]  = self.handle_xor
-        self.handlers[OP_INB]  = self.handle_inb
-        self.handlers[OP_OUTB] = self.handle_outb
-        self.handlers[OP_CMP]  = self.handle_cmp
-        self.handlers[OP_JMP]  = self.handle_jmp
-        self.handlers[OP_JZ]   = self.handle_jz
-        self.handlers[OP_JNZ]  = self.handle_jnz
-        self.handlers[OP_JC]   = self.handle_jc
-        self.handlers[OP_JNC]  = self.handle_jnc
-        self.handlers[OP_CALL] = self.handle_call
-        self.handlers[OP_RET]  = self.handle_ret
-        self.handlers[OP_INT]  = self.handle_int
-        self.handlers[OP_IRET] = self.handle_iret
-        self.handlers[OP_NOP]  = self.handle_nop
+        self.handlers[INSTRUCTIONS.HALT] = self.handle_halt
+        self.handlers[INSTRUCTIONS.GET]  = self.handle_get
+        self.handlers[INSTRUCTIONS.PUT]  = self.handle_put
+        self.handlers[INSTRUCTIONS.MOV]  = self.handle_mov
+        self.handlers[INSTRUCTIONS.PUSH] = self.handle_push
+        self.handlers[INSTRUCTIONS.POP]  = self.handle_pop
+        self.handlers[INSTRUCTIONS.ADD]  = self.handle_add
+        self.handlers[INSTRUCTIONS.ADC]  = self.handle_adc
+        self.handlers[INSTRUCTIONS.SUB]  = self.handle_sub
+        self.handlers[INSTRUCTIONS.SBC]  = self.handle_sbc
+        self.handlers[INSTRUCTIONS.MUL]  = self.handle_mul
+        self.handlers[INSTRUCTIONS.MOD]  = self.handle_mod
+        self.handlers[INSTRUCTIONS.INC]  = self.handle_inc
+        self.handlers[INSTRUCTIONS.DEC]  = self.handle_dec
+        self.handlers[INSTRUCTIONS.LSH]  = self.handle_lsh
+        self.handlers[INSTRUCTIONS.RSH]  = self.handle_rsh
+        self.handlers[INSTRUCTIONS.AND]  = self.handle_and
+        self.handlers[INSTRUCTIONS.OR]   = self.handle_or
+        self.handlers[INSTRUCTIONS.NOT]  = self.handle_not
+        self.handlers[INSTRUCTIONS.XOR]  = self.handle_xor
+        self.handlers[INSTRUCTIONS.INB]  = self.handle_inb
+        self.handlers[INSTRUCTIONS.OUTB] = self.handle_outb
+        self.handlers[INSTRUCTIONS.CMP]  = self.handle_cmp
+        self.handlers[INSTRUCTIONS.JMP]  = self.handle_jmp
+        self.handlers[INSTRUCTIONS.JZ]   = self.handle_jz
+        self.handlers[INSTRUCTIONS.JNZ]  = self.handle_jnz
+        self.handlers[INSTRUCTIONS.JC]   = self.handle_jc
+        self.handlers[INSTRUCTIONS.JNC]  = self.handle_jnc
+        self.handlers[INSTRUCTIONS.JA]   = self.handle_ja
+        self.handlers[INSTRUCTIONS.JAE]  = self.handle_jae
+        self.handlers[INSTRUCTIONS.JB]   = self.handle_jb
+        self.handlers[INSTRUCTIONS.JBE]  = self.handle_jbe
+        self.handlers[INSTRUCTIONS.JG]   = self.handle_jg
+        self.handlers[INSTRUCTIONS.JGE]  = self.handle_jge
+        self.handlers[INSTRUCTIONS.JL]   = self.handle_jl
+        self.handlers[INSTRUCTIONS.JLE]  = self.handle_jle
+        self.handlers[INSTRUCTIONS.CALL] = self.handle_call
+        self.handlers[INSTRUCTIONS.RET]  = self.handle_ret
+        self.handlers[INSTRUCTIONS.INT]  = self.handle_int
+        self.handlers[INSTRUCTIONS.IRET] = self.handle_iret
+        self.handlers[INSTRUCTIONS.NOP]  = self.handle_nop
