@@ -36,11 +36,11 @@ start:
 
     generate_attrs z, a, 0x00, 0x07, 0x01
     mov x, s_welcome
-    mov y, 0x833D 
+    mov y, 0x053D
     call print_string
 
     mov x, s_name
-    mov y, 0x83DC 
+    mov y, 0x05DC
     call print_string
 
     generate_attrs z, a, 0x00, 0x07, 0x00
@@ -68,17 +68,17 @@ print_string_end:
 
 clear_screen:
     ; fill the screen with the background color in z
-    mov y, 0x8000
+    mov y, 0x0200
     and z, 0xFF00 ; clear glyph bits
 clear_screen_loop:
     put [y], z ; put word to vram
     inc y
-    cmp y, 0x87D0 ; end of vram
+    cmp y, 0x09D0 ; end of vram
     jnz clear_screen_loop
     ret
 
 fun_colors:
-    mov y, 0x8780
+    mov y, 0x0980
     mov c, 0x00 ; colors
 fun_colors_loop:
 
@@ -97,7 +97,7 @@ fun_colors_loop:
     mov c, 0x00
 skip_reset_color:
 
-    cmp y, 0x87D0 ; end of vram
+    cmp y, 0x09D0 ; end of vram
     jnz fun_colors_loop
     ret
 

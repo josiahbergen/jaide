@@ -4,7 +4,7 @@
 
 - load-store, little-endian, interrupt-driven, von-neumann architecture
 - 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
-- 32 supported instructions (with support for up to 64)
+- 41 distinct instruction mnemonics
 - 16-bit word length
 - 12 registers: 8 general-purpose, 4 special, all 16-bit
 
@@ -38,7 +38,7 @@ _\*it is recommended that SP be set to 0xFEFF on reset._
 
 the jaide architecture supports up to 16 registers. all registers contain 16 bits.
 
-_currently, 78general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
+_currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
 
 ### general purpose registers
 
@@ -181,5 +181,5 @@ the system interface port supports these commands:
 | 0x00  | nop         | do nothing                 | do nothing         |
 | 0x01  | reset       | clear ram/regs, set pc = 0 | pull reset pin low |
 | 0x02  | halt        | set halted = true          | stop the clock     |
-| 0x03  | nop         | shut down emulator process | disconnect power   |
+| 0x03  | shutdown    | shut down emulator process | disconnect power   |
 | other | _undefined_ | _undefined_                | _undefined_        |

@@ -95,9 +95,9 @@ class Emulator:
     def read16(self, addr: int) -> int: 
         # fetch a 16-bit little-endian value from memory using word addressing
         bank = self.mb.value % 32
-        memory = self.banks[bank - 1] if bank != 0 and 0x8000 <= addr < 0xC000 else self.memory
-        addr = addr - 0x8000 if 0x8000 <= addr < 0xC000 else addr
-        
+        memory = self.banks[bank - 1] if bank != 0 and 0x0200 <= addr < 0x4200 else self.memory
+        addr = addr - 0x0200 if 0x0200 <= addr < 0x4200 else addr
+
         lo = memory[addr * 2]
         hi = memory[addr * 2 + 1]
         return (hi << 8) | lo
@@ -105,13 +105,13 @@ class Emulator:
     def write16(self, addr: int, value: int):
         # write a 16-bit little-endian value to memory using word addressing
 
-        if addr < 0x1000: # writing to ROM
+        if addr < 0x0200: # writing to ROM (0x0000–0x01FF)
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
         
         bank = self.mb.value % 32
-        memory = self.banks[bank - 1] if bank != 0 and 0x8000 <= addr < 0xC000 else self.memory
-        addr = addr - 0x8000 if 0x8000 <= addr < 0xC000 else addr
+        memory = self.banks[bank - 1] if bank != 0 and 0x0200 <= addr < 0x4200 else self.memory
+        addr = addr - 0x0200 if 0x0200 <= addr < 0x4200 else addr
 
         if addr * 2 >= len(memory):
             logger.error(f"attempted to write to out of bounds memory (0x{addr*2:04X} in bank {bank}). halting.")

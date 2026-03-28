@@ -38,7 +38,7 @@ macro pack_vram_word %dest, %tmp, %glyph, %fore, %back, %blink
 end macro
 
 macro xy_to_vram %dest, %x, %y
-    mov %dest, 0x8000 ; start of vram
+    mov %dest, 0x0200 ; start of vram
     push %y ; save y value (we multiply this to get offset)
     mul %y, 80 ; get y offset to vram
     add %dest, %y

@@ -9,5 +9,5 @@ macro tty_out %string
     ; uses port 0 for output
     ; trashes y and z
     mov z, %string ; string address
-    mov y, 0x8000
+    mov y, 0x0200
 end macro
