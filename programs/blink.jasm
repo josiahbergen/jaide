@@ -1,33 +1,50 @@
 start:
     mov mb, 0x01
-    ; white on black, blink on
 
-    mov x, s_hello
-    mov y, 0x8000
-    call print_string
-
-    vram_word z, a, 0x20, 0x01, 0x00, 0x01
-    put [y], z
-    halt
-
-
-print_string:
-    get a, [x]
-    cmp a, 0
-    jz print_string_end
-
-    vram_word b, z, a, 0x01, 0x00, 0x00
-    rsh a, 0x08
-    or a, b
-
-    put [y], a
-    inc x
+    mov x, 0
+    mov y, 0
+    mov a, s_boot_loader
+    call libg_print
     inc y
-    jmp print_string
-print_string_end:
+    mov a, s_ready
+    call kernel__setup_interrupt_vectors
+    call libg_print
+
+kernel__main:
+    halt ; wait for keyboard
+    jmp kernel__main
+
+kernel__setup_interrupt_vectors:
+    mov d, 0xfffb ; interrupt vector address
+    mov e, kernel__keyboard_interrupt
+    put [d], e ; store keyboard interrupt address
     ret
 
-s_hello:
-data "hi marko!", 0
+kernel__keyboard_interrupt:
+    inb e, 0x01
+    inc y
+
+    cmp e, 0x68 ; h
+    jz kernel__keyboard_interrupt__help
+
+    mov a, s_unknown_command
+    call libg_print
+    iret
+
+kernel__keyboard_interrupt__help:
+    mov a, s_help
+    call libg_print
+    iret
+
+s_boot_loader:
+data "booting...", 0
+s_ready:
+data "ready.", 0
+s_prompt:
+data "type a key command, or press h for a list of commands.", 0
+s_help:
+data "h: display this message", 0
+s_unknown_command:
+data "unknown command.", 0
 
 import "programs/libs/graphics.jasm"

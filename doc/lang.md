@@ -52,3 +52,7 @@ END MACRO
 ; to invoke:
 ISROM 0xC000 ; A <- 0
 ```
+
+## Conventions
+
+- Never assume you know the values of registers D or E.

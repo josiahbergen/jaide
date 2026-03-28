@@ -9,7 +9,7 @@ end macro
 ; Pack a full VRAM word: glyph in low byte, attrs in high byte.
 ;   attrs high byte = fore[3:0] | back[6:4] | blink[7]
 ; Clobbers %tmp.
-macro vram_word %dest, %tmp, %glyph, %fore, %back, %blink
+macro pack_vram_word %dest, %tmp, %glyph, %fore, %back, %blink
     ; build attrs byte in %dest
     xor %dest, %dest
     or  %dest, %fore
@@ -36,3 +36,50 @@ macro vram_word %dest, %tmp, %glyph, %fore, %back, %blink
     and %tmp, 0x00FF
     or  %dest, %tmp
 end macro
+
+macro xy_to_vram %dest, %x, %y
+    mov %dest, 0x8000 ; start of vram
+    push %y ; save y value (we multiply this to get offset)
+    mul %y, 80 ; get y offset to vram
+    add %dest, %y
+    add %dest, %x
+    pop %y ; restore y value
+end macro
+
+; print a white-on-black string. wraps around screen.
+;   a = string pointer
+;   x = x position
+;   y = y position
+; clobbers d and e
+libg_print:
+
+    push a ; string pointer
+    push z ; memory address
+
+    ; prepare attributes (white on black)
+    ; foreground color (white)
+
+    mov d, 0b00000011
+    ; background color/blink are 0, do nothing
+    lsh d, 0x08 ; move to high byte
+
+    ; prepare starting memory address
+    xy_to_vram z, x, y
+
+libg_print__loop:
+
+    get e, [a] ; get next char
+    cmp e, 0
+    jz libg_print__end ; end of string
+
+    and d, 0xFF00 ; clear glyph bits
+    or d, e ; set glyph with new char
+
+    put [z], d
+    inc a ; next string
+    inc z ; increment memory address
+    jmp libg_print__loop
+libg_print__end:
+    pop z ; restore registers
+    pop a
+    ret

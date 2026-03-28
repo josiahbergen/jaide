@@ -43,6 +43,7 @@ class Emulator:
         
         # VRAM lives in a shared memory segment so graphics can access it
         self.vram_shm = shared_memory.SharedMemory(create=True, size=BANK_SIZE)
+
         # memory banks and ports
         self.banks: list[bytearray | memoryview] = (
             [memoryview(self.vram_shm.buf)] + 
@@ -277,11 +278,8 @@ class Emulator:
             self._execute_interrupt(interrupt_id)
             return # cycle done, go to next instruction
 
-        if self.waiting_for_interrupt: # i.e. halt was called, we are simply waiting for an interrupt
-            time.sleep(1 / 60) # reduce cpu usage a little
-            return
-
         # poll graphics keyboard input if graphics controller is running
+        # (important: HALT's waiting state returns early, so we must poll before that)
         if self.key_queue is not None:
             try:
                 while True:
@@ -290,6 +288,17 @@ class Emulator:
                     self.request_interrupt(4)
             except Empty:
                 pass
+
+        if self.waiting_for_interrupt: # i.e. halt was called, we are simply waiting for an interrupt
+            # If the keyboard queue caused an interrupt request, service it immediately.
+            if self.interrupts_pending():
+                self.waiting_for_interrupt = False
+                interrupt_id = self.pending_interrupts.pop(0)
+                self._execute_interrupt(interrupt_id)
+                return
+
+            time.sleep(1 / 60) # reduce cpu usage a little
+            return
 
         # normal execution
         decoded = self.decode()

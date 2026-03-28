@@ -18,6 +18,8 @@ def get_args() -> argparse.Namespace:
     _ = arg_parser.add_argument("-g", "--graphics", action="store_true", help="automatically initialize the graphics controller")
     return arg_parser.parse_args()
 
+    # type hint support needed: https://stackoverflow.com/questions/42279063/python-typehints-for-argparse-namespace-objects
+    # take a look at https://github.com/swansonk14/typed-argument-parser/
 
 def check_files(file: str) -> None:
     scope = "__main__.py:check_files()"

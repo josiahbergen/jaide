@@ -104,8 +104,8 @@ def graphics_main(vram_name: str, vram_size: int, key_queue, stop_event) -> None
             shm.close()
             return
 
-        blink_timer = (blink_timer + 1) % 6
-        blink_on = blink_timer < 3
+        blink_timer = (blink_timer + 1) % 8
+        blink_on = blink_timer < 4
 
         current_data = bytes(vram[:WIDTH * HEIGHT * 2])  # read only relevant part
         h = hash(current_data + bytes([1 if blink_on else 0]))
