@@ -1,13 +1,19 @@
-.PHONY: clear test
+.PHONY: test test-mac test-nt
+
+
+test-mac:
+	@clear
+	@echo Running test suite...
+	@uv run -m pytest tests/ -q
+
+test-nt:
+	@cmd /c cls
+	@echo Running test suite...
+	@uv run -m pytest tests/ -q
+
 
 ifeq ($(OS),Windows_NT)
-CLEAR = cmd /c cls
+test: test-nt
 else
-CLEAR = clear
+test: test-mac
 endif
-
-clear:
-	@$(CLEAR)
-
-test: clear
-	@uv run -m pytest tests/ -q
