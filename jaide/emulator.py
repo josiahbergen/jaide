@@ -41,15 +41,12 @@ class Emulator:
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         
-        # VRAM lives in a shared memory segment so graphics can access it
+        # VRAM lives in shared memory so the graphics process can map the same buffer
         self.vram_shm = shared_memory.SharedMemory(create=True, size=BANK_SIZE)
-
-        # memory banks and ports
-        self.banks: list[bytearray | memoryview] = (
-            [memoryview(self.vram_shm.buf)] + 
-            [bytearray(BANK_SIZE) for _ in range(NUM_BANKS - 1)]
-        )
-        self.vram: memoryview = memoryview(self.vram_shm.buf) # special reference to VRAM bank
+        self.vram: memoryview = memoryview(self.vram_shm.buf)
+        self.banks: list[bytearray | memoryview] = [self.vram] + [
+            bytearray(BANK_SIZE) for _ in range(NUM_BANKS - 1)
+        ]
 
         # 256 16-bit ports
         self.ports: list[int] = [0] * 256 
@@ -72,14 +69,18 @@ class Emulator:
         self.gfx_stop_event: Event | None = None
         self.gfx_proc: Process | None = None
 
-    def __del__(self):
+    def _release_shared_vram(self) -> None:
         try:
-            self.banks[0].release()
             self.vram.release()
             self.vram_shm.close()
             self.vram_shm.unlink()
+        except (FileNotFoundError, BufferError):
+            pass
         except Exception:
             pass
+
+    def __del__(self):
+        self._release_shared_vram()
 
     # memory
     def load_binary(self, file: str, addr: int = 0):
@@ -210,15 +211,7 @@ class Emulator:
         if self.gfx_proc is not None:
             self.gfx_proc.join(timeout=1.0)
 
-        # release shared VRAM
-        if hasattr(self, "vram_shm"):
-            try:
-                self.banks[0].release()
-                self.vram.release()
-                self.vram_shm.close()
-                self.vram_shm.unlink()
-            except (FileNotFoundError, BufferError):
-                pass
+        self._release_shared_vram()
 
         sys.exit(0)
 
