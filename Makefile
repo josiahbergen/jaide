@@ -1,26 +1,13 @@
-PYTHON ?= python
-BIN_DIR := programs/bin
+.PHONY: clear test
 
-.PHONY: all assemble run clean FORCE
+ifeq ($(OS),Windows_NT)
+CLEAR = cmd /c cls
+else
+CLEAR = clear
+endif
 
-all: tty.jasm
+clear:
+	@$(CLEAR)
 
-$(BIN_DIR):
-	@mkdir -p $(BIN_DIR)
-
-$(BIN_DIR)/%.bin: programs/%.jasm | $(BIN_DIR)
-	@mkdir -p $(dir $@)
-	@$(PYTHON) -m jasm $< -o $@
-
-%.jasm: programs/%.jasm $(BIN_DIR)/%.bin FORCE
-	@$(PYTHON) -m jaide $(BIN_DIR)/$*.bin -r -g
-
-assemble: $(BIN_DIR)/tty.bin
-
-run: tty.jasm
-
-clean:
-	@rm -f $(BIN_DIR)/*.bin
-	@rm -rf $(BIN_DIR)
-
-FORCE:
+test: clear
+	@uv run -m pytest tests/ -q

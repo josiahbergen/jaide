@@ -6,10 +6,14 @@
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
         "**/__pycache__": true,
-        // ".gitignore": true,
+        "**.pytest_cache": true,
+        "**.vscode": true,
         "**/__init__.py": true,
         "**/.zed/": true,
-        "requirements.in": true,
-        "uv.lock": true
+        "uv.lock": true,
+        // "**.venv": true,
+        // ".gitignore": true,
+        "**.claude": true,
+        "CLAUDE.md": true
     },
 }

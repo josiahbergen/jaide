@@ -72,6 +72,14 @@ class Emulator:
         self.gfx_stop_event: Event | None = None
         self.gfx_proc: Process | None = None
 
+    def __del__(self):
+        try:
+            self.banks[0].release()
+            self.vram.release()
+            self.vram_shm.close()
+            self.vram_shm.unlink()
+        except Exception:
+            pass
 
     # memory
     def load_binary(self, file: str, addr: int = 0):
@@ -205,10 +213,11 @@ class Emulator:
         # release shared VRAM
         if hasattr(self, "vram_shm"):
             try:
+                self.banks[0].release()
                 self.vram.release()
                 self.vram_shm.close()
                 self.vram_shm.unlink()
-            except FileNotFoundError:
+            except (FileNotFoundError, BufferError):
                 pass
 
         sys.exit(0)
@@ -234,7 +243,8 @@ class Emulator:
         reg_b  = regs & 0xF                # dddd — low nibble
 
         if opcode not in OPCODE_FORMATS:
-            logger.error(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. halting.")
+            logger.warning(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. requesting interrupt 1.")
+            self.request_interrupt(1) # invalid instruction interrupt
             self.halted = True
             return (0, 0, 0, 0)
 
@@ -505,7 +515,10 @@ class Emulator:
         dest = self.reg_get(reg_b)
         src  = self.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
         if src == 0:
-            raise EmulatorException(f"modulo by zero at 0x{self.pc.value:04x}.")
+            # division by zero, request hardware fault interrupt
+            logger.warning(f"division by zero at 0x{self.pc.value:04x}. hardware fault interrupt called.")
+            self.request_interrupt(0)
+            return
         result = mask16(dest % src)
         self.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
         self.reg_set(reg_b, result)
@@ -601,13 +614,13 @@ class Emulator:
     def handle_cmp(self, decoded: tuple[int, ...]) -> None:
         opcode, reg_a, reg_b, imm16 = decoded
         modes = OPCODE_FORMATS[opcode].modes
-        # spec: flags <- src - dest
+        # spec: flags <- dest - src
         # reg+reg: src=reg_a(ssss), dest=reg_b(dddd)
         # reg+imm: src=imm,  dest=reg_a(ssss) [dest in ssss anomaly]
         if modes == (MODES.REG, MODES.REG):
-            self._sub_core(self.reg_get(reg_a), self.reg_get(reg_b))
+            self._sub_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
-            self._sub_core(imm16, self.reg_get(reg_a))
+            self._sub_core(self.reg_get(reg_b), imm16)
 
     def _jump_target(self, imm16: int) -> int:
         """ Compute absolute jump target from a signed relative offset. """

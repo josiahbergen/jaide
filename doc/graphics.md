@@ -6,7 +6,7 @@ it uses memory bank 1 for vram, and contains 16Kib of font and attribute ROM.
 
 ## resolution
 
-the controller outputs 80x50 8x8 tiles, for a total size of 640×400.
+the controller outputs 80x25 8x16 tiles, for a total size of 640×400.
 
 ## vram word structure
 

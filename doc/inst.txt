@@ -22,6 +22,7 @@ PUT dest, src       put word into memory
 MOV dest, src       move word
 reg  reg            oooooooo ssss dddd -------- --------  dest <- reg
 reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  dest <- imm16
+reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
 
 PUSH src            push value to stack
 reg                 oooooooo ssss ---- -------- --------  [--sp] <- src
@@ -92,8 +93,8 @@ reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
 imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
 
 CMP dest, src       non-destructive compare (updates Z, C, O, N)
-reg  reg            oooooooo ssss dddd -------- --------  flags <- src - dest
-reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- src - imm16
+reg  reg            oooooooo ssss dddd -------- --------  flags <- dest - src
+reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- dest - imm16
 
 JMP src             unconditional jump
 reg                 oooooooo ssss ---- -------- --------  pc <- src
@@ -140,6 +141,8 @@ pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 CALL src            call a subroutine
 reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
 imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
+pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- pc + imm16
+[imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- [imm16 + src]
 
 RET                 return from a subroutine
                     oooooooo ---- ---- -------- --------  pc <- [++sp]

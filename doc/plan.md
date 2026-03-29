@@ -1,246 +1,359 @@
+# Jaide: Tech Demo to OS-Ready Hardware -- Roadmap
 
+## Context
 
-# Assembler Audit and Migration Plan
+Jaide is a 16-bit custom computing architecture with a working emulator, assembler, and graphics subsystem. It can run simple programs (blink demos, fibonacci). The goal is to close every gap in the ISA, assembler, emulator, and spec that would prevent writing an operating system capable of running a shell, text editor, and loading/executing user binaries. This plan does NOT cover building the OS itself -- only preparing the platform.
 
-## Part 1: Audit -- Refactoring Needs
-
-### 1.1 Global mutable state on `IRNode` (high impact)
-
-`IRNode.labels` and `IRNode.macros` are class-level mutable dicts:
-
-```25:27:jasm/language/ir.py
-    labels: dict[str, int] = {}
-    macros: dict[str, 'MacroNode'] = {}
-```
-
-This means assembling twice in the same process (e.g. for tests or a linker that processes multiple files) will carry stale state. Extract these into an `AssemblerContext` object that gets passed through the pipeline.
-
-### 1.2 Duplicated number parsing (medium impact)
-
-`OperandNode.get_integer_value()` (ir.py:86-98) and `DataDirectiveNode.get_number_value()` (ir.py:389-407) contain identical hex/binary/decimal parsing. Extract to a shared `parse_number(value: str, line: int) -> int` utility.
-
-### 1.3 Duplicated constants between assembler and emulator (high impact)
-
-[jasm/language/constants.py](jasm/language/constants.py) and [jaide/constants.py](jaide/constants.py) independently define identical opcode tables, register maps, addressing modes, and the entire `INSTRUCTION_ENCODINGS` dict. Create a shared `jaide_common/` package (or a single `isa.py` module at the project root) that both `jasm` and `jaide` import from.
-
-### 1.4 Monolithic addressing mode resolution (high impact)
-
-`InstructionNode.get_addressing_mode()` is a ~60-line match statement that manually maps every mnemonic to its addressing mode. With the new ISA, this becomes even harder because addressing modes are now implicit in the opcode. Refactor into a data-driven lookup: define a table of `(mnemonic, operand_pattern) -> opcode_byte` and let the lookup be automatic.
-
-### 1.5 Repetitive `INSTRUCTION_ENCODINGS` table (medium impact)
-
-Most ALU instructions (ADD, SUB, AND, OR, XOR, LSH, RSH, etc.) have identical encoding structures. Use a builder/factory pattern to generate these from a compact definition rather than spelling out every one individually.
-
-### 1.6 Addressing mode set in wrong pipeline stage (medium impact)
-
-`expand_macros()` in [jasm/macros.py](jasm/macros.py) also sets `addressing_mode` and `size` for ALL instructions, not just macro-expanded ones (lines 36-38). This is a layer violation -- addressing mode resolution should be its own explicit pipeline step between macro expansion and label resolution.
-
-### 1.7 Parser instantiated per file (low impact)
-
-In [jasm/parse.py](jasm/parse.py) line 64, `Lark(GRAMMAR, parser='lalr')` is called once per file. The Lark parser with `parser='lalr'` can be constructed once and reused, which would speed up multi-file assembly.
-
-### 1.8 Fragile label mangling in macros (medium impact)
-
-`MacroNode.expand()` only mangles label references inside `JMP|JZ|JNZ|JC|JNC` instructions (ir.py:527). It misses `CALL`, `JN`, `JNN`, `JO`, `JNO`, and any other instruction that takes a label. Should scan ALL instruction operands of type `LABELNAME`, not just specific mnemonics.
-
-### 1.9 Expression evaluation is a no-op (low impact)
-
-`ExpressionNode.evaluate()` always returns 0 (ir.py:459). Either implement it or remove the grammar rule so users get a clear parse error instead of silent wrong output.
+The user's three stated priorities: **position-independent code**, **software interrupts / syscalls**, and **proper device interfaces** (disk, GPU, keyboard, timer).
 
 ---
 
-## Part 2: Audit -- Best Practice Violations
+## Bugs and Spec Errors Found During Audit
 
-### 2.1 `logger.fatal()` as control flow
+These must be understood before any work begins:
 
-Fatal errors call `sys.exit()` from deep within the assembler. This makes the code untestable and prevents error accumulation. Best practice: raise a custom `AssemblerError` exception, catch it at the top level. Even better, accumulate multiple errors and report them all at once.
-
-### 2.2 No tests whatsoever
-
-There is no test infrastructure. At minimum, add:
-
-- Unit tests for number parsing, encoding, and label resolution
-- Integration tests that assemble known `.jasm` files and compare output bytes
-- A test runner in the Makefile
-
-### 2.3 String-keyed dicts instead of enums
-
-`OPCODES`, `ADDRESSING_MODES`, `OPERAND_TYPES` are all plain dicts. Using proper `IntEnum` types would give type safety, auto-completion, and prevent typo-based bugs.
-
-### 2.4 Import path resolution bug
-
-The TODO in parse.py:81 is a real bug -- different path strings pointing to the same file (e.g. relative vs absolute) bypass the circular import check. Normalize paths with `os.path.realpath()` before comparison.
-
-### 2.5 PC tracked in words but binary in bytes
-
-`labels.py` increments PC by `node.get_size()` which returns sizes in words, but `binary.py` produces a byte array. The implicit 2x relationship is never documented or asserted, making it easy to introduce off-by-one bugs. Make the unit explicit throughout.
+### B1. LSH/RSH flag computation untested
+Both `_lsh_core` and `_rsh_core` in `emulator.py` have `# TODO: test` comments. The overflow flag computation reuses the addition pattern `(a ^ b) & 0x80`, which is wrong for shifts.
+- **File**: `jaide/emulator.py:328-344`
 
 ---
 
-## Part 3: Migrating Code Generation to v0.4 Spec
+## Phase 0: Foundation (Safety Net + Critical Fixes)
 
-The new [inst.txt](doc/inst.txt) changes the encoding fundamentally:
+**Goal**: Fix the most dangerous bugs and establish a test harness before changing anything else.
 
-### 3.1 Old vs New encoding format
+### 0.1 -- Create test infrastructure
+- Add `tests/` directory with pytest
+- `tests/test_alu.py` -- unit tests for `_add_core`, `_sub_core`, `_lsh_core`, `_rsh_core` with known inputs/outputs and flag verification
+- `tests/test_instructions.py` -- integration tests: assemble small snippets, load into emulator, step through, verify register/memory/flag state
+- `tests/test_assembler.py` -- assemble known `.jasm` snippets, compare byte output
+- `tests/conftest.py` -- shared fixtures (fresh Emulator, assemble-and-load helper)
+- **Files**: `tests/` (new), `pyproject.toml` (add pytest dep)
 
-**Old** (current assembler): opcode and addressing mode packed into one byte.
+### 0.2 -- Fix CMP operand order
+- In `handle_cmp`: swap to `_sub_core(reg_b, reg_a)` for reg-reg, `_sub_core(reg_a, imm16)` for reg-imm
+- Update `doc/inst.txt` CMP pseudocode to `flags <- dest - src`
+- Write CMP-specific tests that lock in the corrected semantics
+- **Files**: `jaide/emulator.py`, `doc/inst.txt`
 
-```
-Byte 0: [SSSS DDDD]  (source reg, dest reg)
-Byte 1: [OOOOOO MM]  (6-bit opcode << 2 | 2-bit addressing mode)
-Byte 2-3: [IMM16 LE]  (optional)
-```
+### 0.3 -- Fix LSH/RSH flags
+- `_lsh_core`: carry = last bit shifted out = `(a >> (16 - b)) & 1` when `0 < b <= 16`. Overflow = MSB changed.
+- `_rsh_core`: carry = `(a >> (b - 1)) & 1` when `b > 0`. Overflow = 0.
+- Handle shift amounts of 0 and >= 16 as edge cases.
+- Write tests for all edge cases.
+- **Files**: `jaide/emulator.py:328-344`
 
-**New** (v0.4): each instruction+mode variant gets its own full 8-bit opcode.
+### 0.4 -- Fix exception handling (div-by-zero, invalid opcode)
+- `handle_mod`: replace `raise EmulatorException` with `self.request_interrupt(0); return`
+- `decode()`: on unknown opcode, fire `request_interrupt(1)` instead of `self.halted = True`
+- **Files**: `jaide/emulator.py`
 
-```
-Byte 0: [SSSS DDDD]  (source reg, dest reg -- same positions)
-Byte 1: [OOOOOOOO]   (full 8-bit opcode, mode implicit)
-Byte 2-3: [IMM16 LE]  (optional)
-```
-
-Note: the byte order in memory is the same (reg byte first, opcode second, due to little-endian), so the `get_bytes()` emit order doesn't change.
-
-### 3.2 What changes
-
-**Opcode table**: Replace the current single-opcode-per-mnemonic scheme with a mapping of `(mnemonic, operand_pattern) -> opcode_byte`. The new opcodes from inst.txt:
-
-- HALT=0x00
-- GET: [reg]=0x01, [imm16+pc]=0x02, [imm16+reg]=0x03
-- PUT: [reg]=0x04, [imm16+reg]=0x05
-- MOV: reg=0x06, imm16=0x07
-- PUSH: reg=0x08, imm16=0x09
-- POP: 0x0a
-- ADD: reg=0x0b, imm16=0x0c
-- ADC: reg=0x0d, imm16=0x0e
-- SUB: reg=0x0f, imm16=0x10
-- SBC: reg=0x11, imm16=0x12 
-- INC=0x13, DEC=0x14
-- LSH: reg=0x15, imm16=0x16
-- RSH: reg=0x17, imm16=0x18
-- AND: reg=0x19, imm16=0x1a
-- OR: reg=0x1b, imm16=0x1c
-- NOT=0x1d (NOR is removed)
-- XOR: reg=0x1e, imm16=0x1f
-- INB: reg=0x20, imm16=0x21
-- OUTB: reg=0x22, imm16=0x23
-- CMP: reg=0x24, imm16=0x25
-- JMP: reg=0x26, imm16=0x27, [imm16+pc]=0x28, [imm16+reg]=0x29
-- JZ=0x2a, JNZ=0x2b, JC=0x2c, JNC=0x2d, JN=0x2e, JNN=0x2f, JO=0x30, JNO=0x31 (all PC-relative only)
-- CALL: reg=0x32, imm16=0x33
-- RET=0x34, INT: reg=0x35, imm16=0x36, IRET=0x37, NOP=0x38
-
-**Instruction changes**:
-
-- NOR removed
-- JN, JNN, JO, JNO added (PC-relative only)
-- GET gains [imm16+pc] mode
-- PUT loses [imm16] mode, gains [imm16+reg] mode
-- JMP gains direct reg and imm16 modes (non-dereferencing)
-- Conditional jumps restricted to single [imm16+pc] mode
-- CALL changed from address modes to direct reg/imm16
-
-**Grammar changes needed**: The current grammar has no concept of bracket notation for memory operands. The new ISA requires syntax like `GET A, [B]`, `GET A, [0x10 + PC]`, `PUT [B + 0x10], A`. The Lark grammar needs a `memory_operand` rule:
-
-```
-memory_operand: "[" REGISTER "]"
-              | "[" NUMBER "+" REGISTER "]"
-              | "[" REGISTER "+" NUMBER "]"
-```
-
-**Smart label resolution for JMP/CALL**: `JMP label` should automatically emit PC-relative encoding (opcode 0x28) for intra-file labels. `JMP ABS imm16` syntax for explicit absolute jumps (opcode 0x27). The grammar needs an `ABS` keyword.
-
-### 3.3 Concrete file changes
-
-- **[jasm/language/constants.py](jasm/language/constants.py)**: Replace `OPCODES` with a new `OPCODE_TABLE` mapping `(mnemonic, mode) -> byte`. Remove `ADDRESSING_MODES` dict (modes are now implicit). Rewrite `INSTRUCTION_ENCODINGS`.
-- **[jasm/language/grammar.py](jasm/language/grammar.py)**: Add `memory_operand` rule, `ABS` keyword, new mnemonics (ADDC, SUBC, JN, JNN, JO, JNO), remove NOR.
-- **[jasm/language/ir.py](jasm/language/ir.py)**: Rewrite `InstructionNode.get_addressing_mode()`, `get_bytes()`, and `validate_instruction_semantics()`. The `get_bytes()` method no longer needs to pack opcode+mode; it just emits the opcode byte directly.
-- **[jasm/parse.py](jasm/parse.py)**: Handle new `memory_operand` parse tree nodes, producing operand nodes that carry bracket/offset information.
-- **[jaide/constants.py](jaide/constants.py)**: Mirror all opcode changes for the emulator (or share a common module).
-- **[jaide/emulator.py](jaide/emulator.py)**: Update the instruction decoder to use 8-bit opcodes directly.
+### 0.5 -- Fix documentation errors
+- `CLAUDE.md`: fix banking range to `0x0200-0x41FF`
+- `doc/graphics.md`: fix resolution to "80x25 8x16 glyphs"
+- `doc/inst.txt`: add missing MOV/CALL modes
+- **Files**: `CLAUDE.md`, `doc/graphics.md`, `doc/inst.txt`
 
 ---
 
-## Part 4: Adding a Linker
+## Phase 1: ISA Completions
 
-### 4.1 Object file format
+**Goal**: Fill the instruction set gaps that would block OS-level code.
 
-Define a simple `.jo` (jaide object) format:
+Each item touches `common/isa.py` (add to INSTRUCTIONS enum, INSTRUCTION_MODES, _FORMAT_DATA), `jaide/emulator.py` (add handler), and `jasm/language/grammar.py` (add mnemonic to regex if needed). Tests for each.
+
+### 1.1 -- Add DIV instruction
+- `DIV reg, reg` and `DIV reg, imm16`: unsigned integer division, `dest <- dest / src`
+- Sets Z (result zero), C (remainder nonzero), N, O flags
+- Division by zero fires interrupt vector 0 (same as MOD fix in 0.4)
+- Pattern follows MUL/MOD exactly
+
+### 1.2 -- Add ASR (Arithmetic Shift Right)
+- `ASR reg, reg` and `ASR reg, imm16`: right shift preserving sign bit
+- Essential for signed arithmetic (signed division by powers of 2)
+- Handler: sign-extend to Python int, shift, mask back to 16-bit
+- Carry = last bit shifted out. Zero flag. No overflow.
+
+### 1.3 -- Add PUT with REL_POINTER mode
+- `PUT [label], reg` -- store to a PC-relative address
+- **This is the single most important change for position-independent code.** GET already has `[pc + simm]` but PUT doesn't, meaning PIC code cannot write to global/static data without a multi-instruction address-load workaround.
+- Add `(MODES.REL_POINTER, MODES.REG)` to `INSTRUCTION_MODES[PUT]`
+- Add format entry: `(1, None, 0)` -- src register in ssss, immediate is PC-relative offset
+- Add handler branch in `handle_put`
+
+### 1.4 -- Add XCHG (Exchange Registers) [optional, low priority]
+- `XCHG reg, reg`: swap two registers atomically
+- Saves 3 instructions (push/mov/pop pattern) during context switches
+- Not strictly required; defer if timeline is tight
+
+---
+
+## Phase 2: Assembler Modernization
+
+**Goal**: Make the assembler capable of producing the code an OS developer needs.
+
+### 2.1 -- ORG directive
+- `ORG 0x0200` sets the origin/load address for label resolution
+- `AssemblyContext.origin` already exists (defaults to 0) but has no syntax to set it
+- Add grammar rule, IR node (`OrgDirectiveNode`), transformer handler
+- In `labels.py`: when encountered, set `pc` to the specified value
+- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/labels.py`
+
+### 2.2 -- EQU / DEFINE for named constants
+- `SCREEN_WIDTH EQU 80` or `DEFINE SCREEN_WIDTH 80`
+- Store in `context.constants` (separate from labels to avoid PC-relative encoding)
+- During label resolution, when a `LabelOperand` name matches a constant, replace with `ImmediateOperand`
+- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/language/context.py`, `jasm/labels.py`
+
+### 2.3 -- Expression evaluation
+- `ExpressionOperand` already parsed by grammar but throws `logger.fatal("not yet implemented")`
+- Implement recursive evaluator for `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `&`, `|`, `^`, `~`
+- Operates on numeric literals and EQU constants
+- Returns `ImmediateOperand` with computed value
+- **Files**: `jasm/language/transformer.py`, `jasm/language/ir/operands.py`
+
+### 2.4 -- RESW / RESB / TIMES directives
+- `RESW 256` -- reserve 256 zero-filled words (for BSS, buffers, IVT init)
+- `TIMES 512, 0xFF` -- fill 512 words with a value
+- New IR node type, encodes to bytearray in `binary.py`
+- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/binary.py`
+
+### 2.5 -- String escape sequences
+- Currently `DataDirectiveNode.parse_string` does raw `ord(char)` -- no `\n`, `\0`, `\t`, `\\`
+- Add `unescape()` function processing C-style escapes before character conversion
+- **File**: `jasm/language/ir/base.py`
+
+### 2.6 -- ALIGN directive
+- `ALIGN 16` pads with zeros until PC is aligned to boundary
+- In `labels.py`: compute `padding = (alignment - (pc % alignment)) % alignment`, advance PC
+- In `binary.py`: emit zero words for padding
+- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/labels.py`, `jasm/binary.py`
+
+---
+
+## Phase 3: Device Layer
+
+**Goal**: Give the emulated CPU enough peripherals to run an OS.
+
+### 3.0 -- Device abstraction layer
+Create a base `Device` class and `DeviceManager` so the emulator manages all devices uniformly:
+```python
+class Device:
+    def port_read(self, port: int) -> int: ...
+    def port_write(self, port: int, value: int): ...
+    def tick(self): ...  # called once per CPU cycle
+```
+Refactor `port_get`/`port_set` to dispatch to owning device. Add `tick()` call in the `step()` loop.
+- **Files**: `jaide/devices/__init__.py` (new base class), `jaide/emulator.py` (refactor port dispatch, add tick loop)
+
+### 3.1 -- Programmable Interval Timer (PIT) [CRITICAL for OS]
+Without a timer, there is no preemptive multitasking, no `sleep()`, no time-slicing.
+- **Ports**: 0x10 (control: enable/mode bits), 0x11 (reload value in cycles), 0x12 (current count, read-only)
+- **Interrupt**: Vector 5
+- **Behavior**: Each `tick()` decrements counter. At zero: fire interrupt, reload if periodic mode.
+- **File**: `jaide/devices/timer.py` (new)
+
+### 3.2 -- Disk Controller [CRITICAL for OS]
+Without disk I/O, the OS can't load programs or persist data. The user already has a JFS filesystem spec in `doc/file.md`.
+- **Ports**: 0x20 (command: READ_SECTOR/WRITE_SECTOR/STATUS), 0x21 (sector number), 0x22 (memory address hi), 0x23 (memory address lo), 0x24 (status: busy/error/done bits)
+- **Interrupt**: Vector 6 on transfer complete
+- **Backend**: Host filesystem binary file (`--disk disk.img` CLI arg)
+- **DMA-style transfer**: On READ command, copy 256 words into emulator memory over 256 ticks (one word per tick), then fire completion interrupt. Avoids word-by-word programmed I/O.
+- **File**: `jaide/devices/disk.py` (new), `jaide/__main__.py` (add `--disk` arg)
+
+### 3.3 -- Keyboard device refactor
+Currently hardcoded in `emulator.py:282-289` with direct queue polling and magic constants. Move to a `KeyboardDevice` subclass.
+- Port 1, interrupt vector 4 become device constants
+- `key_queue` passed to device instead of emulator
+- **Files**: `jaide/devices/keyboard.py` (new), `jaide/emulator.py` (remove hardcoded logic)
+
+### 3.4 -- Real-Time Clock (RTC)
+Simple read-only device providing wall-clock time through ports.
+- **Ports**: 0x30 (seconds), 0x31 (minutes), 0x32 (hours), 0x33 (day-of-year)
+- No interrupt; software polls when needed.
+- **File**: `jaide/devices/rtc.py` (new)
+
+### 3.5 -- Console device (upgrade port 0)
+Port 0 currently does `print(chr(value))` inline. Wrap in a proper `ConsoleDevice` with status port (0x02: output ready, input available bits). Enables headless/debug operation alongside the graphics display.
+- **File**: `jaide/devices/console.py` (new)
+
+---
+
+## Phase 4: Conventions, Spec, and ABI
+
+**Goal**: Document everything an OS programmer needs to know without reading emulator source.
+
+### 4.1 -- Calling convention / ABI (`doc/abi.md`, new)
+- Arguments: first 4 in A, B, C, D; extras on stack right-to-left
+- Return value: A
+- Caller-saved: A, B, C, D, E (volatile)
+- Callee-saved: X, Y, Z, SP, MB (non-volatile)
+- Stack frame: no mandatory frame pointer; Z optionally used as FP
+- SP must be word-aligned at all times
+
+### 4.2 -- Syscall convention (`doc/syscalls.md`, new)
+- Syscalls use `INT 0x80` (vector 128) -- or pick a vector in the 16-47 range
+- Syscall number in A, arguments in B, C, D, E
+- Return value in A
+- OS installs handler at corresponding IVT entry
+- Define initial syscall numbers: read, write, open, close, exec, exit, sbrk
+
+### 4.3 -- Formalize interrupt vector allocation (update `doc/spec.md`)
+
+| Vector | Type | Purpose |
+|--------|------|---------|
+| 0 | Exception | Division by zero / general fault |
+| 1 | Exception | Invalid opcode |
+| 2 | Exception | Protection fault (future) |
+| 3 | Reserved | Reserved |
+| 4 | Hardware | Keyboard |
+| 5 | Hardware | Timer (PIT) |
+| 6 | Hardware | Disk controller |
+| 7-15 | Hardware | Reserved for future devices |
+| 16-47 | Software | OS syscalls |
+| 48-255 | Software | User-defined |
+
+### 4.4 -- Formalize port allocation (update `doc/spec.md`)
+
+| Port Range | Device |
+|-----------|--------|
+| 0x00-0x02 | Console (serial) |
+| 0x10-0x12 | Timer (PIT) |
+| 0x20-0x24 | Disk controller |
+| 0x30-0x33 | RTC |
+| 0x40-0x4F | Reserved (GPU control) |
+| 0xFF | System control |
+
+### 4.5 -- Boot sequence document (`doc/boot.md`, new)
+1. CPU starts at PC=0x0000 (ROM)
+2. ROM bootloader initializes SP to 0xFEFF
+3. Bootloader reads sector 0 from disk into memory at a defined address (e.g., 0x0200 or 0x4200)
+4. Bootloader jumps to loaded code
+5. Kernel sets up IVT, initializes devices, enables interrupts
+
+### 4.6 -- Fix graphics.md and consolidate VRAM spec
+- Correct resolution discrepancy (80x25 / 8x16, not 80x50 / 8x8)
+- Ensure VRAM word structure, color palette, and bank assignment are fully documented
+
+---
+
+## Phase 5: Tooling and Developer Experience
+
+**Goal**: Make it practical to develop and debug OS-level code.
+
+### 5.1 -- Improved REPL disassembler
+Current `disasm_at` shows raw register indices. Upgrade to:
+- Show register names in context (`MOV A, 0x0200` not `MOV 0 1 0200`)
+- Resolve PC-relative targets to absolute addresses
+- Range disassembly: `disasm 0x0000 0x0020`
+- Show hex bytes alongside mnemonics
+- **File**: `jaide/repl.py`
+
+### 5.2 -- Symbol file output from assembler
+- Add `-s` / `--symbols` flag that writes a `.sym` file (label name -> word address)
+- REPL `loadsym` command loads symbol file, shows labels in disassembly
+- **Files**: `jasm/__main__.py`, `jasm/jasm.py`, `jaide/repl.py`
+
+### 5.3 -- Memory watchpoints
+- `watch 0xFE00` breaks when any instruction writes to that address
+- Essential for debugging memory corruption
+- **Files**: `jaide/repl.py`, `jaide/emulator.py` (check in `write16`)
+
+### 5.4 -- Instruction counter / cycle profiling
+- Track instruction count, per-opcode frequency
+- `profile` REPL command shows stats
+- **Files**: `jaide/emulator.py`, `jaide/repl.py`
+
+### 5.5 -- Disk image creation tool
+- Python utility to create JFS-formatted disk images per `doc/file.md` spec
+- `python -m jfs create disk.img --add boot.bin --add kernel.bin`
+- **Files**: `jfs/` (new package)
+
+### 5.6 -- Linker (stretch goal, builds on existing `doc/plan.md` design)
+The existing `doc/plan.md` already designs a `.jo` object format and `jlink` linker. Implementation:
+- Add `EXPORT` / `EXTERN` directives to assembler grammar
+- Add `-c` (compile-only) flag to emit `.jo` relocatable objects instead of flat binary
+- Build `jlink` package that reads `.jo` files, resolves symbols, patches relocations, emits final binary
+- Not strictly required for a first OS (single-file assembly with IMPORT works), but needed for multi-module builds
+- **Files**: `jlink/` (new), `jasm/language/grammar.py`, `jasm/binary.py`
+
+---
+
+## Execution Order and Dependencies
 
 ```
-HEADER (fixed size)
-  magic:          0x4A4F  ("JO")
-  version:        u16
-  code_size:      u16     (words)
-  sym_count:      u16
-  reloc_count:    u16
-
-CODE SEGMENT
-  raw machine code with 0x0000 placeholders for unresolved references
-
-SYMBOL TABLE (sym_count entries)
-  name_length:    u8
-  name:           [u8; name_length]
-  offset:         u16     (word offset within this object)
-  flags:          u8      (LOCAL=0, GLOBAL=1, EXTERN=2)
-
-RELOCATION TABLE (reloc_count entries)
-  offset:         u16     (word offset of the placeholder in code)
-  symbol_index:   u16     (index into symbol table)
-  type:           u8      (ABS=0, PC_REL=1)
-```
-
-### 4.2 Assembler changes for linkable output
-
-- Add `EXPORT label` and `EXTERN label` directives to the grammar and parser
-- When assembling with `-c` (compile-only) flag, output `.jo` object files instead of raw binaries
-- For intra-file label references, compute PC-relative offsets at assembly time (no relocation needed)
-- For `EXTERN` symbols, emit a placeholder and add a relocation entry
-- For `EXPORT` symbols, add them to the symbol table with GLOBAL flag
-- All other labels are LOCAL (resolved within the file, not visible to linker)
-
-### 4.3 Linker implementation (`jlink/`)
-
-Create a new `jlink` package:
-
-- `jlink/__main__.py` -- CLI entry point: `python -m jlink file_a.jo file_b.jo -o program.bin`
-- `jlink/object_file.py` -- Parse `.jo` files, expose code/symbols/relocations
-- `jlink/linker.py` -- Core logic:
-  1. Read all input object files
-  2. Layout: concatenate code segments, assign base addresses (first file at 0x0000 or user-specified origin via `-b` flag)
-  3. Build global symbol table from all files
-  4. Resolve: for each relocation entry, look up the symbol, compute the final address, patch the code
-  5. Emit final raw binary
-
-### 4.4 Smart `JMP label` behavior
-
-The assembler should automatically pick the right encoding:
-
-- `JMP label` where `label` is defined in the same file: emit `JMP [imm16+pc]` (opcode 0x28), compute offset at assembly time, no relocation needed
-- `JMP label` where `label` is declared `EXTERN`: emit `JMP imm16` (opcode 0x27) with placeholder, add ABS relocation entry
-- `JMP ABS 0x0200`: always emit `JMP imm16` (opcode 0x27) with literal value, no relocation
-
-Same logic applies to `CALL`, and conditionals always use PC-relative.
-
-### 4.5 Build flow
-
-```
-jasm file_a.jasm -c -o file_a.jo    # assemble to object
-jasm file_b.jasm -c -o file_b.jo    # assemble to object
-jlink file_a.jo file_b.jo -o program.bin  # link to binary
-jasm file_a.jasm -o program.bin      # single-file shortcut (no linker needed)
+Phase 0 (Foundation) ──────────────────────────────────────
+  0.1 Test infrastructure
+  0.2 Fix CMP ←─ needs tests from 0.1
+  0.3 Fix LSH/RSH flags
+  0.4 Fix exception interrupts (div-by-zero, invalid opcode)
+  0.5 Fix documentation
+         │
+Phase 1 (ISA) ─────────────────────────────────────────────
+  1.1 DIV ──────────┐
+  1.2 ASR ──────────┤ all independent, can parallelize
+  1.3 PUT [label] ──┘
+         │
+    ┌────┴────┐
+Phase 2       Phase 3
+(Assembler)   (Devices)         ← can develop in parallel
+  2.1 ORG       3.0 Device abstraction
+  2.2 EQU       3.1 Timer (PIT)
+  2.3 Exprs     3.2 Disk controller
+  2.4 RESW      3.3 Keyboard refactor
+  2.5 Escapes   3.4 RTC
+  2.6 ALIGN     3.5 Console device
+    └────┬────┘
+         │
+Phase 4 (Conventions & Spec) ──────────────────────────────
+  4.1-4.6 Documentation (can be written as features land)
+         │
+Phase 5 (Tooling) ─────────────────────────────────────────
+  5.1 Disassembler
+  5.2 Symbol files
+  5.3 Watchpoints
+  5.4 Profiling
+  5.5 Disk image tool ←─ depends on 3.2
+  5.6 Linker (stretch)
 ```
 
 ---
 
-## Recommended Execution Order
+## What is intentionally NOT in this roadmap
 
-The work naturally phases as follows, with each phase building on the previous:
+- **Privilege levels / supervisor mode / MMU**: Important for a production OS but not required for a first OS on an emulated single-user system. The OS author can enforce discipline without hardware protection. Add in a future "Phase 6: Hardening" after the first OS boots.
+- **Virtual memory / paging**: Not feasible without radical architecture changes. Defer indefinitely.
+- **Mouse / audio / networking**: Not needed for shell + text editor.
+- **High-level language / compiler**: Far future. The assembler must be solid first.
+- **The OS itself**: Out of scope per user request.
 
-1. **Refactor foundations** -- Extract shared state, deduplicate code, fix bugs (Part 1)
-2. **Migrate to v0.4 encoding** -- New opcode table, grammar changes, encoding rewrite (Part 3)
-3. **Update emulator** -- Match the new opcodes in the emulator decoder
-4. **Add linker infrastructure** -- Object file format, assembler `-c` mode, `EXPORT`/`EXTERN` directives (Part 4)
-5. **Implement linker** -- `jlink` package (Part 4)
-6. **Add tests** -- Now that the architecture is stable (Part 2.2)
+---
 
+## Verification Plan
+
+After each phase, verify with an end-to-end smoke test:
+
+- **Phase 0**: Run existing `programs/blink.jasm` -- should still work. Run new test suite -- all pass.
+- **Phase 1**: Write a small PIC test program using `PUT [label], reg`, `DIV`, `ASR`. Assemble, load at a non-zero origin, verify correct execution.
+- **Phase 2**: Write a program using `ORG 0x0200`, `EQU`, `RESW`, `ALIGN`, expressions. Assemble and verify binary output.
+- **Phase 3**: Write a program that sets up a timer interrupt handler, reads a sector from disk, and echoes keyboard input. Run with `--disk` and `-g` flags.
+- **Phase 4**: N/A (documentation review).
+- **Phase 5**: Assemble with `--symbols`, load symbols in REPL, disassemble with labels showing, set a watchpoint, verify it fires.
+
+---
+
+## Critical Files Summary
+
+| File | Touched In |
+|------|-----------|
+| `common/isa.py` | Phase 0 (CMP fix), Phase 1 (all ISA additions) |
+| `jaide/emulator.py` | Phase 0, 1, 3 (handlers, exceptions, device integration) |
+| `jasm/language/grammar.py` | Phase 1 (new mnemonics), Phase 2 (all directives) |
+| `jasm/language/ir/base.py` | Phase 2 (new IR node types) |
+| `jasm/language/transformer.py` | Phase 2 (directive handlers, expression eval) |
+| `jasm/labels.py` | Phase 2 (ORG, ALIGN, EQU resolution) |
+| `jasm/binary.py` | Phase 2 (RESW/ALIGN encoding) |
+| `jaide/devices/` | Phase 3 (all new device modules) |
+| `jaide/repl.py` | Phase 5 (disassembler, watchpoints, profiling) |
+| `doc/spec.md` | Phase 0, 4 (all spec updates) |
+| `doc/inst.txt` | Phase 0, 1 (instruction reference updates) |

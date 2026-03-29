@@ -5,13 +5,17 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
 # Virtual environments
 .venv
+uv.lock
 
 # Build files
 **/bin/
 
 # Other files
 .DS_Store
+
+.claude/
 CLAUDE.md
