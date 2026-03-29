@@ -1,18 +1,26 @@
 {
     "files.exclude": {
+
+        // defaults
         "**/.git": true,
         "**/.svn": true,
         "**/.hg": true,
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
+        
+        // python
         "**/__pycache__": true,
         "**.pytest_cache": true,
-        "**.vscode": true,
         "**/__init__.py": true,
-        "**/.zed/": true,
+        "pyproject.toml": true,
         "uv.lock": true,
-        // "**.venv": true,
-        // ".gitignore": true,
+        
+        // stuff i dont wanna be seeing
+        "**/.vscode/": true,
+        "**/.zed/": true,
+        ".gitignore": true,
+
+        // llm helpers
         "**.claude": true,
         "CLAUDE.md": true
     },
