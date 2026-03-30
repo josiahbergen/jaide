@@ -81,11 +81,11 @@ class IRTransformer(Transformer):
         # "[" REGISTER "]"
         return PointerOperand(line(register), register)
 
-    def offset_operand(self, identifier: IdentifierTerminal, register: RegisterTerminal):
+    def offset_pointer_operand(self, identifier: IdentifierTerminal, register: RegisterTerminal):
         # "[" IDENTIFIER "+" REGISTER "]"
         return OffsetPointerOperand(line(identifier), identifier, register)
 
-    def rel_pointer_operand(self, identifier: IdentifierTerminal):
+    def relative_pointer_operand(self, identifier: IdentifierTerminal):
         # "[" IDENTIFIER "]"
         return RelativePointerOperand(line(identifier), identifier)
 
