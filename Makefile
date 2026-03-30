@@ -4,11 +4,11 @@
 test-unix:
 	@clear
 	@echo Running test suite...
-	@uv run -m pytest -q
+	@uv run -m pytest
 
 test-nt:
 	@echo Running test suite...
-	@uv run -m pytest -q
+	@uv run -m pytest -v
 
 
 ifeq ($(OS),Windows_NT)

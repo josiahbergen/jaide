@@ -35,3 +35,28 @@ def assemble_and_load(emu):
             emu.load_binary(bin_path)
         return emu
     return _helper
+
+
+@pytest.fixture
+def assemble_and_load_ram(emu):
+    """Assemble a JASM source string and load it into general-purpose RAM at word 0x4200.
+
+    Use this when the program needs to write to labels that would otherwise land
+    in the ROM region (word addresses 0x0000–0x01FF).  PC is set to 0x4200 so
+    all PC-relative offsets computed by the assembler remain correct at runtime.
+    """
+    RAM_WORD = 0x4200
+
+    def _helper(source: str) -> Emulator:
+        with tempfile.TemporaryDirectory() as tmp:
+            src_path = os.path.join(tmp, "test.jasm")
+            bin_path = os.path.join(tmp, "test.bin")
+            with open(src_path, "w") as f:
+                f.write(source)
+            assemble(src_path, bin_path)
+            # load_binary addr is a byte offset; word N lives at byte N*2
+            emu.load_binary(bin_path, addr=RAM_WORD * 2)
+        emu.pc.set(RAM_WORD)
+        return emu
+
+    return _helper

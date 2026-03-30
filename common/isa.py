@@ -31,6 +31,7 @@ class INSTRUCTIONS(IntEnum):
     DEC  = auto()
     LSH  = auto()
     RSH  = auto()
+    ASR  = auto()
     AND  = auto()
     OR   = auto()
     NOT  = auto()
@@ -55,6 +56,7 @@ class INSTRUCTIONS(IntEnum):
     RET  = auto()
     INT  = auto()
     IRET = auto()
+    XCHG = auto()
 
 
 class REGISTERS(IntEnum):
@@ -96,7 +98,7 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
 
     INSTRUCTIONS.HALT: [ () ],
     INSTRUCTIONS.GET:  [ (MODES.REG, MODES.REG_POINTER), (MODES.REG, MODES.REL_POINTER), (MODES.REG, MODES.OFF_POINTER) ],
-    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.OFF_POINTER, MODES.REG) ],
+    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.OFF_POINTER, MODES.REG), (MODES.REL_POINTER, MODES.REG) ],
     INSTRUCTIONS.MOV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM), (MODES.REG, MODES.RELATIVE) ],
     INSTRUCTIONS.PUSH: [ (MODES.REG, ), (MODES.IMM, ) ],
     INSTRUCTIONS.POP:  [ (MODES.REG, ) ],
@@ -111,10 +113,12 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.DEC:  [ (MODES.REG, ) ],
     INSTRUCTIONS.LSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.RSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.ASR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.AND:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.OR:   [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
     INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.XCHG: [ (MODES.REG, MODES.REG) ],
     INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
@@ -190,6 +194,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # reg: ssss=src reg  dddd=dest ptr reg
     (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.REG)):    (1,    0,    None),
     (INSTRUCTIONS.PUT, (MODES.OFF_POINTER, MODES.REG)):    (1,    0,    0   ),
+    # rel_ptr: ssss=src reg  imm=PC-relative offset (dest is [pc+imm])
+    (INSTRUCTIONS.PUT, (MODES.REL_POINTER, MODES.REG)):    (1,    None, 0   ),
 
     # MOV dest, src
     # reg+reg: ssss=src  dddd=dest
@@ -237,6 +243,9 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
     (INSTRUCTIONS.RSH, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.RSH, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
+
+    (INSTRUCTIONS.ASR, (MODES.REG, MODES.REG)):            (1,    0,    None),
+    (INSTRUCTIONS.ASR, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
 
     (INSTRUCTIONS.AND, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.AND, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
@@ -295,6 +304,9 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
     (INSTRUCTIONS.IRET, ()):                               (None, None, None),
     (INSTRUCTIONS.NOP,  ()):                               (None, None, None),
+
+    # XCHG: ssss=op0, dddd=op1
+    (INSTRUCTIONS.XCHG, (MODES.REG, MODES.REG)):           (0,    1,    None),
 }
 
 

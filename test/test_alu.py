@@ -161,3 +161,43 @@ class TestRshCore:
         result = emu._rsh_core(0, 3)
         assert result == 0
         assert emu.flag_get(FLAG_Z)
+
+
+class TestAsrCore:
+
+    def test_shift_positive(self, emu):
+        # 0x0010 >> 2 == 0x0004, sign bit clear → stays positive
+        result = emu._asr_core(0x0010, 2)
+        assert result == 0x0004
+        assert not emu.flag_get(FLAG_Z)
+        assert not emu.flag_get(FLAG_C)
+
+    def test_preserves_sign_bit(self, emu):
+        # 0x8000 (most-negative) >> 1 == 0xC000 (sign extended)
+        result = emu._asr_core(0x8000, 1)
+        assert result == 0xC000
+        assert not emu.flag_get(FLAG_Z)
+
+    def test_carry_last_bit_shifted_out(self, emu):
+        # 0x0003 >> 1: last bit shifted out is bit 0 = 1 → carry
+        result = emu._asr_core(0x0003, 1)
+        assert result == 0x0001
+        assert emu.flag_get(FLAG_C)
+
+    def test_no_carry_when_last_bit_zero(self, emu):
+        # 0x0004 >> 1: last bit shifted out is bit 0 = 0 → no carry
+        result = emu._asr_core(0x0004, 1)
+        assert result == 0x0002
+        assert not emu.flag_get(FLAG_C)
+
+    def test_zero_result(self, emu):
+        result = emu._asr_core(0x0001, 1)
+        assert result == 0
+        assert emu.flag_get(FLAG_Z)
+        assert emu.flag_get(FLAG_C)
+
+    def test_negative_fills_with_ones(self, emu):
+        # 0xFFFF (-1 signed) >> 4 should remain 0xFFFF
+        result = emu._asr_core(0xFFFF, 4)
+        assert result == 0xFFFF
+        assert not emu.flag_get(FLAG_Z)

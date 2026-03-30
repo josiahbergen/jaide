@@ -317,7 +317,7 @@ class Emulator:
         result = mask16(full)
         carry = 1 if full > 0xFFFF else 0
         overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, overflow)
         return result
 
     def _sub_core(self, a: int, b: int, borrow_in: int = 0) -> int:
@@ -325,7 +325,7 @@ class Emulator:
         result = mask16(full)
         carry = 1 if a >= b + borrow_in else 0
         overflow = 1 if (((a ^ b) & 0x80) != 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, overflow)
         return result
 
     def _lsh_core(self, a: int, b: int) -> int:
@@ -344,6 +344,12 @@ class Emulator:
         carry = 1 if a & (1 << (b - 1)) else 0
         overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
         self.set_all_flags(result == 0, carry, result < 0, overflow)
+        return result
+
+    def _asr_core(self, a: int, b: int) -> int:
+        carry = 1 if b > 0 and (a >> (b - 1)) & 1 else 0
+        result = mask16(self._signed16(a) >> b)
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, 0)
         return result
 
     def _push_core(self, value: int) -> None:
@@ -419,6 +425,10 @@ class Emulator:
             # [label + dest_ptr] <- src
             base = mask16(self.pc.value + self._signed16(imm16))
             self.write16(mask16(base + self.reg_get(reg_b)), self.reg_get(reg_a))
+        elif modes == (MODES.REL_POINTER, MODES.REG):
+            # [pc + imm] <- src  (position-independent store to label)
+            addr = mask16(self.pc.value + self._signed16(imm16))
+            self.write16(addr, self.reg_get(reg_a))
         else:
             raise EmulatorException(f"unexpected PUT variant at 0x{self.pc.value:04x}.")
 
@@ -516,6 +526,23 @@ class Emulator:
         self.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
         self.reg_set(reg_b, result)
 
+    def handle_div(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        dest = self.reg_get(reg_b)
+        src  = self.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
+
+        if src == 0:
+            logger.warning(f"division by zero at 0x{self.pc.value:04x}. hardware fault interrupt called.")
+            self.request_interrupt(0)
+            return
+
+        result    = mask16(dest // src)
+        remainder = dest % src
+
+        self.set_all_flags(result == 0, remainder != 0, result & 0x8000 != 0, 0)
+        self.reg_set(reg_b, result)
+
     def handle_inc(self, decoded: tuple[int, ...]) -> None:
         _, reg_a, reg_b, _ = decoded
         # dest is in dddd slot (reg_b)
@@ -544,6 +571,15 @@ class Emulator:
             result = self._rsh_core(self.reg_get(reg_b), self.reg_get(reg_a))
         else:
             result = self._rsh_core(self.reg_get(reg_b), imm16)
+        self.reg_set(reg_b, result)
+
+    def handle_asr(self, decoded: tuple[int, ...]) -> None:
+        opcode, reg_a, reg_b, imm16 = decoded
+        modes = OPCODE_FORMATS[opcode].modes
+        if modes == (MODES.REG, MODES.REG):
+            result = self._asr_core(self.reg_get(reg_b), self.reg_get(reg_a))
+        else:
+            result = self._asr_core(self.reg_get(reg_b), imm16)
         self.reg_set(reg_b, result)
 
     def handle_and(self, decoded: tuple[int, ...]) -> None:
@@ -582,6 +618,13 @@ class Emulator:
             result = self.reg_get(reg_b) ^ imm16
         self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
+
+    def handle_xchg(self, decoded: tuple[int, ...]) -> None:
+        _, reg_a, reg_b, _ = decoded
+        # reg_a = ssss = op0, reg_b = dddd = op1
+        a, b = self.reg_get(reg_a), self.reg_get(reg_b)
+        self.reg_set(reg_a, b)
+        self.reg_set(reg_b, a)
 
     def handle_inb(self, decoded: tuple[int, ...]) -> None:
         opcode, reg_a, reg_b, imm16 = decoded
@@ -700,14 +743,17 @@ class Emulator:
         self.handlers[INSTRUCTIONS.SBC]  = self.handle_sbc
         self.handlers[INSTRUCTIONS.MUL]  = self.handle_mul
         self.handlers[INSTRUCTIONS.MOD]  = self.handle_mod
+        self.handlers[INSTRUCTIONS.DIV]  = self.handle_div
         self.handlers[INSTRUCTIONS.INC]  = self.handle_inc
         self.handlers[INSTRUCTIONS.DEC]  = self.handle_dec
         self.handlers[INSTRUCTIONS.LSH]  = self.handle_lsh
         self.handlers[INSTRUCTIONS.RSH]  = self.handle_rsh
+        self.handlers[INSTRUCTIONS.ASR]  = self.handle_asr
         self.handlers[INSTRUCTIONS.AND]  = self.handle_and
         self.handlers[INSTRUCTIONS.OR]   = self.handle_or
         self.handlers[INSTRUCTIONS.NOT]  = self.handle_not
         self.handlers[INSTRUCTIONS.XOR]  = self.handle_xor
+        self.handlers[INSTRUCTIONS.XCHG] = self.handle_xchg
         self.handlers[INSTRUCTIONS.INB]  = self.handle_inb
         self.handlers[INSTRUCTIONS.OUTB] = self.handle_outb
         self.handlers[INSTRUCTIONS.CMP]  = self.handle_cmp
