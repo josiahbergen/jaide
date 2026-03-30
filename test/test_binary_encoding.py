@@ -23,7 +23,7 @@ _REG_NAME = {0: "A", 1: "B"}
 _REG_VAL  = {0: int(REGISTERS.A), 1: int(REGISTERS.B)}
 
 # Immediate value used for IMM-mode operands
-_CANONICAL_IMM = 0x0042
+_CANONICAL_IMM = 0x3A33
 
 # Label placed at the top of every generated source file.
 # Being at the top means: label word-address = 0, instruction word-address = 0.

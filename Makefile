@@ -1,13 +1,12 @@
-.PHONY: test test-mac test-nt
+.PHONY: test test-unix test-nt
 
 
-test-mac:
+test-unix:
 	@clear
 	@echo Running test suite...
-	@uv run -m pytest -v
+	@uv run -m pytest -q
 
 test-nt:
-	@cmd /c cls
 	@echo Running test suite...
 	@uv run -m pytest -q
 
@@ -15,5 +14,5 @@ test-nt:
 ifeq ($(OS),Windows_NT)
 test: test-nt
 else
-test: test-mac
+test: test-unix
 endif

@@ -162,9 +162,9 @@ THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.
 ADDRESSING MODE REFERENCE
 -------------------------------------------------------------------------------------
 
-name               mode           where does the value come from?
-REGISTER           reg            REGISTER CONTENTS
-IMMEDIATE          imm16          CONTENTS OF IMMEDIATE VALUE
-RELATIVE ADDRESS   pc + imm16     RESULT OF PROGRAM COUNTER + IMMEDIATE
-REGISTER INDIRECT  [reg]          IN MEMORY LOCATION CONTAINED IN REGISTER CONTENTS
-BASE + OFFSET      [imm16 + reg]  IN MEMORY LOCATION DEFINED BY IMMEDIATE VALUE + REGISTER CONTENTS
+name               mode           syntax        where does the value come from?
+REGISTER           reg            a             REGISTER CONTENTS
+IMMEDIATE          imm16          0x3A33        CONTENTS OF IMMEDIATE VALUE
+RELATIVE ADDRESS   pc + imm16     label         RESULT OF PROGRAM COUNTER + IMMEDIATE
+REGISTER INDIRECT  [reg]          [a]           IN MEMORY LOCATION CONTAINED IN REGISTER CONTENTS
+BASE + OFFSET      [imm16 + reg]  [label + a]   IN MEMORY LOCATION DEFINED BY IMMEDIATE VALUE + REGISTER CONTENTS

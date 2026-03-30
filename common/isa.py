@@ -2,16 +2,16 @@
 # shared isa definitions for the jaide project.
 # josiah bergen, march 2026
 
-
+from tap import Tap
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-
 class INSTRUCTIONS(IntEnum):
+    """all supported instructions"""
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
-        return count
+        return count # ensure 0-indexing
 
     NOP  = auto()
     HALT = auto()
@@ -26,6 +26,7 @@ class INSTRUCTIONS(IntEnum):
     SBC  = auto()
     MUL  = auto()
     MOD  = auto()
+    DIV  = auto()
     INC  = auto()
     DEC  = auto()
     LSH  = auto()
@@ -57,10 +58,11 @@ class INSTRUCTIONS(IntEnum):
 
 
 class REGISTERS(IntEnum):
+    """all the registers"""
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
-        return count
+        return count # ensure 0-indexing
 
     A  = auto()
     B  = auto()
@@ -77,14 +79,17 @@ class REGISTERS(IntEnum):
 
 
 class MODES(IntEnum):
+    """addressing modes for instructions"""
 
-    NULL         = auto()
-    REG          = auto()  # reg            register value
-    IMM          = auto()  # imm16          immediate value
-    RELATIVE     = auto()  # pc + simm16    relative value (calculated from label)
-    REG_POINTER  = auto()  # [reg]          memory at register
-    OFF_POINTER  = auto()  # [imm16 + reg]  memory at immediate + register
-    REL_POINTER  = auto()  # [pc + simm16]  memory at pc + simm16 (calculated from label)
+                          # syntax       parsed         where does the value come from?
+    REG         = auto()  # a            reg            register value
+    IMM         = auto()  # 0x0000       imm16          immediate value
+    RELATIVE    = auto()  # label        pc + imm16     relative value
+    REG_POINTER = auto()  # [a]          [reg]          memory at register
+    OFF_POINTER = auto()  # [label + a]  [imm16 + reg]  memory at immediate + register
+    REL_POINTER = auto()  # [label]      [pc + imm16]   memory at pc + imm16
+
+    NULL        = auto()  # placeholder, used during parsing
 
 
 INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
@@ -100,6 +105,7 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.SUB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.SBC:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.MUL:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
+    INSTRUCTIONS.DIV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.MOD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.INC:  [ (MODES.REG, ) ],
     INSTRUCTIONS.DEC:  [ (MODES.REG, ) ],
@@ -218,6 +224,9 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.MOD, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.MOD, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
 
+    (INSTRUCTIONS.DIV, (MODES.REG, MODES.REG)):            (1,    0,    None),
+    (INSTRUCTIONS.DIV, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
+
     # ALU unary ops: dddd=dest
     (INSTRUCTIONS.INC, (MODES.REG,)):                      (None, 0,    None),
     (INSTRUCTIONS.DEC, (MODES.REG,)):                      (None, 0,    None),
@@ -321,12 +330,29 @@ def generate_opcode_string(opcode: int) -> str | None:
     return f"{fmt.mnemonic.name} {operand_str}".strip()
 
 
+
+class InstructionArguments(Tap):
+    """argparser for generating spec docs"""
+
+    opcode_map: bool = False
+    full_spec: bool = False
+
 if __name__ == "__main__":
 
-    for mnemonic in INSTRUCTIONS:
-        print(f"{mnemonic.name}:")
-        for (instr, modes), opcode in OPCODE_MAP.items():
-            if instr == mnemonic:
-                print(f"  {opcode:#04x}\t{generate_opcode_string(opcode)}")
-        print()
-    print(f"generated opcode map for {len(OPCODE_MAP)} opcodes.")
+    args = InstructionArguments(underscores_to_dashes=True).parse_args()
+
+    if args.opcode_map:
+
+        for mnemonic in INSTRUCTIONS:
+            print(f"{mnemonic.name}:")
+            for (instr, modes), opcode in OPCODE_MAP.items():
+                if instr == mnemonic:
+                    print(f"  {opcode:#04x}\t{generate_opcode_string(opcode)}")
+            print()
+        print(f"generated opcode map for {len(INSTRUCTIONS)} instructions.")
+
+    elif args.full_spec:
+        print("full spec not yet implemented.")
+
+    else:
+        print("no arguments provided.")
