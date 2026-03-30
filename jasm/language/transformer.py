@@ -55,7 +55,7 @@ class IRTransformer(Transformer):
 
     # instructions
 
-    def instruction(self, mnemonic: MnemonicTerminal, operands: list[Operand]):
+    def instruction(self, mnemonic: MnemonicTerminal, operands: list[Operand] = []):
         return InstructionNode(line(mnemonic), mnemonic.value, operands)
 
     def operand_list(self, *operands: Operand):
