@@ -2,21 +2,21 @@
 # main assembly logic and flow control.
 # josiah bergen, december 2025
 
-from jasm.util.logger import logger
-from jasm.parse import generate_context
-from jasm.macros import expand_macros
-from jasm.labels import resolve_labels
 from jasm.binary import generate_binary
+from jasm.labels import resolve_labels
 from jasm.language.context import AssemblyContext
+from jasm.macros import expand_macros
+from jasm.parse import generate_context
+from jasm.util.logger import logger
 
 
-def assemble(file: str, output: str, linkable: bool):
-    """ Assemble a JASM file and return the binary. """
+def assemble(file: str, output: str, options: dict[str, bool]):
+    """Assemble a JASM file and return the binary."""
 
     logger.info("JASM assembler v0.0.4 (copyright 2026 Josiah Bergen)")
- 
+
     # generate the IR
-    ctx: AssemblyContext = generate_context(file, linkable)
+    ctx: AssemblyContext = generate_context(file, options)
 
     # expand macros
     expand_macros(ctx)
@@ -28,9 +28,10 @@ def assemble(file: str, output: str, linkable: bool):
     binary: bytearray = generate_binary(ctx)
 
     # write binary to output file
-    with open(output, "wb") as f:
-        f.write(binary)
-    logger.info(f"wrote {len(binary)} bytes to {output}.")
+    if options["write"]:
+        f = open(output, "wb")
+        _ = f.write(binary)
+        logger.info(f"wrote {len(binary)} bytes to {output}.")
 
     logger.success("assembly complete! yay!")
     return

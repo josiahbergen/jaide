@@ -2,25 +2,25 @@
 # main entry point for the assembler.
 # josiah bergen, december 2025
 
-import argparse
 import os
-from jasm.util.logger import logger
-from jasm.jasm import assemble
 
-def get_args():
-    """
-    Get and return command line arguments.
-    """
-    arg_parser = argparse.ArgumentParser(description="JASM assembler")
-    arg_parser.add_argument("file", nargs="?", default="", help="the file to assemble")
-    arg_parser.add_argument("-o",  "--output", metavar="file", default="a.bin", help="name of the output file")
-    arg_parser.add_argument("-nw", "--nowarn", action="store_true", help="suppress warnings")
-    arg_parser.add_argument("-nl", "--nolink", action="store_true", help="enable absolute jump capabilities. makes binary unlinkable.")
-    arg_parser.add_argument("-v", metavar="level", default=logger.log_level.INFO, type=int, help="verbosity level (0-3)")
-    return arg_parser.parse_args()
+from tap import Positional, Tap
+
+from jasm.jasm import assemble
+from jasm.util.logger import logger
+
+
+class JasmArgumentParser(Tap):
+    source: Positional[str]  # the file to assemble
+    output: str = "a.bin"  # name of the output file
+    nowarn: bool = False  # suppress warnings
+    nowrite: bool = False  # suppress writing to ouput file
+    nolink: bool = False  # enable low-level capabilities, makes binary unlinkable
+    verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
+
 
 def check_files(file: str, output: str):
-    """ Check if the file is a valid JASM source file. """
+    """Check if the file is a valid JASM source file."""
     scope = "__main__.py:check_files()"
 
     # check if file is provided
@@ -28,7 +28,11 @@ def check_files(file: str, output: str):
         logger.fatal("no source file provided.", scope)
 
     if output and not output.endswith(".bin"):
-        logger.warning(f"output file {output} will not have a valid binary extension. are you sure you want to continue?", scope, choice=True)
+        logger.warning(
+            f"output file {output} will not have a valid binary extension. are you sure you want to continue?",
+            scope,
+            choice=True,
+        )
 
     # create output file if it doesn't exist
     if output and not os.path.exists(output):
@@ -38,27 +42,29 @@ def check_files(file: str, output: str):
         os.makedirs(os.path.dirname(output), exist_ok=True)
         open(output, "w").close()
 
-    return True
 
 def main():
-    """ main entry point for the assembler. """
-    args = get_args()
     scope = "__main__.py:main()"
 
+    args = JasmArgumentParser().parse_args()
+    source = args.source
+    output = args.output
+
     # initialize logger
-    logger.set_level(args.v)
+    logger.set_level(args.verbosity)
     logger.set_warnings(not args.nowarn)
     logger.title("welcome to the jasm assembler!")
     logger.nl()
 
-    file = args.file
-    output = args.output
-    linkable = not args.nolink
+    options: dict[str, bool] = {
+        "linkable": not args.nolink,
+        "write": not args.nowrite,
+    }
 
     try:
-        check_files(file, output)
+        check_files(source, output)
         logger.debug("init: everything looks good. starting assembly...")
-        assemble(file, output, linkable) # the magic!
+        assemble(source, output, options)  # the magic!
 
     except KeyboardInterrupt:
         # give a nice exit message on ^C
@@ -68,6 +74,7 @@ def main():
         logger.kill("keyboard interrupt", scope)
 
     exit(0)
+
 
 if __name__ == "__main__":
     main()

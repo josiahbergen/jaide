@@ -4,6 +4,7 @@
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
   "file_scan_exclusions": [
+    // defaults
     "**/.git",
     "**/.svn",
     "**/.hg",
@@ -14,14 +15,24 @@
     "**/Thumbs.db",
     "**/.classpath",
     "**/.settings",
+
+    // python artifacts and env things
     "**/__pycache__/",
+    "**/.pytest_cache/",
     "**/__init__.py",
-    ".vscode",
     ".python-version",
     "pyproject.toml",
-    "requirements.in",
-    "uv.lock"
+    "uv.lock",
+
+    // custom stuff
+    ".vscode",
+    ".zed",
+    ".gitignore",
+
+    // llm tools
+    "CLAUDE.md",
+    ".claude",
   ],
 
-  "format_on_save": "off"
+  "format_on_save": "on",
 }
