@@ -61,6 +61,9 @@ class PointerOperand(Operand):
     def __str__(self) -> str:
         return f"[{self.register}]"
 
+    def get_value(self) -> int:
+        return self.register
+
 
 class RelativePointerOperand(Operand):
     def __init__(self, line: int, label: IdentifierTerminal):
@@ -80,6 +83,9 @@ class OffsetPointerOperand(Operand):
 
     def __str__(self) -> str:
         return f"[{self.label} + {self.register}]"
+
+    def get_value(self) -> int:
+        return self.register
 
 
 class MacroArgumentOperand(Operand):

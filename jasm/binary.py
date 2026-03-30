@@ -51,10 +51,10 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     reg_b = 0
 
     if fmt.reg_a is not None:
-        reg_a = node.operands[fmt.reg_a].register
+        reg_a = node.operands[fmt.reg_a].get_value()
 
     if fmt.reg_b is not None:
-        reg_b = node.operands[fmt.reg_b].register
+        reg_b = node.operands[fmt.reg_b].get_value()
 
     # Compute immediate value, if this opcode has one.
     immediate_value = None
