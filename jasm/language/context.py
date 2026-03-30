@@ -15,17 +15,15 @@ class AssemblyContext:
         self.labels: dict[str, int] = {}  # labels
         self.macros: dict[str, MacroDefinitionNode] = {}  # macros
         self.origin: int = 0  # starting PC
-        self.linkable: bool = options["linkable"]  # linkable mode
+        self.linkable: bool = options.get("linkable", True)  # linkable mode
+        self.write: bool = options.get("write", True)  # write mode
 
     def add_label(self, label: str, pc: int) -> None:
         scope = "context.py:AssemblyContext.add_label()"
         label = label.lower().strip()
 
         if label in self.labels.keys():
-            logger.fatal(
-                f'label "{label}" defined multiple times! note that labels are case-insensitive.',
-                scope,
-            )
+            logger.fatal(f'label "{label}" defined multiple times! note that labels are case-insensitive.', scope)
 
         logger.debug(f'context: label "{label}" defined at PC {pc}')
         self.labels[label] = pc
@@ -36,9 +34,6 @@ class AssemblyContext:
         name = name.upper().strip()
 
         if name in self.macros.keys():
-            logger.warning(
-                f'macro "{name}" re-defined! note that macro names are case-insensitive.',
-                scope,
-            )
+            logger.warning(f'macro "{name}" re-defined! note that macro names are case-insensitive.', scope)
 
         self.macros[name] = macro

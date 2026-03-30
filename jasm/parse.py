@@ -8,6 +8,7 @@ from lark import Lark
 
 from .language.context import AssemblyContext
 from .language.grammar import GRAMMAR
+from .language.transformer import IRTransformer
 from .language.ir.base import ImportDirectiveNode, IRNode, MacroDefinitionNode
 from .util.logger import logger
 
@@ -59,10 +60,7 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
         with open(file, "r") as f:
             text = f.read()
     except Exception as e:
-        logger.fatal(
-            f"error reading file {file}: {e}. perhaps you have a bad import path?",
-            scope,
-        )
+        logger.fatal(f"error reading file {file}: {e}. perhaps you have a bad import path?", scope)
 
     # parse the text
     try:
@@ -78,17 +76,12 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
     # find all import nodes
     imports = [node for node in ir[file] if isinstance(node, ImportDirectiveNode)]
     if len(imports) > 0:
-        logger.debug(
-            f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}"
-        )
+        logger.debug(f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}")
 
     for import_node in imports:
         if import_node.filename in ir:
             # skip if already parsed
-            logger.warning(
-                f"circular or double import detected: {import_node.filename} already parsed, skipping...",
-                scope,
-            )
+            logger.warning(f"circular or double import detected: {import_node.filename} already parsed, skipping...", scope)
             continue
 
         # recursively parse import files
@@ -96,9 +89,7 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
     return
 
 
-def flatten_imports(
-    context: AssemblyContext, ir: dict[str, list[IRNode]]
-) -> list[IRNode]:
+def flatten_imports(context: AssemblyContext, ir: dict[str, list[IRNode]]) -> list[IRNode]:
     """Flatten the main ir dict into a single list of linear IR nodes."""
 
     logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
@@ -109,12 +100,7 @@ def flatten_imports(
 
 
 def append_ir_nodes(
-    context: AssemblyContext,
-    file: str,
-    ir: dict[str, list[IRNode]],
-    big_list: list[IRNode],
-    added_files: set[str],
-) -> None:
+    context: AssemblyContext, file: str, ir: dict[str, list[IRNode]], big_list: list[IRNode], added_files: set[str]) -> None:
     """Recursive function to flatten imports such that they keep their original order. Also adds macro definitions to the assembly context."""
 
     for node in ir[file]:
@@ -123,16 +109,12 @@ def append_ir_nodes(
                 # skip if already added
                 continue
 
-            logger.debug(
-                f"parse: adding {node.filename} to main list at index {len(big_list)}"
-            )
+            logger.debug(f"parse: adding {node.filename} to main list at index {len(big_list)}")
             added_files.add(node.filename)
             append_ir_nodes(context, node.filename, ir, big_list, added_files)
 
         elif isinstance(node, MacroDefinitionNode):
-            logger.debug(
-                f"parse: adding macro definition {node.name} to assembly context"
-            )
+            logger.debug(f"parse: adding macro definition {node.name} to assembly context")
             context.add_macro(node.name, node)
             # don't need to add macro defs to the ir, they're already saved
 

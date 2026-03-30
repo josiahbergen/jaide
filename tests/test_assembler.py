@@ -14,7 +14,7 @@ def _assemble_to_bytes(source: str) -> bytes:
         bin_path = os.path.join(tmp, "test.bin")
         with open(src_path, "w") as f:
             f.write(source)
-        assemble(src_path, bin_path, linkable=True)
+        assemble(src_path, bin_path)
         with open(bin_path, "rb") as f:
             return f.read()
 

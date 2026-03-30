@@ -28,11 +28,7 @@ def check_files(file: str, output: str):
         logger.fatal("no source file provided.", scope)
 
     if output and not output.endswith(".bin"):
-        logger.warning(
-            f"output file {output} will not have a valid binary extension. are you sure you want to continue?",
-            scope,
-            choice=True,
-        )
+        logger.warning(f"output file {output} will not have a valid binary extension. are you sure you want to continue?", scope, choice=True)
 
     # create output file if it doesn't exist
     if output and not os.path.exists(output):

@@ -10,7 +10,7 @@ from jasm.parse import generate_context
 from jasm.util.logger import logger
 
 
-def assemble(file: str, output: str, options: dict[str, bool]):
+def assemble(file: str, output: str, options: dict[str, bool] = {}):
     """Assemble a JASM file and return the binary."""
 
     logger.info("JASM assembler v0.0.4 (copyright 2026 Josiah Bergen)")
@@ -28,7 +28,7 @@ def assemble(file: str, output: str, options: dict[str, bool]):
     binary: bytearray = generate_binary(ctx)
 
     # write binary to output file
-    if options["write"]:
+    if ctx.write:
         f = open(output, "wb")
         _ = f.write(binary)
         logger.info(f"wrote {len(binary)} bytes to {output}.")

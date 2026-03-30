@@ -31,7 +31,7 @@ def assemble_and_load(emu):
             bin_path = os.path.join(tmp, "test.bin")
             with open(src_path, "w") as f:
                 f.write(source)
-            assemble(src_path, bin_path, linkable=True)
+            assemble(src_path, bin_path)
             emu.load_binary(bin_path)
         return emu
     return _helper

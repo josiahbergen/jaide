@@ -30,9 +30,7 @@ def generate_binary(context: AssemblyContext) -> bytearray:
         else:
             pass  # label, no code to generate
 
-        logger.debug(
-            f"bytes: finished generating {len(binary) - old_len} bytes for {node} on line {node.line} (0x{node.pc:04X})"
-        )
+        logger.debug(f"bytes: finished generating {len(binary) - old_len} bytes for {node} on line {node.line} (0x{node.pc:04X})")
 
     logger.debug(f"binary: generation finished ({len(binary)} bytes)")
 
@@ -40,16 +38,10 @@ def generate_binary(context: AssemblyContext) -> bytearray:
 
 
 def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytearray:
+    scope = "binary.py:encode_instruction()"
 
-    if (
-        not context.linkable
-        and node.mnemonic == INSTRUCTIONS.JMP
-        and node.operands[0].mode == MODES.IMM
-    ):
-        logger.fatal(
-            f"jump to absolute address on line {node.line}. use --bios-mode to enable low-level functionality.",
-            "binary.py:encode_instruction()",
-        )
+    if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
+        logger.fatal(f"jump to absolute address on line {node.line}. use --bios-mode to enable low-level functionality.", scope)
 
     fmt = OPCODE_FORMATS[node.opcode]
 
@@ -69,20 +61,12 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     if fmt.imm is not None:
         immediate_value = compute_immediate(node, node.operands[fmt.imm], context)
 
-    logger.verbose(
-        f"binary: registers: {reg_a << 4 | reg_b:08b} | {reg_a:04b} {reg_b:04b} | {reg_a} {reg_b}"
-    )
-    logger.verbose(
-        f"binary: opcode:    {node.opcode:08b} | 0x{node.opcode:02X}      | {fmt.mnemonic.name}"
-    )
+    logger.verbose(f"binary: registers: {reg_a << 4 | reg_b:08b} | {reg_a:04b} {reg_b:04b} | {reg_a} {reg_b}")
+    logger.verbose(f"binary: opcode:    {node.opcode:08b} | 0x{node.opcode:02X}      | {fmt.mnemonic.name}")
 
     if immediate_value is not None:
-        logger.verbose(
-            f"binary: immediate: {immediate_value & 0xFF:08b} | {(immediate_value >> 8) & 0xFF:08b}  | 0x{immediate_value:04X}"
-        )
-        logger.verbose(
-            f"binary: result:    {reg_a << 4 | reg_b:08b} {node.opcode:08b} {immediate_value & 0xFF:08b} {(immediate_value >> 8) & 0xFF:08b}"
-        )
+        logger.verbose(f"binary: immediate: {immediate_value & 0xFF:08b} | {(immediate_value >> 8) & 0xFF:08b}  | 0x{immediate_value:04X}")
+        logger.verbose(f"binary: result:    {reg_a << 4 | reg_b:08b} {node.opcode:08b} {immediate_value & 0xFF:08b} {(immediate_value >> 8) & 0xFF:08b}")
     else:
         logger.verbose(f"binary: result:    {reg_a << 4 | reg_b:08b} {node.opcode:08b}")
 
@@ -97,9 +81,7 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     return result
 
 
-def compute_immediate(
-    node: InstructionNode, immediate: Operand, ctx: AssemblyContext
-) -> int | None:
+def compute_immediate(node: InstructionNode, immediate: Operand, ctx: AssemblyContext) -> int | None:
     next_pc = node.pc + node.size
 
     if isinstance(immediate, ImmediateOperand):
