@@ -4,12 +4,12 @@
 test-mac:
 	@clear
 	@echo Running test suite...
-	@uv run -m pytest tests/ -q
+	@uv run -m pytest -v
 
 test-nt:
 	@cmd /c cls
 	@echo Running test suite...
-	@uv run -m pytest tests/ -q
+	@uv run -m pytest -q
 
 
 ifeq ($(OS),Windows_NT)

@@ -1,4 +1,4 @@
-# Python-generated files
+# python-generated files
 __pycache__/
 *.py[oc]
 build/
@@ -6,16 +6,17 @@ dist/
 wheels/
 *.egg-info
 .pytest_cache/
-
-# Virtual environments
 .venv
 uv.lock
 
-# Build files
+# build files
 **/bin/
 
-# Other files
-.DS_Store
-
+# local settings and helpers
+.vscode/settings.json
+.vscode/launch.json
 .claude/
 CLAUDE.md
+
+# stupid macos
+.DS_Store
