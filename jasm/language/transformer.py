@@ -3,36 +3,35 @@
 # josiah bergen, march 2026
 
 
-from lark import Transformer, v_args, Token
-
+from lark import Token, Transformer, v_args
 
 from ..util.logger import logger
-
 from .ir.base import (
-    IRNode,
-    Operand,
-    InstructionNode, 
-    LabelNode,
     DataDirectiveNode,
     ImportDirectiveNode,
-    MacroDefinitionNode,
+    InstructionNode,
+    IRNode,
+    LabelNode,
     MacroCallNode,
+    MacroDefinitionNode,
+    Operand,
 )
 from .ir.operands import (
-    LabelOperand,
     ImmediateOperand,
-    RegisterOperand,
-    PointerOperand,
-    OffsetPointerOperand,
-    RelativePointerOperand,
+    LabelOperand,
     MacroArgumentOperand,
+    OffsetPointerOperand,
+    PointerOperand,
+    RegisterOperand,
+    RelativePointerOperand,
 )
 from .ir.terminals import (
-    IdentifierTerminal, 
-    StringTerminal, 
+    IdentifierTerminal,
+    MnemonicTerminal,
     NumberTerminal,
     RegisterTerminal,
-    MnemonicTerminal,
+    StringTerminal,
+    Terminal,
 )
 
 
@@ -49,16 +48,14 @@ def assert_operand_count(operands: tuple[Operand, ...], expected: int, scope: st
 
 @v_args(inline=True)  # arguments are inlined into the function as *args
 class IRTransformer(Transformer):
-
-    
-    def start(self, *statements):
+    def start(self, *statements: tuple[IRNode]):
         # base level node, return the entire transformed tree.
         # we return a list because generate_ir_nodes() must return a list[IRNode].
-        return [s for s in statements if s is not None]
+        return [s for s in statements]
 
     # instructions
 
-    def instruction(self, mnemonic: MnemonicTerminal, operands: list[Operand] = []):
+    def instruction(self, mnemonic: MnemonicTerminal, operands: list[Operand]):
         return InstructionNode(line(mnemonic), mnemonic.value, operands)
 
     def operand_list(self, *operands: Operand):
@@ -66,22 +63,28 @@ class IRTransformer(Transformer):
             return []
         return list[Operand](operands)
 
- 
+    def operand(self, terminal: Terminal) -> Operand:
 
-    def operand(self, terminal: IdentifierTerminal | NumberTerminal | RegisterTerminal):
         # basic terminal operands
-        operand_map = {
-            IdentifierTerminal: LabelOperand,
-            NumberTerminal: ImmediateOperand,
-            RegisterTerminal: RegisterOperand,
-        }
-        return operand_map[type(terminal)](line(terminal), terminal)
+        if isinstance(terminal, NumberTerminal):
+            return ImmediateOperand(line(terminal), terminal)
+        elif isinstance(terminal, RegisterTerminal):
+            return RegisterOperand(line(terminal), terminal)
+        elif isinstance(terminal, IdentifierTerminal):
+            return LabelOperand(line(terminal), terminal)
+
+        logger.fatal(
+            f"transformer: invalid operand type {type(terminal).__name__} on line {line(terminal)}",
+            "transformer.py:operand()",
+        )
 
     def pointer_operand(self, register: RegisterTerminal):
         # "[" REGISTER "]"
         return PointerOperand(line(register), register)
 
-    def offset_operand(self, identifier: IdentifierTerminal, register: RegisterTerminal):
+    def offset_operand(
+        self, identifier: IdentifierTerminal, register: RegisterTerminal
+    ):
         # "[" IDENTIFIER "+" REGISTER "]"
         return OffsetPointerOperand(line(identifier), identifier, register)
 
@@ -93,8 +96,11 @@ class IRTransformer(Transformer):
         # "%" IDENTIFIER
         return MacroArgumentOperand(line(identifier), identifier)
 
-    def expression(self, *operands):
-        logger.fatal("transformer: expressions are not yet implemented.", "transformer.py:expression()")
+    def expression(self, *_operands: Operand):
+        logger.fatal(
+            "transformer: expressions are not yet implemented.",
+            "transformer.py:expression()",
+        )
 
     # directives
 
@@ -114,22 +120,30 @@ class IRTransformer(Transformer):
         for constant in constants:
             if isinstance(constant, NumberTerminal):
                 items.append((DataDirectiveNode.Type.NUMBER, constant.value))
-            else: # StringTerminal
+            else:  # StringTerminal
                 items.append((DataDirectiveNode.Type.STRING, constant.value))
-        
+
         # return parsed information!
         return DataDirectiveNode(line(_data), items)
 
     # macros
 
-    def macro_definition(self, _macro: Token, name: IdentifierTerminal, args: list[str], body: list[IRNode], _end: Token, _macro_end: Token):
+    def macro_definition(
+        self,
+        _macro: Token,
+        name: IdentifierTerminal,
+        args: list[str],
+        body: list[IRNode],
+        _end: Token,
+        _macro_end: Token,
+    ):
         return MacroDefinitionNode(line(name), name.value, args, body)
 
     def macro_definition_args(self, *args: MacroArgumentOperand):
         return [arg.placeholder for arg in args]
 
     def macro_body(self, *body: IRNode):
-        return [node for node in body if node is not None]
+        return [node for node in body]
 
     def macro_call(self, name: IdentifierTerminal, args: list[Operand]):
         return MacroCallNode(line(name), name.value, args)
@@ -146,16 +160,16 @@ class IRTransformer(Transformer):
         return constant
 
     def IDENTIFIER(self, identifier: Token):
-        return IdentifierTerminal(line(identifier), identifier.value)
+        return IdentifierTerminal(line(identifier), identifier)
 
     def STRING(self, string: Token):
-        return StringTerminal(line(string), string.value)
+        return StringTerminal(line(string), string)
 
     def NUMBER(self, number: Token):
-        return NumberTerminal(line(number), number.value)
+        return NumberTerminal(line(number), number)
 
     def REGISTER(self, register: Token):
-        return RegisterTerminal(line(register), register.value)
+        return RegisterTerminal(line(register), register)
 
     # def MACRO(self, keyword: Token):
     #     return KeywordTerminal(line(keyword), keyword.value)
@@ -170,4 +184,4 @@ class IRTransformer(Transformer):
     #     return DirectiveTerminal(line(keyword), keyword.value)
 
     def MNEMONIC(self, mnemonic: Token):
-        return MnemonicTerminal(line(mnemonic), mnemonic.value)
+        return MnemonicTerminal(line(mnemonic), mnemonic)

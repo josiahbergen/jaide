@@ -28,7 +28,7 @@ def assemble(file: str, output: str, options: dict[str, bool]):
     binary: bytearray = generate_binary(ctx)
 
     # write binary to output file
-    if options["write"]:
+    if ctx.write:
         f = open(output, "wb")
         _ = f.write(binary)
         logger.info(f"wrote {len(binary)} bytes to {output}.")

@@ -9,6 +9,7 @@ from lark import Lark
 from .language.context import AssemblyContext
 from .language.grammar import GRAMMAR
 from .language.ir.base import ImportDirectiveNode, IRNode, MacroDefinitionNode
+from .language.transformer import IRTransformer
 from .util.logger import logger
 
 

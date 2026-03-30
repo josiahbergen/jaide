@@ -15,7 +15,10 @@ class AssemblyContext:
         self.labels: dict[str, int] = {}  # labels
         self.macros: dict[str, MacroDefinitionNode] = {}  # macros
         self.origin: int = 0  # starting PC
-        self.linkable: bool = options["linkable"]  # linkable mode
+
+        # options
+        self.linkable: bool = options.get("linkable", True)
+        self.write: bool = options.get("write", True)
 
     def add_label(self, label: str, pc: int) -> None:
         scope = "context.py:AssemblyContext.add_label()"

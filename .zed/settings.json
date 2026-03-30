@@ -21,12 +21,12 @@
     "**/.pytest_cache/",
     "**/__init__.py",
     ".python-version",
-    "pyproject.toml",
+    // "pyproject.toml",
     "uv.lock",
 
     // custom stuff
+    ".venv",
     ".vscode",
-    ".zed",
     ".gitignore",
 
     // llm tools
