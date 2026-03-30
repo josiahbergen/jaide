@@ -3,8 +3,8 @@
 import os
 import tempfile
 
+from common.isa import INSTRUCTIONS, MODES, OPCODE_MAP, REGISTERS
 from jasm.jasm import assemble
-from common.isa import OPCODE_MAP, INSTRUCTIONS, MODES, REGISTERS
 
 
 def _assemble_to_bytes(source: str) -> bytes:
@@ -13,8 +13,8 @@ def _assemble_to_bytes(source: str) -> bytes:
         src_path = os.path.join(tmp, "test.jasm")
         bin_path = os.path.join(tmp, "test.bin")
         with open(src_path, "w") as f:
-            f.write(source)
-        assemble(src_path, bin_path, linkable=True)
+            _ = f.write(source)
+        assemble(src_path, bin_path, {"linkable": True})
         with open(bin_path, "rb") as f:
             return f.read()
 
@@ -24,7 +24,6 @@ def _opcode(instr: INSTRUCTIONS, modes: tuple[MODES, ...]) -> int:
 
 
 class TestNop:
-
     def test_nop_encoding(self):
         data = _assemble_to_bytes("nop")
         opcode = _opcode(INSTRUCTIONS.NOP, ())
@@ -32,7 +31,6 @@ class TestNop:
 
 
 class TestMov:
-
     def test_mov_reg_imm(self):
         data = _assemble_to_bytes("mov A, 0x1234")
         opcode = _opcode(INSTRUCTIONS.MOV, (MODES.REG, MODES.IMM))
@@ -54,7 +52,6 @@ class TestMov:
 
 
 class TestAluEncoding:
-
     def test_add_reg_reg(self):
         data = _assemble_to_bytes("add A, B")
         opcode = _opcode(INSTRUCTIONS.ADD, (MODES.REG, MODES.REG))
@@ -81,7 +78,6 @@ class TestAluEncoding:
 
 
 class TestPushPop:
-
     def test_push_reg(self):
         data = _assemble_to_bytes("push A")
         opcode = _opcode(INSTRUCTIONS.PUSH, (MODES.REG,))
@@ -107,7 +103,6 @@ class TestPushPop:
 
 
 class TestMultiInstruction:
-
     def test_two_instructions_size(self):
         data = _assemble_to_bytes("nop\nnop")
         nop_opcode = _opcode(INSTRUCTIONS.NOP, ())
