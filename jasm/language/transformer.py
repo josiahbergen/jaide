@@ -21,6 +21,7 @@ from .ir.base import (
     AlignDirectiveNode,
     MacroDefinitionNode,
     MacroCallNode,
+    ExpressionNode,
 )
 from .ir.operands import (
     LabelOperand,
@@ -97,7 +98,7 @@ class IRTransformer(Transformer):
         # "%" IDENTIFIER
         return MacroArgumentOperand(line(identifier), identifier)
 
-    def expression(self, *operands):
+    def expression(self, *_operands):
         logger.fatal("transformer: expressions are not yet implemented.", "transformer.py:expression()")
 
     # directives

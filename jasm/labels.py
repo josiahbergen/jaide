@@ -36,11 +36,18 @@ def resolve_labels(context: AssemblyContext) -> None:
         # resolve constants, parser emits them as labels
         if isinstance(node, InstructionNode):
             for i, operand in enumerate(node.operands):
+
+                # resolve constants
                 if isinstance(operand, LabelOperand) and operand.name in context.constants:
-                    
                     logger.debug(f"labels: populating constant operand {operand} -> {context.constants[operand.name]} on line {node.line}")
-                    # swap out the label for a convenient immediate
-                    node.operands[i] = ImmediateOperand(operand.line, NumberTerminal(operand.line, str(context.constants[operand.name])))
+                    number = NumberTerminal(operand.line, str(context.constants[operand.name]))
+                    node.operands[i] = ImmediateOperand(operand.line, number)
+
+                # resolve expressions
+                # if isinstance(operand, ExpressionOperand):
+                #     logger.debug(f"labels: evaluating expression {operand} on line {node.line}")
+                #     number = NumberTerminal(operand.line, str(operand.compute()))
+                #     node.operands[i] = ImmediateOperand(operand.line, number)
 
         # we have all the information to calculate the size now!
         if isinstance(node, AlignDirectiveNode):
