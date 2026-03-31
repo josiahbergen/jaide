@@ -11,6 +11,7 @@ org 0x0000
 define vram_start 0x1000
 
 start:
+    data 0x3A33
     ; booloader entry point. lives at 0x0000.
 
     ; setup our registers
@@ -50,4 +51,4 @@ boot__generic_fault_handler:
     halt
     jmp boot__generic_fault_handler
 
-times 10 255
+align 0x200 ; fill entire booloader region

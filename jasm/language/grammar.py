@@ -12,13 +12,14 @@ GRAMMAR = r"""
                 | label
 
     # Directives 
-    directive: data_directive | import_directive | org_directive | define_directive | times_directive
+    directive: data_directive | import_directive | org_directive | define_directive | times_directive | align_directive
 
     data_directive: DATA constant ("," constant)*
     import_directive: IMPORT STRING
     org_directive: ORG NUMBER
     define_directive: DEFINE IDENTIFIER NUMBER
     times_directive: TIMES NUMBER NUMBER
+    align_directive: ALIGN NUMBER
 
     # Macros 
     # Matches: MACRO name args \n body END MACRO
@@ -89,6 +90,7 @@ GRAMMAR = r"""
     ORG.95: /ORG\b/i
     DEFINE.95: /DEFINE\b/i
     TIMES.95: /TIMES\b/i
+    ALIGN.95: /ALIGN\b/i
 
     # Macro keywords (priority 95 ensures these are matched before IDENTIFIER)
     MACRO.95: /MACRO\b/i

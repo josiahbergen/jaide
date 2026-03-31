@@ -203,6 +203,32 @@ class TimesDirectiveNode(IRNode):
         return self.count * 2  # count * word size
 
 
+class AlignDirectiveNode(IRNode):
+    def __init__(self, line: int, alignment: str):
+        super().__init__(line)
+        self.alignment: int = self.parse_number(alignment)
+        self.size: int | None = None  # we don't know the size at creation
+
+    def __str__(self) -> str:
+        return f"align {self.alignment}"
+    
+    def get_size(self) -> int:
+        # this one is annoying, we need to dynamically calculate the size while doing the label pass.
+        if self.size is None:
+            logger.fatal(f"premature get_size() call on {self.alignment} (line {self.line})", "ir.py:AlignDirectiveNode.get_size()")
+        return self.size
+
+    def encode(self) -> bytearray:
+        if self.size is None:
+            logger.fatal(f"premature get_size() call on {self.alignment} (line {self.line})", "ir.py:AlignDirectiveNode.get_size()")
+
+        bits = bytearray()
+        for _ in range(self.size):
+            bits.append(0)
+        logger.verbose(f"binary: aligning to {self.alignment} words")
+        logger.verbose(f"binary: generated {len(bits)} zeros for {self}")
+        return bits
+
 class MacroDefinitionNode(IRNode):
 
     def __init__(self, line: int, name: str, args: list[str], body: list[IRNode]):

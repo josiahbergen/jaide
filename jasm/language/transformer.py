@@ -18,6 +18,7 @@ from .ir.base import (
     OrgDirectiveNode,
     DefineDirectiveNode,
     TimesDirectiveNode,
+    AlignDirectiveNode,
     MacroDefinitionNode,
     MacroCallNode,
 )
@@ -121,6 +122,10 @@ class IRTransformer(Transformer):
     def times_directive(self, _times: Token, count: NumberTerminal, value: NumberTerminal):
         # "TIMES" NUMBER NUMBER
         return TimesDirectiveNode(line(count), count.value, value.value)
+
+    def align_directive(self, _align: Token, alignment: NumberTerminal):
+        # "ALIGN" NUMBER
+        return AlignDirectiveNode(line(alignment), alignment.value)
 
     def data_directive(self, _data: Token, *constants: NumberTerminal | StringTerminal):
         # we get a bunch of terminals, and gotta convert/annotate them into a list

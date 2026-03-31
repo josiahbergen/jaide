@@ -3,7 +3,7 @@
 # josiah bergen, december 2025
 
 from .language.context import AssemblyContext
-from .language.ir.base import DataDirectiveNode, InstructionNode, Operand, TimesDirectiveNode
+from .language.ir.base import DataDirectiveNode, InstructionNode, Operand, TimesDirectiveNode, AlignDirectiveNode
 from .language.ir.operands import (
     ImmediateOperand,
     LabelOperand,
@@ -21,10 +21,7 @@ def generate_binary(context: AssemblyContext) -> bytearray:
     for node in context.ir:
         old_len = len(binary)
 
-        if isinstance(node, DataDirectiveNode):
-            binary.extend(node.encode())
-
-        elif isinstance(node, TimesDirectiveNode):
+        if isinstance(node, (DataDirectiveNode, TimesDirectiveNode, AlignDirectiveNode)):
             binary.extend(node.encode())
 
         elif isinstance(node, InstructionNode):

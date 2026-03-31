@@ -40,12 +40,6 @@ The user's three stated priorities: **position-independent code**, **software in
 - New IR node type, encodes to bytearray in `binary.py`
 - **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/binary.py`
 
-### 2.5 -- String escape sequences
-
-- Currently `DataDirectiveNode.parse_string` does raw `ord(char)` -- no `\n`, `\0`, `\t`, `\\`
-- Add `unescape()` function processing C-style escapes before character conversion
-- **File**: `jasm/language/ir/base.py`
-
 ### 2.6 -- ALIGN directive
 
 - `ALIGN 16` pads with zeros until PC is aligned to boundary

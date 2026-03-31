@@ -2,7 +2,7 @@
 # label resolution functions.
 # josiah bergen, december 2025
 
-from .language.ir.base import LabelNode, InstructionNode
+from .language.ir.base import AlignDirectiveNode, LabelNode, InstructionNode
 from .language.ir.operands import ImmediateOperand, LabelOperand
 from .language.ir.terminals import NumberTerminal
 from .util.logger import logger
@@ -18,7 +18,7 @@ def resolve_labels(context: AssemblyContext) -> None:
     for node in context.ir:
 
         # we actually set the pc for all nodes, not just labels.
-        # at this point, the only nodes that are left are instructions, data/times directives, and labels.
+        # at this point, the only nodes that are left are instructions, data/times/align directives, and labels.
         node.pc = pc 
 
         if isinstance(node, LabelNode):
@@ -37,10 +37,14 @@ def resolve_labels(context: AssemblyContext) -> None:
         if isinstance(node, InstructionNode):
             for i, operand in enumerate(node.operands):
                 if isinstance(operand, LabelOperand) and operand.name in context.constants:
-                    logger.debug(f"labels: populating constant  operand {operand} -> {context.constants[operand.name]} on line {node.line}")
                     
+                    logger.debug(f"labels: populating constant operand {operand} -> {context.constants[operand.name]} on line {node.line}")
                     # swap out the label for a convenient immediate
                     node.operands[i] = ImmediateOperand(operand.line, NumberTerminal(operand.line, str(context.constants[operand.name])))
+
+        # we have all the information to calculate the size now!
+        if isinstance(node, AlignDirectiveNode):
+            node.size = (node.alignment - (pc % node.alignment)) % node.alignment
 
         size = node.get_size()  # size in words
 
