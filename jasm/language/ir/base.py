@@ -200,7 +200,7 @@ class TimesDirectiveNode(IRNode):
         return bits
 
     def get_size(self) -> int:
-        return self.count * 2  # count * word size
+        return self.count  # size in words
 
 
 class AlignDirectiveNode(IRNode):
@@ -222,12 +222,12 @@ class AlignDirectiveNode(IRNode):
         if self.size is None:
             logger.fatal(f"premature get_size() call on {self.alignment} (line {self.line})", "ir.py:AlignDirectiveNode.get_size()")
 
-        bits = bytearray()
-        for _ in range(self.size):
-            bits.append(0)
-        logger.verbose(f"binary: aligning to {self.alignment} words")
-        logger.verbose(f"binary: generated {len(bits)} zeros for {self}")
-        return bits
+        binary = bytearray()
+        for _ in range(self.size * 2):  # two bytes per word etc etc
+            binary.append(0)
+        logger.verbose(f"binary: generated {len(binary) // 2} words of zeros (aligning to {self.alignment} words)")
+        return binary
+
 
 class MacroDefinitionNode(IRNode):
 

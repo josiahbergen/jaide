@@ -1,18 +1,12 @@
 ; jaide bootloader
 ; josiah bergen, march 2026
 
-; goals:
-; print a welcome message
-; set memory bank and stack pointer registers
-; set up interrupt vector table
-; (future) search for bootable disk, load, and transfer execution
-
 org 0x0000
 define vram_start 0x1000
 
 start:
-    data 0x3A33
     ; booloader entry point. lives at 0x0000.
+    data 0x3A33
 
     ; setup our registers
     mov mb, 0x01 ; set memory bank to vram
@@ -36,7 +30,6 @@ boot__print_loop:
 
 boot__vector_initialization:
 
-    ; set up interrupt vector table
     mov d, 0xffff ; start of ivt
 
     ; fill reserved vectors with NOPs
@@ -45,10 +38,10 @@ boot__vector_initialization:
     ; put [d + 1], absolute [boot__generic_fault_handler] ;
     ; put [d + 2], absolute [boot__generic_fault_handler] ;
 
-    jmp 0x200 ; jump to end of reserved area
+    jmp 0x200 ; jump to end of rom to the loaded kernel in ram
 
 boot__generic_fault_handler:
-    halt
+    halt ; do nothing and sit in our misery
     jmp boot__generic_fault_handler
 
-align 0x200 ; fill entire booloader region
+align 0x200 ; fill entire rom
