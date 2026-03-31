@@ -36,6 +36,7 @@ class INSTRUCTIONS(IntEnum):
     OR   = auto()
     NOT  = auto()
     XOR  = auto()
+    SWP  = auto()
     INB  = auto()
     OUTB = auto()
     CMP  = auto()
@@ -56,7 +57,6 @@ class INSTRUCTIONS(IntEnum):
     RET  = auto()
     INT  = auto()
     IRET = auto()
-    XCHG = auto()
 
 
 class REGISTERS(IntEnum):
@@ -118,7 +118,7 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.OR:   [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
     INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.XCHG: [ (MODES.REG, MODES.REG) ],
+    INSTRUCTIONS.SWP: [ (MODES.REG, MODES.REG) ],
     INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
@@ -305,8 +305,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.IRET, ()):                               (None, None, None),
     (INSTRUCTIONS.NOP,  ()):                               (None, None, None),
 
-    # XCHG: ssss=op0, dddd=op1
-    (INSTRUCTIONS.XCHG, (MODES.REG, MODES.REG)):           (0,    1,    None),
+    # SWP: ssss=op0, dddd=op1
+    (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
 }
 
 

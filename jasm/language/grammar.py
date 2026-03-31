@@ -12,10 +12,13 @@ GRAMMAR = r"""
                 | label
 
     # Directives 
-    directive: data_directive | import_directive
+    directive: data_directive | import_directive | org_directive | define_directive | times_directive
 
     data_directive: DATA constant ("," constant)*
     import_directive: IMPORT STRING
+    org_directive: ORG NUMBER
+    define_directive: DEFINE IDENTIFIER NUMBER
+    times_directive: TIMES NUMBER NUMBER
 
     # Macros 
     # Matches: MACRO name args \n body END MACRO
@@ -78,12 +81,15 @@ GRAMMAR = r"""
 
     # Mnemonics
     # Priority 100 ensures these are matched before generic IDENTIFIERs
-    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|MUL|MOD|DIV|INC|DEC|LSH|RSH|ASR|AND|OR|NOT|XOR|XCHG|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|JA|JAE|JB|JBE|JG|JGE|JL|JLE|CALL|RET|INT|IRET|HALT|NOP)\b/i
+    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|MUL|MOD|DIV|INC|DEC|LSH|RSH|ASR|AND|OR|NOT|XOR|SWP|INB|OUTB|CMP|JMP|JZ|JNZ|JC|JNC|JA|JAE|JB|JBE|JG|JGE|JL|JLE|CALL|RET|INT|IRET|HALT|NOP)\b/i
 
     # Directives (priority 95 ensures these are matched before IDENTIFIER)
     DATA.95: /DATA\b/i
     IMPORT.95: /IMPORT\b/i
-    
+    ORG.95: /ORG\b/i
+    DEFINE.95: /DEFINE\b/i
+    TIMES.95: /TIMES\b/i
+
     # Macro keywords (priority 95 ensures these are matched before IDENTIFIER)
     MACRO.95: /MACRO\b/i
     END.95: /END\b/i

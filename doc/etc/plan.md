@@ -6,44 +6,6 @@ Jaide is a 16-bit custom computing architecture with a working emulator, assembl
 
 The user's three stated priorities: **position-independent code**, **software interrupts / syscalls**, and **proper device interfaces** (disk, GPU, keyboard, timer).
 
----
-
-## Phase 1: ISA Completions
-
-**Goal**: Fill the instruction set gaps that would block OS-level code.
-
-Each item touches `common/isa.py` (add to INSTRUCTIONS enum, INSTRUCTION_MODES,\_FORMAT_DATA), `jaide/emulator.py` (add handler), and `jasm/language/grammar.py` (add mnemonic to regex if needed). Tests for each.
-
-### 1.1 -- Add DIV instruction
-
-- `DIV reg, reg` and `DIV reg, imm16`: unsigned integer division, `dest <- dest / src`
-- Sets Z (result zero), C (remainder nonzero), N, O flags
-- Division by zero fires interrupt vector 0 (same as MOD fix in 0.4)
-- Pattern follows MUL/MOD exactly
-
-### 1.2 -- Add ASR (Arithmetic Shift Right)
-
-- `ASR reg, reg` and `ASR reg, imm16`: right shift preserving sign bit
-- Essential for signed arithmetic (signed division by powers of 2)
-- Handler: sign-extend to Python int, shift, mask back to 16-bit
-- Carry = last bit shifted out. Zero flag. No overflow.
-
-### 1.3 -- Add PUT with REL_POINTER mode
-
-- `PUT [label], reg` -- store to a PC-relative address
-- **This is the single most important change for position-independent code.** GET already has `[pc + simm]` but PUT doesn't, meaning PIC code cannot write to global/static data without a multi-instruction address-load workaround.
-- Add `(MODES.REL_POINTER, MODES.REG)` to `INSTRUCTION_MODES[PUT]`
-- Add format entry: `(1, None, 0)` -- src register in ssss, immediate is PC-relative offset
-- Add handler branch in `handle_put`
-
-### 1.4 -- Add XCHG (Exchange Registers) [optional, low priority]
-
-- `XCHG reg, reg`: swap two registers atomically
-- Saves 3 instructions (push/mov/pop pattern) during context switches
-- Not strictly required; defer if timeline is tight
-
----
-
 ## Phase 2: Assembler Modernization
 
 **Goal**: Make the assembler capable of producing the code an OS developer needs.

@@ -285,17 +285,17 @@ class TestPutRelPointer:
         assert emu.reg["B"].value == 0x00FF
 
 
-class TestXchg:
+class TestSwp:
 
-    def test_xchg_swaps_registers(self, assemble_and_load):
-        emu = assemble_and_load("mov A, 0x1111\nmov B, 0x2222\nxchg A, B")
+    def test_swp_swaps_registers(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x1111\nmov B, 0x2222\nswp A, B")
         for _ in range(3):
             emu.step()
         assert emu.reg["A"].value == 0x2222
         assert emu.reg["B"].value == 0x1111
 
-    def test_xchg_same_register(self, assemble_and_load):
-        emu = assemble_and_load("mov A, 0x00FF\nxchg A, A")
+    def test_swp_same_register(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x00FF\nswp A, A")
         emu.step()
         emu.step()
         assert emu.reg["A"].value == 0x00FF

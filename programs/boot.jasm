@@ -1,0 +1,53 @@
+; jaide bootloader
+; josiah bergen, march 2026
+
+; goals:
+; print a welcome message
+; set memory bank and stack pointer registers
+; set up interrupt vector table
+; (future) search for bootable disk, load, and transfer execution
+
+org 0x0000
+define vram_start 0x1000
+
+start:
+    ; booloader entry point. lives at 0x0000.
+
+    ; setup our registers
+    mov mb, 0x01 ; set memory bank to vram
+    mov sp, 0xfeff ; set the stack pointer to the proper location
+
+    mov b, boot__s_message ; address of string
+    mov x, vram_start ; start of vram
+    jmp boot__print_loop
+
+boot__s_message:
+    data "starting...", 0
+    
+boot__print_loop:
+    get a, [b] ; get next character
+    cmp a, 0
+    jz boot__vector_initialization ; we done, onto the next step
+    put [x], a ; put the character to vram
+    inc x ; increment pointers
+    inc b
+    jmp boot__print_loop
+
+boot__vector_initialization:
+
+    ; set up interrupt vector table
+    mov d, 0xffff ; start of ivt
+
+    ; fill reserved vectors with NOPs
+    ; TODO: absolute keyword
+    ; put [d],     absolute [boot__generic_fault_handler] ;
+    ; put [d + 1], absolute [boot__generic_fault_handler] ;
+    ; put [d + 2], absolute [boot__generic_fault_handler] ;
+
+    jmp 0x200 ; jump to end of reserved area
+
+boot__generic_fault_handler:
+    halt
+    jmp boot__generic_fault_handler
+
+times 10 255

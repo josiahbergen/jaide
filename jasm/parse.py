@@ -9,7 +9,7 @@ from lark import Lark
 from .language.context import AssemblyContext
 from .language.grammar import GRAMMAR
 from .language.transformer import IRTransformer
-from .language.ir.base import ImportDirectiveNode, IRNode, MacroDefinitionNode
+from .language.ir.base import ImportDirectiveNode, IRNode, MacroDefinitionNode, DefineDirectiveNode, OrgDirectiveNode
 from .util.logger import logger
 
 
@@ -17,19 +17,32 @@ def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:
     """Generate the context from the source file."""
 
     # dictionary of lists of IR nodes, one for each file that is parsed
-    context = AssemblyContext(file, options)
     ir: dict[str, list[IRNode]] = {}
 
     # recursive function to parse all files
     parse_file(file, ir)
 
-    # flatten the IR and return
-    context.ir = flatten_imports(context, ir)
+    logger.debug(f"parse: transformer finished!")
+    logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
+
+    first_file = list[str](ir.keys())[0] # root file, so the recursive parsing mimics the original file order
+    context: AssemblyContext = AssemblyContext(first_file)
+
+    # recursively generate context from all parsed files
+    update_context_from_file(context, ir, first_file)
+
     logger.debug(f"parse: done! generated {len(context.ir)} nodes.")
 
     logger.verbose("parse: all nodes:")
     for node in context.ir:
         logger.verbose(f"parse: {str(node)}")
+
+    logger.debug(f"context: added {len(context.constants)} constant{'' if len(context.constants) == 1 else 's'}.")
+    logger.debug(f"context: added {len(context.macros)} macro definition{'' if len(context.macros) == 1 else 's'}.")
+    logger.debug(f"context: used data from {len(context.files)} file{'' if len(context.files) == 1 else 's'}.")
+    logger.debug(f"context: origin: {context.origin if context.origin != -1 else 'not set'}")
+    logger.debug(f"context: linkable: {context.linkable}")
+    logger.debug(f"context: write: {context.write}")
 
     return context
 
@@ -89,35 +102,34 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
     return
 
 
-def flatten_imports(context: AssemblyContext, ir: dict[str, list[IRNode]]) -> list[IRNode]:
-    """Flatten the main ir dict into a single list of linear IR nodes."""
-
-    logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
-    big_list = []
-    added_files: set[str] = set[str]()
-    append_ir_nodes(context, list[str](ir.keys())[0], ir, big_list, added_files)
-    return big_list
-
-
-def append_ir_nodes(
-    context: AssemblyContext, file: str, ir: dict[str, list[IRNode]], big_list: list[IRNode], added_files: set[str]) -> None:
-    """Recursive function to flatten imports such that they keep their original order. Also adds macro definitions to the assembly context."""
+def update_context_from_file(context: AssemblyContext, ir: dict[str, list[IRNode]], file: str) -> None:
+    """Recursive function to flatten imports such that they keep their original order. Also adds any directives to the assembly context."""
 
     for node in ir[file]:
         if isinstance(node, ImportDirectiveNode):
-            if node.filename in added_files:
+            if node.filename in context.files:
                 # skip if already added
                 continue
 
-            logger.debug(f"parse: adding {node.filename} to main list at index {len(big_list)}")
-            added_files.add(node.filename)
-            append_ir_nodes(context, node.filename, ir, big_list, added_files)
+            logger.debug(f"parse: adding {node.filename} to main list at index {len(context.ir)}")
+            context.files.add(node.filename)
+
+            # found import, recursively update the context
+            update_context_from_file(context, ir, node.filename)
 
         elif isinstance(node, MacroDefinitionNode):
             logger.debug(f"parse: adding macro definition {node.name} to assembly context")
             context.add_macro(node.name, node)
-            # don't need to add macro defs to the ir, they're already saved
+
+        elif isinstance(node, DefineDirectiveNode):
+            logger.debug(f"parse: adding define directive {node.name} to assembly context")
+            context.add_constant(node.name, node.value)
+
+        elif isinstance(node, OrgDirectiveNode):
+            logger.debug(f"parse: adding org directive {node.address} to assembly context")
+            context.set_origin(node.address)
 
         else:
-            big_list.append(node)
+            # not a directive or macro definition, so add to the big list
+            context.ir.append(node)
     return

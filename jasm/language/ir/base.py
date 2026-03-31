@@ -28,6 +28,16 @@ class IRNode:
         scope = "ir.py:IRNode.get_size()"
         logger.fatal(f"get_size() not implemented for {type(self).__name__} on line {self.line}", scope)
 
+
+    def parse_number(self, string: str) -> int:
+        scope = "ir.py:IRNode.parse_number()"
+        value = int(string, 0)
+        if value < -32768 or value > 32767:
+            logger.fatal(f"number {string} ({value}) out of range for a signed 16-bit value (line {self.line})", scope)
+        if value < 0:
+            value = value & 0xFFFF
+        return value
+
 # top-level nodes
 
 class Operand(IRNode):
@@ -77,10 +87,10 @@ class LabelNode(IRNode):
 
     def __init__(self, line: int, name: str):
         super().__init__(line)
-        self.name: str = name
+        self.name: str = name.upper().strip()  # normalize
 
     def __str__(self) -> str:
-        return f"{self.name}:"
+        return f"{self.name.lower()}:"
 
     def get_size(self) -> int:
         return 0
@@ -129,27 +139,13 @@ class DataDirectiveNode(IRNode):
                 bytes.extend(self.parse_string(value))
         return bytes
 
-    def parse_number(self, string: str) -> int:
-        scope = "ir.py:DataDirectiveNode.get_number_value()"
-        value = int(string, 0)
-        
-        if value < -32768 or value > 0xFFFF:
-            logger.fatal(f"number {string} ({value}) out of range for a 16-bit value (line {self.line})", scope)
-        
-        if value < 0:
-            value = value & 0xFFFF
-        
-        logger.verbose(f"parse_bytes: {string} -> {value}")
-        return value
-
-
     def parse_string(self, string: str) -> list[int]:
         bytes: list[int] = [ord(char) for char in string]
         logger.verbose(f"parse_bytes: got bytes of string \"{string}\": {', '.join([str(byte) for byte in bytes])}")
         return bytes
 
     def get_size(self) -> int:
-        logger.verbose(f"data directive: got size {len(self.data)} (raw: {', '.join([str(byte) for byte in self.data])})")
+        logger.verbose(f"data directive: got size {len(self.data)} for {', '.join([f'{d[1]}' for d in self.items])}")
         return len(self.data)
 
     def encode(self) -> bytearray:
@@ -159,6 +155,52 @@ class DataDirectiveNode(IRNode):
             bits.append((word >> 8) & 0xFF)
         logger.verbose(f"get_bytes: {" ".join([f'{byte:04X}' for byte in bits])[:100]}... ({len(bits)} bytes from {', '.join([f'{d[1]}' for d in self.items])})")
         return bits
+
+
+class OrgDirectiveNode(IRNode):
+    def __init__(self, line: int, address: str):
+        super().__init__(line)
+        self.address: int = self.parse_number(address)
+
+    def __str__(self) -> str:
+        return f"org {self.address}"
+
+    def get_size(self) -> int:
+        return 0  # parsed and removed
+
+
+class DefineDirectiveNode(IRNode):
+    def __init__(self, line: int, name: str, value: str):
+        super().__init__(line)
+        self.name: str = name.upper().strip()  # normalize
+        self.value: int = self.parse_number(value)
+
+    def __str__(self) -> str:
+        return f"define {self.name.lower()} {self.value}"
+
+    def get_size(self) -> int:
+        return 0  # parsed and removed
+
+
+class TimesDirectiveNode(IRNode):
+    def __init__(self, line: int, count: str, value: str):
+        super().__init__(line)
+        self.count: int = self.parse_number(count)
+        self.value: int = self.parse_number(value)
+
+    def __str__(self) -> str:
+        return f"times {self.count} {self.value}"
+
+    def encode(self) -> bytearray:
+        bits = bytearray()
+        for _ in range(self.count):
+            bits.append(self.value & 0xFF)
+            bits.append((self.value >> 8) & 0xFF)
+        logger.verbose(f"times directive: got {len(bits)} bytes for {self.count} times of {self.value}")
+        return bits
+
+    def get_size(self) -> int:
+        return self.count * 2  # count * word size
 
 
 class MacroDefinitionNode(IRNode):

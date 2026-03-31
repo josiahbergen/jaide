@@ -8,6 +8,9 @@ from .language.context import AssemblyContext
 
 def expand_macros(context: AssemblyContext) -> None:
     """ Parse and expand macros in the IR. """
+
+    old_len: int = len(context.ir)
+    num_macros: int = 0
     
     i: int = 0
     while i < len(context.ir):
@@ -35,9 +38,11 @@ def expand_macros(context: AssemblyContext) -> None:
 
         logger.verbose(f"macro: expanded macro {node.name} on line {node.line} into {len(expanded)} nodes at index {i}")
         i += len(expanded) - 1 # we removed the original call node, and added the expanded nodes
+        num_macros += 1
 
     
-    logger.debug(f"macro: expanded {len(context.ir)} nodes.")
+    logger.debug(f"macro: generated {len(context.ir) - old_len} nodes from {num_macros} macro calls.")
+    
     for node in context.ir:
         logger.verbose(f"completed expansion: {node}")
 

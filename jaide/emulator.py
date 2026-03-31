@@ -619,7 +619,7 @@ class Emulator:
         self.reg_set(reg_b, result)
         self.flag_set(FLAG_Z, result == 0)
 
-    def handle_xchg(self, decoded: tuple[int, ...]) -> None:
+    def handle_swp(self, decoded: tuple[int, ...]) -> None:
         _, reg_a, reg_b, _ = decoded
         # reg_a = ssss = op0, reg_b = dddd = op1
         a, b = self.reg_get(reg_a), self.reg_get(reg_b)
@@ -753,7 +753,7 @@ class Emulator:
         self.handlers[INSTRUCTIONS.OR]   = self.handle_or
         self.handlers[INSTRUCTIONS.NOT]  = self.handle_not
         self.handlers[INSTRUCTIONS.XOR]  = self.handle_xor
-        self.handlers[INSTRUCTIONS.XCHG] = self.handle_xchg
+        self.handlers[INSTRUCTIONS.SWP]  = self.handle_swp
         self.handlers[INSTRUCTIONS.INB]  = self.handle_inb
         self.handlers[INSTRUCTIONS.OUTB] = self.handle_outb
         self.handlers[INSTRUCTIONS.CMP]  = self.handle_cmp

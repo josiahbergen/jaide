@@ -47,7 +47,7 @@ class ImmediateOperand(Operand):
 class LabelOperand(Operand):
     def __init__(self, line: int, identifier: IdentifierTerminal):
         super().__init__(line, MODES.RELATIVE)
-        self.name: str = identifier.value
+        self.name: str = identifier.value.upper().strip() # normalize
 
     def __str__(self) -> str:
         return f"{self.name}"        
@@ -68,7 +68,7 @@ class PointerOperand(Operand):
 class RelativePointerOperand(Operand):
     def __init__(self, line: int, label: IdentifierTerminal):
         super().__init__(line, MODES.REL_POINTER)
-        self.label: str = label.value
+        self.label: str = label.value.upper().strip() # normalize
 
     def __str__(self) -> str:
         return f"[{self.label}]"
@@ -78,7 +78,7 @@ class OffsetPointerOperand(Operand):
     def __init__(self, line: int, label: IdentifierTerminal, register: RegisterTerminal):
         super().__init__(line, MODES.OFF_POINTER)
         # we add two new values! wow!
-        self.label: str = label.value
+        self.label: str = label.value.upper().strip() # normalize
         self.register: REGISTERS = REGISTERS[register.value]
 
     def __str__(self) -> str:

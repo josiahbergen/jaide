@@ -28,17 +28,17 @@ in the jaide emulator, type help to view a list of commands.
 
 ## reset state
 
-on reset, the content of all\* registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+on reset, the content of all registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
 
 thus, the jaide will simply start execution at `0x0000`
 
-_\*it is recommended that SP be set to 0xFEFF on reset._
+*it is recommended that SP be set to 0xFEFF on reset.*
 
 ## registers
 
 the jaide architecture supports up to 16 registers. all registers contain 16 bits.
 
-_currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
+*currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support.*
 
 ### general purpose registers
 
@@ -46,13 +46,13 @@ _currently, 8 general purpose and 4 special registers are implemented. the four 
 
 ### special registers
 
-`PC` program counter _(read-only)_
+`PC` program counter *(read-only)*
 
 `SP` stack pointer
 
 `MB` memory bank
 
-`F` flags _(zero, carry, negative, overflow, interrupts enabled)_
+`F` flags *(zero, carry, negative, overflow, interrupts enabled)*
 
 the format of the flags register is `C Z N O I - - - - - - - - - - -`.
 
@@ -72,8 +72,7 @@ a single 16-bit instruction word is defined as follows:
 
 `EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset.
 
-
-_\*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
+*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate.*
 
 ### instruction set
 
@@ -83,18 +82,19 @@ see the [instruction set](inst.txt) and for a comprehensive list of instructions
 
 jaide supports up to 128 Kib of memory.
 
-| Range             | Size      | Purpose                        |
-| ----------------- | ----------| ------------------------------ |
-| `0xFF00...0xFFFF` | 512 bytes | interrupt table                |
-| `0xFE00...0xFEFF` | 512 bytes | stack (recommended)\*\*        |
-| `0x4200...0xFDFF` | 94 Kib    | general purpose RAM            |
-| `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked)\* |
-| `0x0000...0x01FF` | 1 KiB     | BIOS ROM                       |
+
+| Range             | Size      | Purpose                      |
+| ----------------- | --------- | ---------------------------- |
+| `0xFF00...0xFFFF` | 512 bytes | interrupt table              |
+| `0xFE00...0xFEFF` | 512 bytes | stack (recommended)          |
+| `0x4200...0xFDFF` | 94 Kib    | general purpose RAM          |
+| `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked) |
+| `0x0000...0x01FF` | 1 KiB     | BIOS ROM                     |
 
 
-_\*\*the stack grows downwards. it is recommended that SP be set to 0xFEFF._
+*the stack grows downwards. it is recommended that SP be set to 0xFEFF.*
 
-_\*this memory can be swapped using the MB register._
+*this memory can be swapped using the MB register.*
 
 ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
 
@@ -119,14 +119,13 @@ jaide supports up to 256 interrupt vectors. these can be triggered programatical
 jaide checks the `IRQ` (interrupt reqest) line at the end of every instruction cycle, before the next fetch. if `IRQ` is high and the interrupt flag is set:
 
 1. jaide sets the `INTA` (interrupt acknowledge) line high, and waits.
-
 2. the external device places a desired 16-bit interrupt vector on the data bus. `IRQ` is cleared to communicate that the the vector is ready.
-
 3. the cpu reads the vector, clears `INTA`, and proceeds with the standard interrupt procedure (see below)
 
 interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define handlers for each of them.
 
 ### vector allocation
+
 
 | vector | type      | description                             |
 | ------ | --------- | --------------------------------------- |
@@ -136,15 +135,17 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 | 3      | reserved  | reserved                                |
 | 4-127  | external  | available for external hardware devices |
 
+
 ### a note on HALT
 
-calling `HALT` puts the cpu in a _non-permanent_, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
+calling `HALT` puts the cpu in a *non-permanent*, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
 
 ### using INT and IRET
 
 when an interrupt `n` is called, jaide saves its state and transfers execution to the word found at the offset `n` into the interrupt table, starting at `0xFFFF` and moving downwards.
 
 more specifically, when `INT` is called:
+
 
 | action                | description                                              |
 | --------------------- | -------------------------------------------------------- |
@@ -155,14 +156,17 @@ more specifically, when `INT` is called:
 | `vector = 0xFFFF - n` | handler address is computed                              |
 | `PC <- MEM16[vector]` | execution jumps to handler                               |
 
+
 nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
 
 normal execution can be restored by calling `IRET`. more specifically, when `IRET` is called:
+
 
 | action         | description                                         |
 | -------------- | --------------------------------------------------- |
 | `F <- [SP++]`  | flags are popped (unmasks interrupts if applicable) |
 | `PC <- [SP++]` | program counter is popped                           |
+
 
 ## ports
 
@@ -176,10 +180,13 @@ port `0xFF` is a special port that can be used to control the physical hardware.
 
 the system interface port supports these commands:
 
+
 | value | command     | emulator behavior          | hardware behavior  |
 | ----- | ----------- | -------------------------- | ------------------ |
 | 0x00  | nop         | do nothing                 | do nothing         |
 | 0x01  | reset       | clear ram/regs, set pc = 0 | pull reset pin low |
 | 0x02  | halt        | set halted = true          | stop the clock     |
 | 0x03  | shutdown    | shut down emulator process | disconnect power   |
-| other | _undefined_ | _undefined_                | _undefined_        |
+| other | *undefined* | *undefined*                | *undefined*        |
+
+
