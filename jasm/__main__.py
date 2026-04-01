@@ -32,7 +32,7 @@ def check_files(file: str, output: str):
 
     # create output file if it doesn't exist
     if output and not os.path.exists(output):
-        logger.info(f"creating output file {output}...")
+        logger.debug(f"creating output file {output}...")
 
         # create directory if it doesn't exist
         os.makedirs(os.path.dirname(output), exist_ok=True)
