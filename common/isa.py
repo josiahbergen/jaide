@@ -380,7 +380,7 @@ def generate_opcode_encoding_string(opcode: int) -> str:
     full_syntax: str = f"{mnemonic} {operand_1_syntax}{', ' if operand_1_syntax and operand_2_syntax else ''}{operand_2_syntax}"
 
     # this is checking "is the source register used?"
-    opcode_binary: str = f"oooooooo"
+    opcode_binary: str = "oooooooo"
     source_reg_binary: str = "ssss" if fmt.src_operand is not None else "----"
     dest_reg_binary: str = "dddd" if fmt.dest_operand is not None else "----"
     immediate_binary: str = "xxxxxxxxxxxxxxxx" if fmt.imm_operand is not None else ""
@@ -405,8 +405,8 @@ if __name__ == "__main__":
 
     if args.full_spec:
         print("JASM SPECIFICATION\nVERSION 0.5\n")
-        print(f"instruction      src    dest      word 1            word 2")
-        print(f"-------------    -----  -----     ----------------- -----------------\n")
+        print("instruction      src    dest      word 1            word 2")
+        print("-------------    -----  -----     ----------------- -----------------\n")
 
 
     for mnemonic in INSTRUCTIONS:

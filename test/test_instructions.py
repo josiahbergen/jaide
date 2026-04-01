@@ -1,6 +1,6 @@
 """Integration tests: assemble snippets, load into emulator, step through, verify state."""
 
-from jaide.constants import FLAG_C, FLAG_Z, FLAG_N, FLAG_O
+from jaide.constants import FLAG_C, FLAG_Z
 
 
 class TestMov:

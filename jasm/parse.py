@@ -22,7 +22,7 @@ def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:
     # recursive function to parse all files
     parse_file(file, ir)
 
-    logger.debug(f"parse: transformer finished!")
+    logger.debug("parse: transformer finished!")
     logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
 
     first_file = list[str](ir.keys())[0] # root file, so the recursive parsing mimics the original file order

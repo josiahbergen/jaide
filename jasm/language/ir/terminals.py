@@ -5,7 +5,6 @@
 
 from .base import IRNode
 
-from ...util.logger import logger
 
 class Terminal(IRNode):
 

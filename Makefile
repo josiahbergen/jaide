@@ -31,7 +31,7 @@ nop:
 run:
 	@test -n "$(LATEST)" || (echo "no binaries found in $(BIN_DIR)." && exit 1)
 	@echo "running $(LATEST)..."
-	@$(JAIDE) $(JAIDEFLAGS) $(LATEST)
+	$(JAIDE) $(LATEST) $(JAIDEFLAGS) 
 
 test:
 	@clear

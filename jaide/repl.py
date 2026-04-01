@@ -13,7 +13,7 @@ from jaide.util.logger import logger
 
 from common.isa import OPCODE_FORMATS
 from jaide.constants import (
-    MNEMONICS, REGISTERS, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
+    REGISTERS, FLAG_C, FLAG_Z, FLAG_N, FLAG_O, FLAG_I,
 )
 
 

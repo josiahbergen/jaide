@@ -293,8 +293,8 @@ class MacroDefinitionNode(IRNode):
         instructions = [element for element in template if isinstance(element, InstructionNode)]
         for instruction in instructions:
             labels_to_change = [op for op in instruction.operands if isinstance(op, LabelOperand) and op.name == old_name]
-            for l in labels_to_change:
-                l.name = new_label
+            for label_to_change in labels_to_change:
+                label_to_change.name = new_label
                 references += 1
 
         logger.verbose(f"macro: mangled label {old_name} and {references} references to {new_label} on line {line_of_call}")

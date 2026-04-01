@@ -3,7 +3,7 @@
 # josiah bergen, january 2026
 
 # ISA definitions are in common/isa.py — import from there, not here.
-from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, InstructionFormat
+from common.isa import OPCODE_FORMATS
 
 MEMORY_SIZE = 0x1FFFF + 1  # 128KiB, word addressable
 BANK_SIZE   = 0x4000       # 32KiB,  word addressable

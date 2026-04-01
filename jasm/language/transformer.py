@@ -21,7 +21,6 @@ from .ir.base import (
     AlignDirectiveNode,
     MacroDefinitionNode,
     MacroCallNode,
-    ExpressionNode,
 )
 from .ir.operands import (
     LabelOperand,
