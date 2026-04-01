@@ -10,7 +10,7 @@ from jasm.jasm import assemble
 @pytest.fixture
 def emu():
     """Fresh Emulator instance, cleaned up after the test."""
-    e = Emulator()
+    e = Emulator(verbosity=-1)
     yield e
     e.__del__()
 

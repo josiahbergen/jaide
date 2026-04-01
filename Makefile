@@ -7,7 +7,7 @@ BIN_DIR    = programs/bin
 # used to run the most recently touched binary
 LATEST = $(shell ls -t $(BIN_DIR)/*.bin 2>/dev/null | head -1)
 
-.PHONY: nop clear clean
+.PHONY: nop clean test
 
 # wildcard target considers the build files temporary,
 # so we need to make sure they're not deleted
@@ -17,19 +17,25 @@ LATEST = $(shell ls -t $(BIN_DIR)/*.bin 2>/dev/null | head -1)
 # target looks like "programs/bin/program.bin"
 # prerequisite looks like "programs/program.jasm"
 $(BIN_DIR)/%.bin: programs/%.jasm
-	@clear
 	@mkdir -p $(BIN_DIR)
 	@$(JASM) $(JASMFLAGS) $< --output $@
-	@$(JAIDE) $(JAIDEFLAGS) $(BIN_DIR)/$<
+
+nop:
+	@echo "please specify a program or target:"
+	@echo "  make <program name>"
+	@echo "  make run"
+	@echo "  make test"
+	@echo "  make clean"
+	@true
 
 run:
 	@test -n "$(LATEST)" || (echo "no binaries found in $(BIN_DIR)." && exit 1)
 	@echo "running $(LATEST)..."
 	@$(JAIDE) $(JAIDEFLAGS) $(LATEST)
 
-nop:
-	@echo "please specify a program (e.g. make graphics)."
-	@true
+test:
+	@clear
+	@uv run -m pytest
 
 clean:
 	@echo "cleaning up..."

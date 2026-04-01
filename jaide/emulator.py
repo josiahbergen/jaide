@@ -24,7 +24,9 @@ def mask16(x: int) -> int: return x & 0xFFFF # mask to 16 bits
 
 class Emulator:
 
-    def __init__(self):
+    def __init__(self, verbosity: int = logger.log_level.INFO):
+
+        logger.set_level(verbosity)
 
         # general purpose registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
@@ -99,7 +101,7 @@ class Emulator:
             return
 
         self.memory[addr:addr+len(binary)] = binary
-        print(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
+        logger.info(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
     
     def read16(self, addr: int) -> int: 
         # fetch a 16-bit little-endian value from memory using word addressing

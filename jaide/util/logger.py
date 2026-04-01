@@ -25,6 +25,8 @@ class Logger:
 
     def set_level(self, level: int):
         self.level = level
+        if level <= self.log_level.ERROR:
+            self.warnings = False
 
     def set_warnings(self, warnings: bool):
         self.warnings = warnings
