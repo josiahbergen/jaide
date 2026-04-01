@@ -146,11 +146,11 @@ class REPL:
             return f"??? (unknown opcode 0x{opcode:02x})"
 
         fmt   = OPCODE_FORMATS[opcode]
-        imm16 = self.emulator.read16(addr + 1) if fmt.imm is not None else 0
+        imm16 = self.emulator.read16(addr + 1) if fmt.imm_operand is not None else 0
 
-        reg_a_str = f" {REGISTERS[reg_a]}" if fmt.reg_a is not None else ''
-        reg_b_str = f" {REGISTERS[reg_b]}" if fmt.reg_b is not None else ''
-        imm16_str = f" {imm16:04X}"        if fmt.imm  is not None else ''
+        reg_a_str = f" {REGISTERS[reg_a]}" if fmt.src_operand is not None else ''
+        reg_b_str = f" {REGISTERS[reg_b]}" if fmt.dest_operand is not None else ''
+        imm16_str = f" {imm16:04X}"        if fmt.imm_operand is not None else ''
         return f"{fmt.mnemonic.name}{reg_a_str}{reg_b_str}{imm16_str}"
 
     def c_load(self, file: str, addr: int):

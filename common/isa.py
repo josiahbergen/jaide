@@ -86,7 +86,7 @@ class MODES(IntEnum):
                           # syntax       parsed         where does the value come from?
     REG         = auto()  # a            reg            register value
     IMM         = auto()  # 0x0000       imm16          immediate value
-    RELATIVE    = auto()  # label        pc + imm16     relative value
+    RELATIVE    = auto()  # label        imm16          immediate value
     REG_POINTER = auto()  # [a]          [reg]          memory at register
     OFF_POINTER = auto()  # [label + a]  [imm16 + reg]  memory at immediate + register
     REL_POINTER = auto()  # [label]      [pc + imm16]   memory at pc + imm16
@@ -97,9 +97,15 @@ class MODES(IntEnum):
 INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
 
     INSTRUCTIONS.HALT: [ () ],
-    INSTRUCTIONS.GET:  [ (MODES.REG, MODES.REG_POINTER), (MODES.REG, MODES.REL_POINTER), (MODES.REG, MODES.OFF_POINTER) ],
-    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.OFF_POINTER, MODES.REG), (MODES.REL_POINTER, MODES.REG) ],
-    INSTRUCTIONS.MOV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM), (MODES.REG, MODES.RELATIVE) ],
+    INSTRUCTIONS.GET:  [ (MODES.REG, MODES.REG_POINTER), ],
+    # PIC: (MODES.REG, MODES.REL_POINTER), (MODES.REG, MODES.OFF_POINTER)
+ 
+    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.REG_POINTER, MODES.IMM)],
+    # PIC: (MODES.OFF_POINTER, MODES.REG), (MODES.REL_POINTER, MODES.REG)
+
+    INSTRUCTIONS.MOV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM)],
+    # PIC: (MODES.REG, MODES.RELATIVE)
+
     INSTRUCTIONS.PUSH: [ (MODES.REG, ), (MODES.IMM, ) ],
     INSTRUCTIONS.POP:  [ (MODES.REG, ) ],
     INSTRUCTIONS.ADD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
@@ -118,11 +124,13 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.OR:   [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
     INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SWP: [ (MODES.REG, MODES.REG) ],
+    INSTRUCTIONS.SWP:  [ (MODES.REG, MODES.REG) ],
     INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.JMP:  [ (MODES.REG, ), (MODES.IMM, ), (MODES.RELATIVE, ), (MODES.OFF_POINTER, ) ],
+    INSTRUCTIONS.JMP:  [ (MODES.REG, ), (MODES.IMM, ) ],
+    # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
+
     INSTRUCTIONS.JZ:   [ (MODES.RELATIVE, ) ],
     INSTRUCTIONS.JNZ:  [ (MODES.RELATIVE, ) ],
     INSTRUCTIONS.JC:   [ (MODES.RELATIVE, ) ],
@@ -135,7 +143,9 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.JGE:  [ (MODES.RELATIVE, ) ],
     INSTRUCTIONS.JL:   [ (MODES.RELATIVE, ) ],
     INSTRUCTIONS.JLE:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.CALL: [ (MODES.REG, ), (MODES.RELATIVE, ), (MODES.OFF_POINTER, )],
+    INSTRUCTIONS.CALL: [ (MODES.REG, ), (MODES.IMM, ) ],
+    # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
+
     INSTRUCTIONS.RET:  [ () ],
     INSTRUCTIONS.INT:  [ (MODES.REG, ), (MODES.IMM, ) ],
     INSTRUCTIONS.IRET: [ () ],
@@ -156,30 +166,16 @@ OPCODE_MAP: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], int] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# InstructionFormat: per-opcode encoding layout.
-#
-# Each unique (mnemonic, modes) pair → one opcode. The format tells both the
-# assembler and emulator how to find each field in the instruction word:
-#
-#   instruction word:  [ ssss | dddd ] [ opcode ]
-#   immediate word:    [ imm_lo ]      [ imm_hi ]   (only if imm is not None)
-#
-#   reg_a  → operand index whose register goes in the ssss nibble (high), or None
-#   reg_b  → operand index whose register goes in the dddd nibble (low),  or None
-#   imm    → operand index that holds the immediate value, or None
-# ---------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class InstructionFormat:
-    mnemonic: INSTRUCTIONS
-    modes:    tuple[MODES, ...]
-    reg_a:    int | None   # operand index → ssss (high nibble)
-    reg_b:    int | None   # operand index → dddd (low nibble)
-    imm:      int | None   # operand index → immediate word
+    mnemonic:     INSTRUCTIONS
+    modes:        tuple[MODES, ...] # modes of the operands that this opcode uses, looks like (MODES.REG, MODES.IMM)
+    src_operand:  int | None        # operand index of ssss
+    dest_operand: int | None        # operand index of dddd
+    imm_operand:  int | None        # operand index of immediate word
 
 
-# (mnemonic, modes) → (reg_a_operand, reg_b_operand, imm_operand)
+# (mnemonic, modes) → (src_operand, dest_operand, imm_operand)
 _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int | None, int | None]] = {
 
     (INSTRUCTIONS.HALT, ()):                                (None, None, None),
@@ -187,22 +183,23 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # GET dest, src
     # reg: ssss=src ptr reg  dddd=dest reg                 src    dest  imm
     (INSTRUCTIONS.GET, (MODES.REG, MODES.REG_POINTER)):    (1,    0,    None),
-    (INSTRUCTIONS.GET, (MODES.REG, MODES.REL_POINTER)):    (None, 0,    1   ),
-    (INSTRUCTIONS.GET, (MODES.REG, MODES.OFF_POINTER)):    (1,    0,    1   ),
+    # (INSTRUCTIONS.GET, (MODES.REG, MODES.REL_POINTER)):  (None, 0,    1   ),
+    # (INSTRUCTIONS.GET, (MODES.REG, MODES.OFF_POINTER)):  (1,    0,    1   ),
 
     # PUT dest, src
     # reg: ssss=src reg  dddd=dest ptr reg
     (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.REG)):    (1,    0,    None),
-    (INSTRUCTIONS.PUT, (MODES.OFF_POINTER, MODES.REG)):    (1,    0,    0   ),
-    # rel_ptr: ssss=src reg  imm=PC-relative offset (dest is [pc+imm])
-    (INSTRUCTIONS.PUT, (MODES.REL_POINTER, MODES.REG)):    (1,    None, 0   ),
+    # imm: dddd=dest ptr reg  imm=value to store
+    (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.IMM)):    (None, 0,    1   ),
+    # (INSTRUCTIONS.PUT, (MODES.OFF_POINTER, MODES.REG)):  (1,    0,    0   ),
+    # (INSTRUCTIONS.PUT, (MODES.REL_POINTER, MODES.REG)):  (1,    None, 0   ),
 
     # MOV dest, src
     # reg+reg: ssss=src  dddd=dest
     # reg+imm: ssss=dest (anomaly: dest register goes in source slot when src is an immediate)
     (INSTRUCTIONS.MOV, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.MOV, (MODES.REG, MODES.IMM)):            (0,    None, 1   ),
-    (INSTRUCTIONS.MOV, (MODES.REG, MODES.RELATIVE)):       (0,    None, 1   ),
+    # (INSTRUCTIONS.MOV, (MODES.REG, MODES.RELATIVE)):     (0,    None, 1   ),
 
     # PUSH src
     (INSTRUCTIONS.PUSH, (MODES.REG,)):                     (0,    None, None),
@@ -274,8 +271,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # JMP
     (INSTRUCTIONS.JMP, (MODES.REG,)):                      (0,    None, None),
     (INSTRUCTIONS.JMP, (MODES.IMM,)):                      (None, None, 0   ),
-    (INSTRUCTIONS.JMP, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JMP, (MODES.OFF_POINTER,)):              (0,    None, 0   ),
+    # (INSTRUCTIONS.JMP, (MODES.RELATIVE,)):               (None, None, 0   ),
+    # (INSTRUCTIONS.JMP, (MODES.OFF_POINTER,)):            (0,    None, 0   ),
 
     # Conditional jumps (all RELATIVE)
     (INSTRUCTIONS.JZ,  (MODES.RELATIVE,)):                 (None, None, 0   ),
@@ -293,8 +290,9 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
     # CALL
     (INSTRUCTIONS.CALL, (MODES.REG,)):                     (0,    None, None),
-    (INSTRUCTIONS.CALL, (MODES.RELATIVE,)):                (None, None, 0   ),
-    (INSTRUCTIONS.CALL, (MODES.OFF_POINTER,)):             (0,    None, 0   ),
+    (INSTRUCTIONS.CALL, (MODES.IMM,)):                     (None, None, 0   ),
+    # (INSTRUCTIONS.CALL, (MODES.RELATIVE,)):              (None, None, 0   ),
+    # (INSTRUCTIONS.CALL, (MODES.OFF_POINTER,)):           (0,    None, 0   ),
 
     (INSTRUCTIONS.RET,  ()):                               (None, None, None),
 
@@ -312,11 +310,11 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
 OPCODE_FORMATS: dict[int, InstructionFormat] = {
     opcode: InstructionFormat(
-        mnemonic = instr,
-        modes    = modes,
-        reg_a    = _FORMAT_DATA[(instr, modes)][0],
-        reg_b    = _FORMAT_DATA[(instr, modes)][1],
-        imm      = _FORMAT_DATA[(instr, modes)][2],
+        mnemonic       = instr,
+        modes          = modes,
+        src_operand    = _FORMAT_DATA[(instr, modes)][0], # will be 0, 1, or None
+        dest_operand   = _FORMAT_DATA[(instr, modes)][1], # will be 0, 1, or None
+        imm_operand    = _FORMAT_DATA[(instr, modes)][2], # will be 0, 1, or None
     )
     for (instr, modes), opcode in OPCODE_MAP.items()
 }
@@ -328,7 +326,7 @@ def generate_opcode_string(opcode: int) -> str | None:
     mode_string: dict[MODES, str] = {
         MODES.REG:         "reg",
         MODES.IMM:         "imm",
-        MODES.RELATIVE:    "pc + simm",
+        MODES.RELATIVE:    "imm",
         MODES.REG_POINTER: "[reg]",
         MODES.OFF_POINTER: "[imm + reg]",
         MODES.REL_POINTER: "[pc + simm]",
@@ -342,6 +340,57 @@ def generate_opcode_string(opcode: int) -> str | None:
     return f"{fmt.mnemonic.name} {operand_str}".strip()
 
 
+def generate_opcode_encoding_string(opcode: int) -> str:
+    """ 
+    Generate a string representation of the instruction encoding for the given opcode.
+
+    String representation format is:
+
+    mnemonic [operand] [operand] oooooooo ssss dddd xxxxxxxx xxxxxxxx 
+    """
+
+    mode_syntax_string_map: dict[MODES, str] = {
+        MODES.REG:         "a",
+        MODES.IMM:         "0xff",
+        MODES.RELATIVE:    "label",
+        MODES.REG_POINTER: "[a]",
+        MODES.OFF_POINTER: "[label + a]",
+        MODES.REL_POINTER: "[label]",
+    }
+
+    mode_name_map: dict[MODES, str] = {
+        MODES.REG:         "reg",
+        MODES.IMM:         "imm",
+        MODES.RELATIVE:    "imm",
+        MODES.REG_POINTER: "[reg]",
+        MODES.OFF_POINTER: "[imm + reg]",
+        MODES.REL_POINTER: "[imm]",
+    }
+
+    fmt = OPCODE_FORMATS.get(opcode)
+    if not fmt:
+        return f"no opcode found for {opcode:#04x}"
+
+    mnemonic: str = fmt.mnemonic.name.lower()
+    operand_1_mode = mode_name_map[fmt.modes[0]] if len(fmt.modes) > 0 else ""
+    operand_2_mode = mode_name_map[fmt.modes[1]] if len(fmt.modes) > 1 else ""
+
+    operand_1_syntax: str = mode_syntax_string_map[fmt.modes[0]] if len(fmt.modes) > 0 else ""
+    operand_2_syntax: str = mode_syntax_string_map[fmt.modes[1]] if len(fmt.modes) > 1 else ""
+    full_syntax: str = f"{mnemonic} {operand_1_syntax}{', ' if operand_1_syntax and operand_2_syntax else ''}{operand_2_syntax}"
+
+    # this is checking "is the source register used?"
+    opcode_binary: str = f"oooooooo"
+    source_reg_binary: str = "ssss" if fmt.src_operand is not None else "----"
+    dest_reg_binary: str = "dddd" if fmt.dest_operand is not None else "----"
+    immediate_binary: str = "xxxxxxxxxxxxxxxx" if fmt.imm_operand is not None else ""
+
+    return (
+        f"{full_syntax:<14}   "
+        + f"{operand_1_mode:<7}{operand_2_mode:<7}   "
+        + f"{opcode_binary} {source_reg_binary} {dest_reg_binary} {immediate_binary}"
+    )
+
 
 class InstructionArguments(Tap):
     """argparser for generating spec docs"""
@@ -349,22 +398,28 @@ class InstructionArguments(Tap):
     opcode_map: bool = False
     full_spec: bool = False
 
+
 if __name__ == "__main__":
 
     args = InstructionArguments(underscores_to_dashes=True).parse_args()
 
-    if args.opcode_map:
+    if args.full_spec:
+        print("JASM SPECIFICATION\nVERSION 0.5\n")
+        print(f"instruction      src    dest      word 1            word 2")
+        print(f"-------------    -----  -----     ----------------- -----------------\n")
 
-        for mnemonic in INSTRUCTIONS:
-            print(f"{mnemonic.name}:")
-            for (instr, modes), opcode in OPCODE_MAP.items():
-                if instr == mnemonic:
-                    print(f"  {opcode:#04x}\t{generate_opcode_string(opcode)}")
-            print()
-        print(f"generated opcode map for {len(INSTRUCTIONS)} instructions.")
 
-    elif args.full_spec:
-        print("full spec not yet implemented.")
+    for mnemonic in INSTRUCTIONS:
+        for (instr, modes), opcode in OPCODE_MAP.items():
 
-    else:
+            if instr == mnemonic and args.opcode_map:
+                print(f"{opcode:#04x}\t{generate_opcode_string(opcode)}")
+
+            if instr == mnemonic and args.full_spec:
+                print(f"{generate_opcode_encoding_string(opcode)}")
+
+        print()
+    print(f"generated data for {len(INSTRUCTIONS)} instructions.")
+
+    if not args.opcode_map and not args.full_spec:
         print("no arguments provided.")

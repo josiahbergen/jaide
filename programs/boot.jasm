@@ -31,16 +31,21 @@ boot__print_loop:
 boot__vector_initialization:
 
     mov d, 0xffff ; start of ivt
-
     ; fill reserved vectors with our fault handlers
 
     ; when this gets assembled with --nolink, 
     ; the labels here will be resolved as absolute addresses,
     ; calculated via the ORG directive at the start of this file.
+
+    ; unhandled fault (div by zero, etc.)
     put [d], boot__generic_fault_handler
+
     dec d
+    ; invalid instruction
     put [d], boot__generic_fault_handler
+    
     dec d
+    ; protection fault (future)
     put [d], boot__generic_fault_handler
 
     jmp 0x200 ; jump to end of rom to the loaded kernel in ram

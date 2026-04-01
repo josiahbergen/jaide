@@ -2,6 +2,8 @@
 JASM SPECIFICATION
 VERSION 0.4
 
+this document may be out-of-date. use common/isa.py to generate up-to-date information about the instruction set.
+
 ------------------------------------------------------------------------------------
 
 NOP                 no operation
@@ -12,17 +14,14 @@ HALT                halt until interrupt
 
 GET dest, src       load word from memory
 reg  [reg]          oooooooo ssss dddd -------- --------  dest <- [src]
-reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
-reg  [imm16 + reg]  oooooooo ssss dddd xxxxxxxx xxxxxxxx  dest <- [src + imm16] 
 
 PUT dest, src       put word into memory
-[reg]          reg  oooooooo ssss dddd -------- --------  [dest]         <- src
-[imm16 + reg]  reg  oooooooo ssss dddd xxxxxxxx xxxxxxxx  [dest + imm16] <- src
+[reg] reg           oooooooo ssss dddd -------- --------  [dest]  <- src
+[reg] imm16         oooooooo ---- dddd xxxxxxxx xxxxxxxx  [dest]  <- imm16
 
 MOV dest, src       move word
 reg  reg            oooooooo ssss dddd -------- --------  dest <- reg
 reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  dest <- imm16
-reg  pc + imm16     oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- [pc + imm16]
 
 PUSH src            push value to stack
 reg                 oooooooo ssss ---- -------- --------  [--sp] <- src
@@ -99,8 +98,6 @@ reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- dest - imm16
 JMP src             unconditional jump
 reg                 oooooooo ssss ---- -------- --------  pc <- src
 imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- imm16
-pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
-[imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  pc <- [imm16 + src]
 
 JZ src              jump if zero
 pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
@@ -141,8 +138,6 @@ pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  pc <- pc + imm16
 CALL src            call a subroutine
 reg                 oooooooo ssss ---- -------- --------  [--sp] <- pc + 1, pc <- src
 imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- imm16
-pc + imm16          oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- pc + imm16
-[imm16 + reg]       oooooooo ssss ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <- [imm16 + src]
 
 RET                 return from a subroutine
                     oooooooo ---- ---- -------- --------  pc <- [++sp]
@@ -162,9 +157,13 @@ THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.
 ADDRESSING MODE REFERENCE
 -------------------------------------------------------------------------------------
 
-name               mode           syntax        where does the value come from?
-REGISTER           reg            a             REGISTER CONTENTS
-IMMEDIATE          imm16          0x3A33        CONTENTS OF IMMEDIATE VALUE
-RELATIVE ADDRESS   pc + imm16     label         RESULT OF PROGRAM COUNTER + IMMEDIATE
-REGISTER INDIRECT  [reg]          [a]           IN MEMORY LOCATION CONTAINED IN REGISTER CONTENTS
-BASE + OFFSET      [imm16 + reg]  [label + a]   IN MEMORY LOCATION DEFINED BY IMMEDIATE VALUE + REGISTER CONTENTS
+name               mode    syntax   where does the value come from?
+REGISTER           reg     a        REGISTER CONTENTS
+IMMEDIATE          imm16   0x3A33   CONTENTS OF IMMEDIATE VALUE
+REGISTER INDIRECT  [reg]   [a]      MEMORY AT ADDRESS IN REGISTER
+
+RELATIVE ADDRESS (conditional branches only)
+pc + imm16         label            RESULT OF PROGRAM COUNTER + IMMEDIATE OFFSET
+
+NOTE: PIC (position-independent code) addressing modes (pc-relative loads, pc-relative
+memory access) are not yet implemented. they are reserved for a future linker design.

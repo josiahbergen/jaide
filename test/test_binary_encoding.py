@@ -61,15 +61,15 @@ def _make_source(fmt: InstructionFormat) -> str:
 
 def _compute_expected(opcode: int, fmt: InstructionFormat) -> bytes:
     """Compute the expected binary bytes by applying the format encoding rules."""
-    reg_a = _REG_VAL[fmt.reg_a] if fmt.reg_a is not None else 0
-    reg_b = _REG_VAL[fmt.reg_b] if fmt.reg_b is not None else 0
+    src_operand = _REG_VAL[fmt.src_operand] if fmt.src_operand is not None else 0
+    dest_operand = _REG_VAL[fmt.dest_operand] if fmt.dest_operand is not None else 0
 
     result = bytearray()
-    result.append((reg_a << 4) | reg_b)  # [ssss | dddd]
+    result.append((src_operand << 4) | dest_operand)  # [ssss | dddd]
     result.append(opcode)
 
-    if fmt.imm is not None:
-        imm_mode = fmt.modes[fmt.imm]
+    if fmt.imm_operand is not None:
+        imm_mode = fmt.modes[fmt.imm_operand]
         if imm_mode == MODES.IMM:
             imm_val = _CANONICAL_IMM
         else:

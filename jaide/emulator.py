@@ -244,7 +244,7 @@ class Emulator:
             return (0, 0, 0, 0)
 
         fmt   = OPCODE_FORMATS[opcode]
-        imm16 = self.fetch() if fmt.imm is not None else 0
+        imm16 = self.fetch() if fmt.imm_operand is not None else 0
 
         return opcode, reg_a, reg_b, imm16
 
@@ -704,11 +704,8 @@ class Emulator:
         self._push_core(self.pc.value)
         if modes == (MODES.REG,):
             self.pc.set(self.reg_get(reg_a))
-        elif modes == (MODES.RELATIVE,):
-            self.pc.set(self._jump_target(imm16))
-        elif modes == (MODES.OFF_POINTER,):
-            base = self._jump_target(imm16)
-            self.pc.set(self.read16(mask16(base + self.reg_get(reg_a))))
+        elif modes == (MODES.IMM,):
+            self.pc.set(imm16)
         else:
             raise EmulatorException(f"unexpected CALL variant at 0x{self.pc.value:04x}.")
 

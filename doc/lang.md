@@ -35,14 +35,18 @@ the jasm assembler supports the following flags:
 
 `python -m jasm source [--output OUTPUT] [--nowarn] [--nowrite] [--nolink] [--verbosity VERBOSITY] [-h]`
 
-| flag      | effect                                   |
-| --------- | ---------------------------------------- |
-| source    | the source file to assemble              |
-| output    | the output file path (defaults to a.bin) |
-| nowarn    | suppress warnings                        |
-| nowrite   | suppress writing to output files         |
-| nolink    | assembles position-**dependent** code    |
-| verbosity | set verbosity (accepts values from 0-3)  |
+| flag      | effect                                                       |
+| --------- | ------------------------------------------------------------ |
+| source    | the source file to assemble                                  |
+| output    | the output file path (defaults to a.bin)                     |
+| nowarn    | suppress warnings                                            |
+| nowrite   | suppress writing to output files                             |
+| nolink    | resolve labels as absolute addresses (makes code unlinkable) |
+| verbosity | set verbosity (accepts values from 0-3)                      |
+
+`--nolink` should be used for any code that will be loaded at a fixed, known address (bootloader, kernel, interrupt handlers). labels resolve to their absolute address as computed from the `org` directive. the assembled binary is only correct when loaded at that address.
+
+_note: linkable (position-independent) code is not yet implemented. `--nolink` is currently the only supported mode._
 
 ## constants
 
@@ -52,16 +56,26 @@ strings (only valid in data directives, see below) must be encased in quotes (`"
 
 ## addressing modes
 
-jasm uses six addressing modes. see the table below:
+jasm uses the following addressing modes:
 
-| mode             | syntax        | where does the value come from?      |
-| ---------------- | ------------- | ------------------------------------ |
-| register         | `a`           | register value                       |
-| immediate        | `0x1000`      | immediate value                      |
-| relative         | `label`       | value of pc + immediate              |
-| register pointer | `[a]`         | memory at value in register          |
-| offset pointer   | `[label + a]` | memory at pc + immediate + register  |
-| relative pointer | `[label]`     | memory at pc + immediate             |
+| mode             | syntax   | where does the value come from?  |
+| ---------------- | -------- | -------------------------------- |
+| register         | `a`      | register value                   |
+| immediate        | `0x1000` | immediate value                  |
+| register pointer | `[a]`    | memory at address in register    |
+
+when used in an instruction operand, a label name resolves to its absolute address (a 16-bit immediate). use `org` to set the base address.
+
+```jasm
+org 0x0000
+mov b, my_label     ; loads the absolute address of my_label into b
+jmp my_label        ; jumps to the absolute address of my_label
+put [d], my_label   ; stores the absolute address of my_label into memory at [d]
+```
+
+conditional branch instructions (`jz`, `jnz`, `jc`, etc.) use a pc-relative offset internally, but you write them the same way — the assembler computes the offset for you.
+
+_note: PIC (position-independent) addressing modes (`[label]`, `[label + reg]`) are reserved for a future linker design and are not currently supported._
 
 ## directives
 

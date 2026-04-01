@@ -3,7 +3,7 @@
 # josiah bergen, december 2025
 
 from jasm.binary import generate_binary
-from jasm.labels import resolve_labels
+from jasm.labels import prepare_instructions
 from jasm.language.context import AssemblyContext
 from jasm.macros import expand_macros
 from jasm.parse import generate_context
@@ -13,16 +13,21 @@ from jasm.util.logger import logger
 def assemble(file: str, output: str, options: dict[str, bool] = {}):
     """Assemble a JASM file and return the binary."""
 
-    logger.info("JASM assembler v0.0.4 (copyright 2026 Josiah Bergen)")
+    logger.info("JASM assembler v0.0.5 (copyright 2026 Josiah Bergen)")
 
-    # generate the IR
+    # generate the IR using a recursive parser + transformer
+    # includes macros, labels, constants, and directives
     ctx: AssemblyContext = generate_context(file, options)
 
-    # expand macros
+    # we get the ir in the form of a big list of nodes.
+    # we need to expand macros into the actual nodes that will be encoded.
+    # this step needs to be done before we can prepare instructions for encoding.
     expand_macros(ctx)
 
-    # resolve labels
-    resolve_labels(ctx)
+    # ir is now as if there were never any macros or imports.
+    # this step gives all nodes a pc value, and converts label operands to absolute immediates.
+    # it also does a few other things that need to be done before we can generate the binary.
+    prepare_instructions(ctx)
 
     # generate binary
     binary: bytearray = generate_binary(ctx)

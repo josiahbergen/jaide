@@ -41,37 +41,37 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     scope = "binary.py:encode_instruction()"
 
     if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
+        # jump to absolute (non-label) address
         logger.fatal(f"jump to absolute address on line {node.line}. use --nolink to enable low-level functionality.", scope)
 
     fmt = OPCODE_FORMATS[node.opcode]
 
-    # Extract register values from the operands identified in the format.
-    # reg_a → ssss (high nibble), reg_b → dddd (low nibble).
-    reg_a = 0
-    reg_b = 0
+    # get register values from the operands identified via the format.
+    src_operand: int = 0
+    dest_operand: int = 0
 
-    if fmt.reg_a is not None:
-        reg_a = node.operands[fmt.reg_a].get_value()
+    if fmt.src_operand is not None:
+        src_operand = node.operands[fmt.src_operand].get_value()
 
-    if fmt.reg_b is not None:
-        reg_b = node.operands[fmt.reg_b].get_value()
+    if fmt.dest_operand is not None:
+        dest_operand = node.operands[fmt.dest_operand].get_value()
 
-    # Compute immediate value, if this opcode has one.
-    immediate_value = None
-    if fmt.imm is not None:
-        immediate_value = compute_immediate(node, node.operands[fmt.imm], context)
+    immediate_value: int | None = None
+    if fmt.imm_operand is not None:
+        # compute immediate value, if this opcode has one.
+        immediate_value = compute_immediate(node, node.operands[fmt.imm_operand], context)
 
-    logger.verbose(f"binary: registers: {reg_a << 4 | reg_b:08b} | {reg_a:04b} {reg_b:04b} | {reg_a} {reg_b}")
+    logger.verbose(f"binary: registers: {src_operand << 4 | dest_operand:08b} | {src_operand:04b} {dest_operand:04b} | {src_operand} {dest_operand}")
     logger.verbose(f"binary: opcode:    {node.opcode:08b} | 0x{node.opcode:02X}      | {fmt.mnemonic.name}")
 
     if immediate_value is not None:
         logger.verbose(f"binary: immediate: {immediate_value & 0xFF:08b} | {(immediate_value >> 8) & 0xFF:08b}  | 0x{immediate_value:04X}")
-        logger.verbose(f"binary: result:    {reg_a << 4 | reg_b:08b} {node.opcode:08b} {immediate_value & 0xFF:08b} {(immediate_value >> 8) & 0xFF:08b}")
+        logger.verbose(f"binary: result:    {src_operand << 4 | dest_operand:08b} {node.opcode:08b} {immediate_value & 0xFF:08b} {(immediate_value >> 8) & 0xFF:08b}")
     else:
-        logger.verbose(f"binary: result:    {reg_a << 4 | reg_b:08b} {node.opcode:08b}")
+        logger.verbose(f"binary: result:    {src_operand << 4 | dest_operand:08b} {node.opcode:08b}")
 
     result = bytearray()
-    result.append((reg_a << 4) | reg_b)  # register byte: [ssss | dddd]
+    result.append((src_operand << 4) | dest_operand)  # register byte: [ssss | dddd]
     result.append(node.opcode)  # opcode byte
 
     if immediate_value is not None:
@@ -82,17 +82,29 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
 
 
 def compute_immediate(node: InstructionNode, immediate: Operand, ctx: AssemblyContext) -> int | None:
+    scope = "binary.py:compute_immediate()"
     next_pc = node.pc + node.size
 
     if isinstance(immediate, ImmediateOperand):
         return immediate.value  # plain constant
 
     if isinstance(immediate, LabelOperand):
-        # relative offset: encoded as (label - next_pc) mod 2^16
+        # only conditional branches reach here. even though we don't have PIC,
+        # these will still work correctly as long as code is loaded at its org address.
+
+        # NOTE: when PIC is added, this path will handle linkable-mode label refs,
+        # emitting a pc-relative offset so the code runs correctly at any load address.
+        if immediate.name not in ctx.labels:
+            logger.fatal(f"undefined label \"{immediate.name}\" on line {node.line}", scope)
         label_address = ctx.labels[immediate.name]
         return (label_address - next_pc) & 0xFFFF
 
+    # NOTE: PIC (not yet implemented).
+    # [label] (REL_POINTER) and [label + reg] (OFF_POINTER) encode pc-relative offsets
+    # for position-independent memory access. disabled until the linker is designed.
     if isinstance(immediate, (RelativePointerOperand, OffsetPointerOperand)):
-        # [label] or [label + reg] — offset relative to next instruction
-        label_address = ctx.labels[immediate.label]
-        return (label_address - next_pc) & 0xFFFF
+        logger.fatal(
+            f"pc-relative pointer operands ([label] / [label + reg]) are not yet supported "
+            f"outside of PIC mode (line {node.line}). use a register pointer instead.",
+            scope
+        )

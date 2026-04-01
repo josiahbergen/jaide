@@ -4,7 +4,7 @@
 
 - load-store, little-endian, interrupt-driven, von-neumann architecture
 - 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
-- 41 distinct instruction mnemonics
+- 44 distinct instruction mnemonics
 - 16-bit word length
 - 12 registers: 8 general-purpose, 4 special, all 16-bit
 
