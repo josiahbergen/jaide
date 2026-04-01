@@ -41,7 +41,7 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
     scope = "binary.py:encode_instruction()"
 
     if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
-        logger.fatal(f"jump to absolute address on line {node.line}. use --bios-mode to enable low-level functionality.", scope)
+        logger.fatal(f"jump to absolute address on line {node.line}. use --nolink to enable low-level functionality.", scope)
 
     fmt = OPCODE_FORMATS[node.opcode]
 

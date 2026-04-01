@@ -1,9 +1,8 @@
-
 # the jasm programming language
 
 okay technically it's an assembly language but who's really asking
 
-to make programming easier, extensions for [vscode](https://github.com/josiahbergen/jasm), [cursor](https://github.com/josiahbergen/jasm), and [zed (outdated, contact me if you need it)](https://github.com/josiahbergen/zed-jasm)  are available.
+to make programming easier, extensions for [vscode](https://github.com/josiahbergen/jasm), [cursor](https://github.com/josiahbergen/jasm), and [zed (outdated, contact me if you need it)](https://github.com/josiahbergen/zed-jasm) are available.
 
 for a list of all instructions, see the [instruction set](lang/inst.txt). you can also view the language [grammar](../jasm/language/grammar.py), if you're into that.
 
@@ -13,12 +12,14 @@ _keep in mind that proficiency in at least one assembly language (x86 perferred!
 
 ```jasm
 start:
+    ; write comments with the ";" charater!
+
     mov a, 0x10 ; move immediate 0x10 into register a
     put a, 0xC000 ; put contents of register a into memory location 0xC000
 
     cmp A, B ; compare registers A and B
     jz equal ; jump if zero (equal)
-    hant ; they were not equal, halt
+    halt ; they were not equal, halt
 
 equal:
     ; they were equal! great!
@@ -26,30 +27,45 @@ equal:
     halt
 ```
 
+## assembly
+
+the jasm assembler supports the following flags:
+
+`python -m jasm source [--output OUTPUT] [--nowarn] [--nowrite] [--nolink] [--verbosity VERBOSITY] [-h]`
+
+| flag      | effect                                   |
+| --------- | ---------------------------------------- |
+| source    | the source file to assemble              |
+| output    | the output file path (defaults to a.bin) |
+| nowarn    | suppress warnings                        |
+| nowrite   | suppress writing to output files         |
+| nolink    | assembles position-**dependent** code    |
+| verbosity | set verbosity (accepts values from 0-3)  |
+
 ## constants
 
 numbers can be expressed in base `2`, `10`, or `16`. standard prefixes are used.
 
-strings (only valid in data direcives, see below) must be encased in quotes (`"`).
+strings (only valid in data directives, see below) must be encased in quotes (`"`).
 
 ## addressing modes
 
 jasm uses six addressing modes. see the table below:
 
-| mode              |  syntax     |  where does the value come from? |
-| ----------------- | ----------- | -------------------------------- |
-| register          | a           |  register value                  |
-| immediate         | 0x1000      |  immediate value                 |
-| relative          | label       |  value of pc + immediate         |
-| register pointer  | [a]         |  memory at value in register     |
-| offset pointer    | [label + a] |  memory at immediate + register  |
-| relative pointer  | [label]     |  memory at pc + immediate        |
+| mode             | syntax      | where does the value come from? |
+| ---------------- | ----------- | ------------------------------- |
+| register         | a           | register value                  |
+| immediate        | 0x1000      | immediate value                 |
+| relative         | label       | value of pc + immediate         |
+| register pointer | [a]         | memory at value in register     |
+| offset pointer   | [label + a] | memory at immediate + register  |
+| relative pointer | [label]     | memory at pc + immediate        |
 
 ## directives
 
 ### data
 
-used to inline binary data into your program. gonna get depricated/replaced with a data segment once I get segmentation working.
+used to inline binary data into your program. gonna get deprecated/replaced with a data segment once I get segmentation working.
 
 ```jasm
 ; use a label to keep track of location
@@ -73,7 +89,7 @@ import "libs/string.jasm"
 define a constant. must be a number.
 
 ```jasm
-define vram_start 0x1000 
+define vram_start 0x1000
 mov x, vram_start ; compiles to 'mov x, 0x1000'
 ```
 
@@ -90,7 +106,7 @@ times 512, 0x0000 ; generates 512 words of zeros
 pads code with zeros until the program counter is aligned to a boundary.
 
 ```jasm
-align 0x200 ; if pc is 0x26, this will generate 472 words of zeros. 
+align 0x200 ; if pc is 0x26, this will generate 472 words of zeros.
 ```
 
 ### org
@@ -104,6 +120,8 @@ org 0x200
 ## macros
 
 jasm supports powerful (using the term powerful very loosely) macros. macro definitions live only in the assembler. they are not emitted as code or data.
+
+macro bodies may only contain instructions, data, and labels. labels are name-mangled per expansion.
 
 ### definition
 
