@@ -49,7 +49,6 @@ def main():
 
     if args.run:
         logger.info("starting execution...")
-        emulator.halted = False # unhalt
         emulator.run() # auto-run
 
     try:

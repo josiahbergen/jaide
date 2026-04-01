@@ -26,7 +26,6 @@ def _jump_target(emu: Emulator, imm16: int) -> int:
 
 def handle_halt(emu, _decoded: tuple[int, ...]) -> None:
     emu.waiting_for_interrupt = True
-    logger.debug("halted, waiting for interrupt...")
 
 
 def handle_get(emu, decoded: tuple[int, ...]) -> None:
@@ -299,7 +298,6 @@ def handle_inb(emu, decoded: tuple[int, ...]) -> None:
 def handle_outb(emu, decoded: tuple[int, ...]) -> None:
     opcode, reg_a, reg_b, imm16 = decoded
     modes = OPCODE_FORMATS[opcode].modes
-    print(f"outb {emu.reg_get(reg_a)} to {emu.reg_get(reg_b)}")
     # src = reg_a (ssss), port = reg_b (dddd) or imm
     if modes == (MODES.REG, MODES.REG):
         emu.port_set(emu.reg_get(reg_b), emu.reg_get(reg_a))

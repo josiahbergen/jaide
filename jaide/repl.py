@@ -154,8 +154,6 @@ class REPL:
         self.emulator.load_binary(file, addr)
 
     def c_run(self):
-        self.emulator.halted = False
-        self.emulator.waiting_for_interrupt = False
         self.emulator.run()
 
     def c_step(self):
@@ -191,7 +189,7 @@ class REPL:
 
     def c_devices(self):
         for device in self.emulator.devices:
-            logger.info(f"{device.__class__.__name__}: {str(device)}")
+            logger.info(f"{str(device)}")
 
     def c_set(self, reg: str, value: int):
         self.emulator.reg_set(REGISTERS.index(reg), value)

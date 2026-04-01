@@ -69,7 +69,7 @@ class PIT(Device):
     def set_flags(self, value: int) -> None:
         self.enabled = (value & 0b00000001) != 0
         self.one_shot = (value & 0b00000010) != 0
-        logger.debug(f"PIT flags set to {self.enabled}, {self.one_shot}")
+        logger.debug(f"pit flags set to enabled={self.enabled}, one-shot={self.one_shot}")
 
     def tick(self) -> None:
         if not self.enabled:
@@ -86,4 +86,4 @@ class PIT(Device):
             self.irq(5) # raise interrupt vector 5
 
     def __str__(self) -> str:
-        return f"PIT: enabled={self.enabled}, one-shot={self.one_shot}, counter={self.counter}, reload={self.reload}"
+        return f"pit: enabled={self.enabled}, one-shot={self.one_shot}, counter={self.counter}, reload={self.reload}"

@@ -50,7 +50,7 @@ boot__vector_initialization:
     ; timer interrupt (5)
     mov d, 0xffff
     sub d, 0x05
-    put [d], boot__generic_irq_handler
+    put [d], kernel__pit_handler
 
     mov mb, 0x00 ; restore default memory bank before entering kernel
     jmp kernel__main ; jump to end of rom to the loaded kernel in ram
@@ -63,10 +63,36 @@ align 0x200 ; fill entire rom
 ; this code now lives at 0x200, which will be the start of the loaded kernel in ram
 kernel__main:
 
-    ; enable timer device
+    ; enable pit
     mov a, 0x01 ; enable bit
     outb 0x11, a ; set flags
+    jmp kernel__wait
+
+kernel__pit_counter:
+    data 0x0000
+
+kernel__pit_handler:
+
+    ; get the current counter value
+    mov b, kernel__pit_counter
+    get a, [b]
+
+    ; increment and store the counter
+    inc a
+    put [b], a
+
+    ; variable delay
+    cmp a, 0x20
+    jnz kernel__pit_handler__end
+
+    mov z, 0x2E ; '.'
+    outb 0x00, z ; print to serial console
+    put [b], 0 ; reset the counter
+
+kernel__pit_handler__end:
+    iret
 
 kernel__wait:
     ; halt ; wait for interrupt, for now
-    jmp kernel__main
+    halt
+    jmp kernel__wait

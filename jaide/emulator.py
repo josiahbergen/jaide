@@ -62,7 +62,7 @@ class Emulator:
 
         # debugger etc.
         self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
-        self.halted: bool = False  # hardware halt (not waiting for interrupt
+        self.halted: bool = False  # hardware halt
         self._halted_step_count: int = 0
 
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
@@ -121,8 +121,8 @@ class Emulator:
             memory = self.memory
 
         if addr * 2 >= len(memory):
-            logger.error(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}). halting.")
-            self.halted = True
+            logger.error(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}). requesting hardware fault interrupt.")
+            self.raise_interrupt(0)
             return
 
         value = mask16(value)
@@ -175,8 +175,10 @@ class Emulator:
         logger.warning(f"no device found on port {port}, return value is undefined behavior.")
         return 0
 
+
     def port_set(self, port: int, value: int) -> None:
         value = mask16(value)
+        
         if port == 0:  # port 0 is special and will print the value to the console
             print(chr(value), end="", flush=True)
 
@@ -194,10 +196,8 @@ class Emulator:
         # TODO: refactor to not be a dumb ahh loop
         for device in self.devices:
             if port in device.read_dispatch:
-                value = device.port_read(port)
+                device.port_write(port, value)
                 break
-
-        self.ports[port] = value
 
 
     # interrupt helpers
@@ -208,7 +208,6 @@ class Emulator:
             raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
 
         self.pending_interrupts.append(vector)
-        logger.debug(f"raising interrupt {vector}, there are now {len(self.pending_interrupts)} pending interrupt(s)")
 
 
     def interrupts_pending(self) -> bool:
@@ -244,7 +243,6 @@ class Emulator:
         if opcode not in OPCODE_FORMATS:
             logger.warning(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. requesting interrupt 1.")
             self.raise_interrupt(1)  # invalid instruction interrupt
-            self.halted = True
             return (0, 0, 0, 0)
 
         fmt = OPCODE_FORMATS[opcode]
@@ -259,7 +257,7 @@ class Emulator:
         # we can restart while waiting for an interrupt
         # so we communicate that, because communication is key
         if self.waiting_for_interrupt:
-            logger.debug("halted, waiting for interrupt...")
+            logger.debug("waiting for interrupt...")
 
         try:
             while True:
@@ -270,13 +268,10 @@ class Emulator:
             # or if the user interrupts the program
             logger.error(f"emulator stopped: {e.message}")
             # breakpoints are a deliberate stop — leave halted clear so step/run can continue
-            if not e.message.startswith("hit breakpoint at"):
-                self.halted = True
         except KeyboardInterrupt:
             # this prevents ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
             print("! execution stopped (user interrupt).")
-            self.halted = True
 
 
     def step(self) -> None:

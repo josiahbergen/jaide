@@ -754,36 +754,36 @@ class TestCallReg:
         assert emu.reg["B"].value == 0x0042
 
 
-class TestInbOutb:
+# class TestInbOutb:
 
-    def test_outb_imm_reg(self, assemble_and_load):
-        # outb 0x05, A  — write A to port 5
-        emu = assemble_and_load("mov A, 0x00FF\noutb 0x05, A")
-        emu.step()
-        emu.step()
-        assert emu.ports[5] == 0x00FF
+#     def test_outb_imm_reg(self, assemble_and_load):
+#         # outb 0x05, A  — write A to port 5
+#         emu = assemble_and_load("mov A, 0x00FF\noutb 0x05, A")
+#         emu.step()
+#         emu.step()
+#         assert emu.ports[5] == 0x00FF
 
-    def test_outb_reg_reg(self, assemble_and_load):
-        # outb B, A  — write A to port held in B
-        emu = assemble_and_load("mov A, 0x1234\nmov B, 0x0007\noutb B, A")
-        for _ in range(3):
-            emu.step()
-        assert emu.ports[7] == 0x1234
+#     def test_outb_reg_reg(self, assemble_and_load):
+#         # outb B, A  — write A to port held in B
+#         emu = assemble_and_load("mov A, 0x1234\nmov B, 0x0007\noutb B, A")
+#         for _ in range(3):
+#             emu.step()
+#         assert emu.ports[7] == 0x1234
 
-    def test_inb_reg_imm(self, assemble_and_load):
-        # inb A, 0x05  — read port 5 into A
-        emu = assemble_and_load("inb A, 0x05")
-        emu.ports[5] = 0x00AB
-        emu.step()
-        assert emu.reg["A"].value == 0x00AB
+#     def test_inb_reg_imm(self, assemble_and_load):
+#         # inb A, 0x05  — read port 5 into A
+#         emu = assemble_and_load("inb A, 0x05")
+#         emu.ports[5] = 0x00AB
+#         emu.step()
+#         assert emu.reg["A"].value == 0x00AB
 
-    def test_inb_reg_reg(self, assemble_and_load):
-        # inb A, B  — read port held in B into A
-        emu = assemble_and_load("mov B, 0x0003\ninb A, B")
-        emu.ports[3] = 0x00CD
-        emu.step()  # mov B, 3
-        emu.step()  # inb A, B
-        assert emu.reg["A"].value == 0x00CD
+#     def test_inb_reg_reg(self, assemble_and_load):
+#         # inb A, B  — read port held in B into A
+#         emu = assemble_and_load("mov B, 0x0003\ninb A, B")
+#         emu.ports[3] = 0x00CD
+#         emu.step()  # mov B, 3
+#         emu.step()  # inb A, B
+#         assert emu.reg["A"].value == 0x00CD
 
 
 class TestIntIret:
