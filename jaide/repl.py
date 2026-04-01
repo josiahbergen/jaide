@@ -155,6 +155,7 @@ class REPL:
 
     def c_run(self):
         self.emulator.halted = False
+        self.emulator.waiting_for_interrupt = False
         self.emulator.run()
 
     def c_step(self):

@@ -93,8 +93,13 @@ class Emulator:
     def read16(self, addr: int) -> int:
         # fetch a 16-bit little-endian value from memory using word addressing
         bank = self.mb.value % 32
-        memory = self.banks[bank - 1] if bank != 0 and 0x0200 <= addr < 0x4200 else self.memory
-        addr = addr - 0x0200 if 0x0200 <= addr < 0x4200 else addr
+        # banked view (MB != 0): RAM window 0x0200–0x41FF maps to the start of banks[MB-1].
+        # flat memory (MB == 0): use absolute word addresses — do not strip 0x0200.
+        if bank != 0 and 0x0200 <= addr < 0x4200:
+            memory = self.banks[bank - 1]
+            addr = addr - 0x0200
+        else:
+            memory = self.memory
 
         lo = memory[addr * 2]
         hi = memory[addr * 2 + 1]
@@ -109,8 +114,11 @@ class Emulator:
             return
 
         bank = self.mb.value % 32
-        memory = self.banks[bank - 1] if bank != 0 and 0x0200 <= addr < 0x4200 else self.memory
-        addr = addr - 0x0200 if 0x0200 <= addr < 0x4200 else addr
+        if bank != 0 and 0x0200 <= addr < 0x4200:
+            memory = self.banks[bank - 1]
+            addr = addr - 0x0200
+        else:
+            memory = self.memory
 
         if addr * 2 >= len(memory):
             logger.error(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}). halting.")
@@ -261,11 +269,13 @@ class Emulator:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
             logger.error(f"emulator stopped: {e.message}")
+            # breakpoints are a deliberate stop — leave halted clear so step/run can continue
+            if not e.message.startswith("hit breakpoint at"):
+                self.halted = True
         except KeyboardInterrupt:
             # this prevents ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
             print("! execution stopped (user interrupt).")
-        finally:
             self.halted = True
 
 
