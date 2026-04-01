@@ -2,6 +2,8 @@
 
 okay technically it's an assembly language but who's really asking
 
+jasm is a custom assembly langauge that, when assembled, allows one to run binaries on the jaide architecture.
+
 to make programming easier, extensions for [vscode](https://github.com/josiahbergen/jasm), [cursor](https://github.com/josiahbergen/jasm), and [zed (outdated, contact me if you need it)](https://github.com/josiahbergen/zed-jasm) are available.
 
 for a list of all instructions, see the [instruction set](lang/inst.txt). you can also view the language [grammar](../jasm/language/grammar.py), if you're into that.
@@ -52,14 +54,14 @@ strings (only valid in data directives, see below) must be encased in quotes (`"
 
 jasm uses six addressing modes. see the table below:
 
-| mode             | syntax      | where does the value come from? |
-| ---------------- | ----------- | ------------------------------- |
-| register         | a           | register value                  |
-| immediate        | 0x1000      | immediate value                 |
-| relative         | label       | value of pc + immediate         |
-| register pointer | [a]         | memory at value in register     |
-| offset pointer   | [label + a] | memory at immediate + register  |
-| relative pointer | [label]     | memory at pc + immediate        |
+| mode             | syntax        | where does the value come from?      |
+| ---------------- | ------------- | ------------------------------------ |
+| register         | `a`           | register value                       |
+| immediate        | `0x1000`      | immediate value                      |
+| relative         | `label`       | value of pc + immediate              |
+| register pointer | `[a]`         | memory at value in register          |
+| offset pointer   | `[label + a]` | memory at pc + immediate + register  |
+| relative pointer | `[label]`     | memory at pc + immediate             |
 
 ## directives
 
