@@ -12,12 +12,20 @@ from .util.logger import logger
 
 
 class EmulatorArgumentParser(Tap):
-    binary: str = ""         # a binary file to load
-    run: bool = False        # run the binary file immediately
+    binary: str = ""   # a binary file to load
+    run: bool = False  # run the binary file immediately
+    verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
+
+    # devices
+    pit: bool = False  
+    rtc: bool = False
+    graphics: bool = False
+    disk: bool = False
 
     def configure(self):
-        self.add_argument("binary", nargs="?", default="")
+        self.add_argument("binary", nargs="?")
         self.add_argument("-r", "--run")
+        self.add_argument("-v", "--verbosity")
 
 def check_files(file: str) -> None:
     scope = "__main__.py:check_files()"
@@ -38,7 +46,14 @@ def main():
     """ main entry point for the emulator. """
     args = EmulatorArgumentParser().parse_args()
 
-    emulator = Emulator(verbosity=logger.log_level.DEBUG)
+    devices: dict[str, bool] = {
+        "pit": args.pit,
+        "rtc": args.rtc,
+        "graphics": args.graphics,
+        "disk": args.disk,
+    }
+
+    emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices)
 
     # load binary file if provided
     if args.binary:

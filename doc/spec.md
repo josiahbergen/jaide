@@ -82,7 +82,6 @@ see the [instruction set](inst.txt) and for a comprehensive list of instructions
 
 jaide supports up to 128 Kib of memory.
 
-
 | Range             | Size      | Purpose                      |
 | ----------------- | --------- | ---------------------------- |
 | `0xFF00...0xFFFF` | 512 bytes | interrupt table              |
@@ -90,7 +89,6 @@ jaide supports up to 128 Kib of memory.
 | `0x4200...0xFDFF` | 94 Kib    | general purpose RAM          |
 | `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked) |
 | `0x0000...0x01FF` | 1 KiB     | BIOS ROM                     |
-
 
 *the stack grows downwards. it is recommended that SP be set to 0xFEFF.*
 
@@ -126,7 +124,6 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 
 ### vector allocation
 
-
 | vector | type      | description                             |
 | ------ | --------- | --------------------------------------- |
 | 0      | exception | unhandled fault                         |
@@ -134,7 +131,6 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 | 2      | exception | protection fault                        |
 | 3      | reserved  | reserved                                |
 | 4-127  | external  | available for external hardware devices |
-
 
 ### a note on HALT
 
@@ -146,7 +142,6 @@ when an interrupt `n` is called, jaide saves its state and transfers execution t
 
 more specifically, when `INT` is called:
 
-
 | action                | description                                              |
 | --------------------- | -------------------------------------------------------- |
 | `NOP if I == 0`       | if interrupts are masked, jaide will `NOP` and continue. |
@@ -156,17 +151,14 @@ more specifically, when `INT` is called:
 | `vector = 0xFFFF - n` | handler address is computed                              |
 | `PC <- MEM16[vector]` | execution jumps to handler                               |
 
-
 nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
 
 normal execution can be restored by calling `IRET`. more specifically, when `IRET` is called:
-
 
 | action         | description                                         |
 | -------------- | --------------------------------------------------- |
 | `F <- [SP++]`  | flags are popped (unmasks interrupts if applicable) |
 | `PC <- [SP++]` | program counter is popped                           |
-
 
 ## ports
 
@@ -180,7 +172,6 @@ port `0xFF` is a special port that can be used to control the physical hardware.
 
 the system interface port supports these commands:
 
-
 | value | command     | emulator behavior          | hardware behavior  |
 | ----- | ----------- | -------------------------- | ------------------ |
 | 0x00  | nop         | do nothing                 | do nothing         |
@@ -188,5 +179,3 @@ the system interface port supports these commands:
 | 0x02  | halt        | set halted = true          | stop the clock     |
 | 0x03  | shutdown    | shut down emulator process | disconnect power   |
 | other | *undefined* | *undefined*                | *undefined*        |
-
-

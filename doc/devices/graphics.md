@@ -1,5 +1,7 @@
 # the jaide graphics controller
 
+**_NOTE: the graphics controller is not implemented at this time._**
+
 the jaide graphics controller is a graphical processing unit for the jaide computing system.
 
 it uses memory bank 1 for vram, and contains 16Kib of font and attribute ROM.

@@ -20,7 +20,9 @@ from .constants import (
     NUM_BANKS,
     REGISTERS,
 )
-from .devices import PIT, Device
+from .devices.device import Device
+from .devices.pit import PIT
+from .devices.rtc import RTC
 from .exceptions import EmulatorException
 from .register import Register
 from .util.logger import logger
@@ -31,7 +33,7 @@ def mask16(x: int) -> int:
 
 
 class Emulator:
-    def __init__(self, verbosity: int = logger.log_level.INFO):
+    def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}):
 
         logger.set_level(verbosity)
 
@@ -51,9 +53,10 @@ class Emulator:
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
 
-        # devices (hard-coded but whatever honestly)
         self.ports: list[int] = [0] * 256
-        self.devices: list[Device] = [PIT(self.raise_interrupt)]
+        self.devices: list[Device] = []
+        if "pit" in enabled_devices: self.devices.append(PIT(self.raise_interrupt))
+        if "rtc" in enabled_devices: self.devices.append(RTC(self.raise_interrupt))
 
         # interrupt handling
         self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled

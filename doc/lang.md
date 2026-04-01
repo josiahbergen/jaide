@@ -77,6 +77,12 @@ conditional branch instructions (`jz`, `jnz`, `jc`, etc.) use a pc-relative offs
 
 _note: PIC (position-independent) addressing modes (`[label]`, `[label + reg]`) are reserved for a future linker design and are not currently supported._
 
+## devices
+
+jaide's emulator comes with a few devices out-of-the-box.
+
+see the device [documentation](devices/) for information on each device!
+
 ## directives
 
 ### data
