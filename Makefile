@@ -1,7 +1,7 @@
 JASM       = uv run -m jasm
 JASMFLAGS  = --nolink
 JAIDE      = uv run -m jaide
-JAIDEFLAGS = -r -g
+JAIDEFLAGS = 
 BIN_DIR    = programs/bin
 
 # used to run the most recently touched binary
@@ -30,8 +30,8 @@ nop:
 
 run:
 	@test -n "$(LATEST)" || (echo "no binaries found in $(BIN_DIR)." && exit 1)
-	@echo "running $(LATEST)..."
-	$(JAIDE) $(LATEST) $(JAIDEFLAGS) 
+	@clear
+	@$(JAIDE) $(LATEST) $(JAIDEFLAGS) 
 
 test:
 	@clear

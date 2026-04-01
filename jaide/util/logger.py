@@ -18,7 +18,7 @@ class Logger:
         ERROR: int = 0
 
 
-    def __init__(self, level: int, warnings: bool = True):
+    def __init__(self, level: int = log_level.DEBUG, warnings: bool = True):
         cl.init()
         self.level: int = level
         self.warnings: bool = warnings
@@ -117,4 +117,4 @@ class Logger:
         if self.level >= self.log_level.DEBUG:
             print("")
 
-logger = Logger(Logger.log_level.INFO, warnings=True)
+logger = Logger()

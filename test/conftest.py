@@ -12,7 +12,6 @@ def emu():
     """Fresh Emulator instance, cleaned up after the test."""
     e = Emulator(verbosity=-1)
     yield e
-    e.__del__()
 
 
 @pytest.fixture

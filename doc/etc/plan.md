@@ -10,21 +10,6 @@ The user's three stated priorities: **position-independent code**, **software in
 
 **Goal**: Make the assembler capable of producing the code an OS developer needs.
 
-### 2.1 -- ORG directive
-
-- `ORG 0x0200` sets the origin/load address for label resolution
-- `AssemblyContext.origin` already exists (defaults to 0) but has no syntax to set it
-- Add grammar rule, IR node (`OrgDirectiveNode`), transformer handler
-- In `labels.py`: when encountered, set `pc` to the specified value
-- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/labels.py`
-
-### 2.2 -- EQU / DEFINE for named constants
-
-- `SCREEN_WIDTH EQU 80` or `DEFINE SCREEN_WIDTH 80`
-- Store in `context.constants` (separate from labels to avoid PC-relative encoding)
-- During label resolution, when a `LabelOperand` name matches a constant, replace with `ImmediateOperand`
-- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/language/context.py`, `jasm/labels.py`
-
 ### 2.3 -- Expression evaluation
 
 - `ExpressionOperand` already parsed by grammar but throws `logger.fatal("not yet implemented")`
@@ -32,20 +17,6 @@ The user's three stated priorities: **position-independent code**, **software in
 - Operates on numeric literals and EQU constants
 - Returns `ImmediateOperand` with computed value
 - **Files**: `jasm/language/transformer.py`, `jasm/language/ir/operands.py`
-
-### 2.4 -- RESW / RESB / TIMES directives
-
-- `RESW 256` -- reserve 256 zero-filled words (for BSS, buffers, IVT init)
-- `TIMES 512, 0xFF` -- fill 512 words with a value
-- New IR node type, encodes to bytearray in `binary.py`
-- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/binary.py`
-
-### 2.6 -- ALIGN directive
-
-- `ALIGN 16` pads with zeros until PC is aligned to boundary
-- In `labels.py`: compute `padding = (alignment - (pc % alignment)) % alignment`, advance PC
-- In `binary.py`: emit zero words for padding
-- **Files**: `jasm/language/grammar.py`, `jasm/language/ir/base.py`, `jasm/language/transformer.py`, `jasm/labels.py`, `jasm/binary.py`
 
 ---
 

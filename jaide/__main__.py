@@ -2,24 +2,22 @@
 # main entry point for the emulator.
 # josiah bergen, january 2026
 
-import argparse
 import os
-from multiprocessing import Queue, Event
+
+from tap import Tap
 
 from .emulator import Emulator
-from .util.logger import logger
-from .devices.graphics import start_graphics_process
 from .repl import REPL
+from .util.logger import logger
 
-def get_args() -> argparse.Namespace:
-    arg_parser = argparse.ArgumentParser(description="JAIDE emulator")
-    _ = arg_parser.add_argument("binary", type=str, nargs="?", default="", help="a binary file to load")
-    _ = arg_parser.add_argument("-r", "--run", action="store_true", help="run the binary file immediately")
-    _ = arg_parser.add_argument("-g", "--graphics", action="store_true", help="automatically initialize the graphics controller")
-    return arg_parser.parse_args()
 
-    # type hint support needed: https://stackoverflow.com/questions/42279063/python-typehints-for-argparse-namespace-objects
-    # take a look at https://github.com/swansonk14/typed-argument-parser/
+class EmulatorArgumentParser(Tap):
+    binary: str = ""         # a binary file to load
+    run: bool = False        # run the binary file immediately
+
+    def configure(self):
+        self.add_argument("binary", nargs="?", default="")
+        self.add_argument("-r", "--run")
 
 def check_files(file: str) -> None:
     scope = "__main__.py:check_files()"
@@ -38,12 +36,9 @@ def check_files(file: str) -> None:
 
 def main():
     """ main entry point for the emulator. """
-    args = get_args()
+    args = EmulatorArgumentParser().parse_args()
 
-    logger.title("welcome to the jaide emulator v0.0.1 (copyright 2026 Josiah Bergen)")
-    logger.nl()
-
-    emulator = Emulator()
+    emulator = Emulator(verbosity=logger.log_level.DEBUG)
 
     # load binary file if provided
     if args.binary:
@@ -51,23 +46,6 @@ def main():
         emulator.load_binary(args.binary)
     else:
         logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
-
-    if args.graphics:
-        # set up IPC for graphics controller
-        key_queue = Queue()
-        gfx_stop_event = Event()
-
-        gfx_proc = start_graphics_process(
-            emulator.vram_shm.name,
-            emulator.vram_shm.size,
-            key_queue,
-            gfx_stop_event,
-        )
-
-        # attach handles to emulator so it can poll input and shut graphics down
-        emulator.key_queue = key_queue
-        emulator.gfx_stop_event = gfx_stop_event
-        emulator.gfx_proc = gfx_proc
 
     if args.run:
         logger.info("starting execution...")
@@ -81,7 +59,7 @@ def main():
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
         # so we'll mirror the behavior of the quit command
-        logger.info("bye! (signal from __main__)")
+        logger.info("\nbye! (signal from __main__)")
         emulator.shutdown()
 
 if __name__ == "__main__":

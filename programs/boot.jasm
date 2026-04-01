@@ -6,7 +6,6 @@ define vram_start 0x1000
 
 start:
     ; booloader entry point. lives at 0x0000.
-    data 0x3A33
 
     ; setup our registers
     mov mb, 0x01 ; set memory bank to vram
@@ -14,7 +13,7 @@ start:
 
     mov b, boot__s_message ; address of string
     mov x, vram_start ; start of vram
-    jmp boot__print_loop
+    jmp boot__vector_initialization
 
 boot__s_message:
     data "starting...", 0
@@ -38,25 +37,36 @@ boot__vector_initialization:
     ; calculated via the ORG directive at the start of this file.
 
     ; unhandled fault (div by zero, etc.)
-    put [d], boot__generic_fault_handler
+    put [d], boot__generic_irq_handler
 
     dec d
     ; invalid instruction
-    put [d], boot__generic_fault_handler
+    put [d], boot__generic_irq_handler
     
     dec d
     ; protection fault (future)
-    put [d], boot__generic_fault_handler
+    put [d], boot__generic_irq_handler
 
-    jmp 0x200 ; jump to end of rom to the loaded kernel in ram
+    ; timer interrupt (5)
+    mov d, 0xffff
+    sub d, 0x05
+    put [d], boot__generic_irq_handler
 
-boot__generic_fault_handler:
-    halt ; do nothing and sit in our misery
-    jmp boot__generic_fault_handler
+    mov mb, 0x00 ; restore default memory bank before entering kernel
+    jmp kernel__main ; jump to end of rom to the loaded kernel in ram
+
+boot__generic_irq_handler:
+    iret ; return from fault like it nothing happened
 
 align 0x200 ; fill entire rom
 
 ; this code now lives at 0x200, which will be the start of the loaded kernel in ram
 kernel__main:
-    halt ; wait for interrupt, for now
+
+    ; enable timer device
+    mov a, 0x01 ; enable bit
+    outb 0x11, a ; set flags
+
+kernel__wait:
+    ; halt ; wait for interrupt, for now
     jmp kernel__main

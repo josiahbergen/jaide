@@ -16,6 +16,13 @@ dependencies = [
 [tool.pytest]
 testpaths = ["test"]
 
+[tool.ruff]
+fix = true
+line-length = 320
+
+[tool.ruff.lint]
+select = ["I"]
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
