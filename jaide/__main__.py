@@ -23,6 +23,7 @@ class EmulatorArgumentParser(Tap):
     disk: bool = False
 
     def configure(self):
+        # configure short flags
         self.add_argument("binary", nargs="?")
         self.add_argument("-r", "--run")
         self.add_argument("-v", "--verbosity")
@@ -73,7 +74,8 @@ def main():
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
         # so we'll mirror the behavior of the quit command
-        logger.info("\nbye! (signal from __main__)")
+        # logger.info("\nbye! (signal from __main__)")
+        logger.info("")
         emulator.shutdown()
 
 if __name__ == "__main__":

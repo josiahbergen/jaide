@@ -2,7 +2,7 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define vram_start 0x1000
+define message_start 0x1004
 
 start:
     ; booloader entry point. lives at 0x0000.
@@ -12,8 +12,8 @@ start:
     mov sp, 0xfeff ; set the stack pointer to the proper location
 
     mov b, boot__s_message ; address of string
-    mov x, vram_start ; start of vram
-    jmp boot__vector_initialization
+    mov x, message_start ; start of message location
+    jmp boot__print_loop
 
 boot__s_message:
     data "starting...", 0
@@ -22,8 +22,10 @@ boot__print_loop:
     get a, [b] ; get next character
     cmp a, 0
     jz boot__vector_initialization ; we done, onto the next step
-    put [x], a ; put the character to vram
-    inc x ; increment pointers
+    put [x], a      ; word 0: character code
+    inc x
+    put [x], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
+    inc x
     inc b
     jmp boot__print_loop
 

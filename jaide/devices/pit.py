@@ -7,6 +7,7 @@ from typing import Callable
 from ..util.logger import logger
 from .device import Device
 
+PIT_INTERRUPT_VECTOR = 5
 
 class PIT(Device):
     def __init__(self, irq: Callable[[int], None]):
@@ -18,21 +19,21 @@ class PIT(Device):
         self.counter: int = 0
         self.reload: int = 0xFFFF  # arbitrary number for now, gets set by set_reload
 
-        self.read_dispatch[0x10] = lambda: self.reload
-        self.write_dispatch[0x10] = self.set_reload
+        self.read_dispatch[0x10]  = lambda: self.reload
+        self.write_dispatch[0x10] = self._set_reload
 
-        self.read_dispatch[0x11] = self.get_flags
-        self.write_dispatch[0x11] = self.set_flags
+        self.read_dispatch[0x11]  = self._get_flags
+        self.write_dispatch[0x11] = self._set_flags
 
-    def set_reload(self, value: int) -> None:
+    def _set_reload(self, value: int) -> None:
         self.reload = value
 
-    def set_flags(self, value: int) -> None:
+    def _set_flags(self, value: int) -> None:
         self.enabled = (value & 0b00000001) != 0
         self.one_shot = (value & 0b00000010) != 0
         logger.debug(f"pit flags set to enabled={self.enabled}, one-shot={self.one_shot}")
 
-    def get_flags(self) -> int:
+    def _get_flags(self) -> int:
         value = 0 | self.enabled
         value |= self.one_shot << 1
         return value
@@ -49,7 +50,7 @@ class PIT(Device):
             else:
                 self.counter = self.reload  # run it back baby
 
-            self.irq(5)  # raise interrupt vector 5
+            self.irq(PIT_INTERRUPT_VECTOR)  # raise interrupt vector 5
 
     def __str__(self) -> str:
         return f"pit: enabled={self.enabled}, one-shot={self.one_shot}, counter={self.counter}, reload={self.reload}"

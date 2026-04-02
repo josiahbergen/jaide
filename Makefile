@@ -1,7 +1,7 @@
 JASM       = uv run -m jasm
 JASMFLAGS  = --nolink
 JAIDE      = uv run -m jaide
-JAIDEFLAGS = -r --pit --rtc
+JAIDEFLAGS = -r --pit --rtc --graphics
 BIN_DIR    = programs/bin
 
 # used to run the most recently touched binary
@@ -31,7 +31,7 @@ nop:
 run:
 	@test -n "$(LATEST)" || (echo "no binaries found in $(BIN_DIR)." && exit 1)
 	@clear
-	@$(JAIDE) $(LATEST) $(JAIDEFLAGS)
+	$(JAIDE) $(LATEST) $(JAIDEFLAGS)
 
 test:
 	@clear
@@ -41,7 +41,6 @@ clean:
 	@echo "cleaning up..."
 	@rm -rf $(BIN_DIR)
 	@echo "successfully cleaned $(BIN_DIR)."
-
 
 # allow "make program" instead of "make programs/bin/program.bin"
 # last so real rules take priority

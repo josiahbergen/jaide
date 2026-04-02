@@ -117,7 +117,7 @@ mov x, vram_start ; compiles to 'mov x, 0x1000'
 
 ### times
 
-fill a defined number words with a value.
+fill a defined number of words with a value.
 
 ```jasm
 times 512, 0x0000 ; generates 512 words of zeros
@@ -125,7 +125,7 @@ times 512, 0x0000 ; generates 512 words of zeros
 
 ### align
 
-pads code with zeros until the program counter is aligned to a boundary.
+pad code with zeros until the program counter is aligned to a boundary.
 
 ```jasm
 align 0x200 ; if pc is 0x26, this will generate 472 words of zeros.
@@ -133,7 +133,7 @@ align 0x200 ; if pc is 0x26, this will generate 472 words of zeros.
 
 ### org
 
-sets the origin/load address for label resolution. useful for code you don't want to (or can't) link.
+set the origin/load address for label resolution. useful for code you don't want to (or can't) link.
 
 ```jasm
 org 0x200
@@ -141,7 +141,7 @@ org 0x200
 
 ## macros
 
-jasm supports powerful (using the term powerful very loosely) macros. macro definitions live only in the assembler. they are not emitted as code or data.
+jasm supports powerful (using the term powerful _very_ loosely) macros. macro definitions live only in the assembler, they are not emitted as code or data.
 
 macro bodies may only contain instructions, data, and labels. labels are name-mangled per expansion.
 
@@ -177,5 +177,3 @@ mov x, 0
 mov y, 10
 xy_to_vram z, x, y ; puts some memory address in z
 ```
-
-after expansion, the rest of the pipeline (labels, constants, encoding) sees the macro as if you had typed the expanded instructions yourself.

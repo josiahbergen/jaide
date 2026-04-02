@@ -13,25 +13,25 @@ class RTC(Device):
         """Real-time clock."""
         super().__init__(irq)
 
-        self.read_dispatch[0x30] = self.get_second
-        self.read_dispatch[0x31] = self.get_minute
-        self.read_dispatch[0x32] = self.get_hour
-        self.read_dispatch[0x33] = self.get_day_of_year
+        self.read_dispatch[0x30] = self._get_second
+        self.read_dispatch[0x31] = self._get_minute
+        self.read_dispatch[0x32] = self._get_hour
+        self.read_dispatch[0x33] = self._get_day_of_year
 
-    def get_second(self) -> int:
+    def _get_second(self) -> int:
         return time.localtime().tm_sec
 
-    def get_minute(self) -> int:
+    def _get_minute(self) -> int:
         return time.localtime().tm_min
 
-    def get_hour(self) -> int:
+    def _get_hour(self) -> int:
         return time.localtime().tm_hour
 
-    def get_day_of_year(self) -> int:
+    def _get_day_of_year(self) -> int:
         return time.localtime().tm_yday
 
     def tick(self) -> None:
         pass
 
     def __str__(self) -> str:
-        return f"rtc: second={self.get_second()}, minute={self.get_minute()}, hour={self.get_hour()}, day_of_year={self.get_day_of_year()}"
+        return f"rtc: second={self._get_second()}, minute={self._get_minute()}, hour={self._get_hour()}, day_of_year={self._get_day_of_year()}"

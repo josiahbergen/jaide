@@ -4,7 +4,7 @@
 
 import os
 import sys
-import time
+from collections import deque
 from typing import Callable
 
 from common.isa import INSTRUCTIONS, OPCODE_FORMATS
@@ -21,6 +21,8 @@ from .constants import (
     REGISTERS,
 )
 from .devices.device import Device
+from .devices.graphics import GraphicsDevice
+from .devices.keyboard import KeyboardDevice
 from .devices.pit import PIT
 from .devices.rtc import RTC
 from .exceptions import EmulatorException
@@ -55,8 +57,16 @@ class Emulator:
 
         self.ports: list[int] = [0] * 256
         self.devices: list[Device] = []
+
+        # simple read/write devices
         if "pit" in enabled_devices: self.devices.append(PIT(self.raise_interrupt))
         if "rtc" in enabled_devices: self.devices.append(RTC(self.raise_interrupt))
+
+        # graphics and keyboard devices
+        if "graphics" in enabled_devices:
+            _key_queue = deque()
+            self.devices.append(GraphicsDevice(self.raise_interrupt, _key_queue, self.banks[0]))
+            self.devices.append(KeyboardDevice(self.raise_interrupt, _key_queue))
 
         # interrupt handling
         self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled
