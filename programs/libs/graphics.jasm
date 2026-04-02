@@ -5,16 +5,37 @@ macro xy_to_vram %dest, %x, %y
     push %y ; save y value (we multiply this to get offset)
     mul %y, 160 ; get y offset to vram
     add %dest, %y
-    add %dest, %x ; hack to multiply x by 2
     add %dest, %x
+    add %dest, %x ; hack to multiply x by 2
     pop %y ; restore y value
 end macro
 
-macro print_at %x, %y, %string
+macro imm_xy_to_vram %dest, %ximm, %yimm
+    mov %dest, vram_start ; start of vram
+    mov e, %yimm
+    mul e, 160 ; get y offset to vram
+    add %dest, e
+    add %dest, %ximm
+    add %dest, %ximm ; hack to multiply x by 2
+end macro
+
+macro string_at %x, %y, %string
     mov x, %x
     mov y, %y
     mov a, %string
     call libg__print
+end macro
+
+macro blink_at %ximm, %yimm
+    mov z, vram_start ; start of vram
+    mov e, %yimm
+    mul e, 160 ; get y offset to vram
+    add z, e
+    add z, %ximm
+    add z, %ximm ; hack to multiply x by 2
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
 end macro
 
 ; print a white-on-black string. wraps around screen.

@@ -292,7 +292,6 @@ class Emulator:
 
     def step(self) -> None:
 
-
         # hardware-level overrides
         if self.halted:
             raise EmulatorException("halted")
@@ -301,7 +300,7 @@ class Emulator:
 
         if self.interrupts_pending():
             # interrupt called!
-            logger.debug(f"interrupt called! {self.pending_interrupts}")
+            # logger.debug(f"interrupt called! {self.pending_interrupts}")
             interrupt_id = self.pending_interrupts.pop()
             self._execute_interrupt(interrupt_id)
 
@@ -312,7 +311,6 @@ class Emulator:
 
          # tick all devices
         for device in self.devices:
-            # logger.debug(f"ticking device {device.__class__.__name__}")
             device.tick()
 
         if self.waiting_for_interrupt:
