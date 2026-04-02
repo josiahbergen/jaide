@@ -2,7 +2,7 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define message_start 0x1004
+define message_start 0x1002
 
 start:
     ; booloader entry point. lives at 0x0000.
@@ -30,6 +30,11 @@ boot__print_loop:
     jmp boot__print_loop
 
 boot__vector_initialization:
+
+    put [x], 0x20;   word 0: space
+    inc x
+    put [x], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
 
     mov d, 0xffff ; start of ivt
     ; fill reserved vectors with our fault handlers
