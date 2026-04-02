@@ -2,104 +2,88 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define message_start 0x1002
+define indicator_position 0xBC00
+
 
 start:
     ; booloader entry point. lives at 0x0000.
 
     ; setup our registers
     mov mb, 0x01 ; set memory bank to vram
-    mov sp, 0xfeff ; set the stack pointer to the proper location
+    mov sp, 0xfeff ; set the stack pointer to recommended location
 
-    mov b, boot__s_message ; address of string
-    mov x, message_start ; start of message location
-    jmp boot__print_loop
-
-boot__s_message:
-    data "starting...", 0
-    
-boot__print_loop:
-    get a, [b] ; get next character
-    cmp a, 0
-    jz boot__vector_initialization ; we done, onto the next step
-    put [x], a      ; word 0: character code
-    inc x
-    put [x], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
-    inc x
-    inc b
-    jmp boot__print_loop
-
-boot__vector_initialization:
-
-    put [x], 0x20;   word 0: space
+    mov x, indicator_position ; start of message location
+    put [x], 0x20   ; word 0: space
     inc x
     put [x], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
 
-
+    ; populate hardware fault interrupt handlers
     mov d, 0xffff ; start of ivt
-    ; fill reserved vectors with our fault handlers
-
-    ; when this gets assembled with --nolink, 
-    ; the labels here will be resolved as absolute addresses,
-    ; calculated via the ORG directive at the start of this file.
 
     ; unhandled fault (div by zero, etc.)
-    put [d], boot__generic_irq_handler
-
+    put [d], boot__fault_hander
     dec d
     ; invalid instruction
-    put [d], boot__generic_irq_handler
-    
+    put [d], boot__fault_hander
     dec d
     ; protection fault (future)
-    put [d], boot__generic_irq_handler
+    put [d], boot__fault_hander
 
-    ; timer interrupt (5)
-    mov d, 0xffff
-    sub d, 0x05
-    put [d], kernel__pit_handler
+    jmp kernel__main ; jump to end of rom (i.e. where the loaded kernel is loaded)
 
-    mov mb, 0x00 ; restore default memory bank before entering kernel
-    jmp kernel__main ; jump to end of rom to the loaded kernel in ram
-
-boot__generic_irq_handler:
-    iret ; return from fault like it nothing happened
+boot__fault_hander:
+    and f, 0x00 ; clear flags (disables interrupts)
+    ; attempt to halt cpu via system interface port
+    mov a, 0x02 ; halt command
+    outb 0xFF, a
+    halt ; if that didn't work, just hang cpu permanently
+    jmp boot__fault_hander
 
 align 0x200 ; fill entire rom
 
-; this code now lives at 0x200, which will be the start of the loaded kernel in ram
+; this code now lives at 0x200, and will eventually be in a separate file,
+; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 kernel__main:
 
-    ; enable pit
-    mov a, 0x01 ; enable bit
-    outb 0x11, a ; set flags
-    jmp kernel__wait
+    mov a, kernel__s_welcome
+    mov x, 0
+    mov y, 0
+    call libg__print
 
-kernel__pit_counter:
-    data 0x0000
+kernel_draw_tty_prompt:
 
-kernel__pit_handler:
+    mov a, kernel__s_prompt
+    mov x, 0
+    mov y, 1
+    call libg__print
 
-    ; get the current counter value
-    mov b, kernel__pit_counter
-    get a, [b]
+    mov x, 1
+    mov y, 1
+    xy_to_vram z, x, y
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
 
-    ; increment and store the counter
-    inc a
-    put [b], a
+kernel__loop:
+    halt ; wait around for interrupts to come in
+    jmp kernel_draw_tty_prompt
 
-    ; variable delay
-    cmp a, 0x20
-    jnz kernel__pit_handler__end
-
-    mov z, 0x2E ; '.'
-    outb 0x00, z ; print to serial console
-    put [b], 0 ; reset the counter
-
-kernel__pit_handler__end:
-    iret
-
-kernel__wait:
-    ; halt ; wait for interrupt, for now
+kernel__panic:
     halt
-    jmp kernel__wait
+    jmp kernel__panic
+
+kernel__s_prompt:
+    data "$ ", 0
+
+kernel__s_welcome:
+    data "ready.", 0
+
+
+kernel__s_command_len:
+    data 0
+
+kernel__s_command:
+    data 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+
+import "programs/libs/graphics.jasm"

@@ -2,12 +2,12 @@
 # intermediate representation for the JASM language.
 # josiah bergen, december 2025
 
-import os
 import copy
+import os
 from enum import IntEnum
 
-from ...util.logger import logger
 from ...language.isa import INSTRUCTIONS, MODES, OPCODE_MAP
+from ...util.logger import logger
 
 
 class IRNode:
@@ -33,7 +33,7 @@ class IRNode:
         scope = "ir.py:IRNode.parse_number()"
         value = int(string, 0)
         if value < -32768 or value > 32767:
-            logger.fatal(f"number {string} ({value}) out of range for a signed 16-bit value (line {self.line})", scope)
+            logger.warning(f"number {string} ({value}) out of range for a signed 16-bit value (line {self.line})", scope)
         if value < 0:
             value = value & 0xFFFF
         return value

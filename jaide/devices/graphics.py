@@ -42,8 +42,8 @@ COLORS: list[tuple[int, int, int]] = [
 ]
 
 
-class GraphicsDevice(Device):
-    def __init__(self, irq: Callable[[int], None], key_queue: deque, vram: bytearray):
+class Graphics(Device):
+    def __init__(self, irq: Callable[[int], None], key_queue: deque, vram: bytearray, shutdown: Callable[[], None]):
         """Graphics controller. Renders VRAM (bank 1) to a pygame window.
 
         vram      -- reference to emulator.banks[0] (VRAM bank)
@@ -54,6 +54,7 @@ class GraphicsDevice(Device):
         self.vram: bytearray     = vram
         self.enabled: bool       = True
         self.key_queue: deque    = key_queue
+        self.shutdown: Callable[[], None] = shutdown
         self._last_render: float = 0.0  # seconds
 
         self._glyphs: list[bytes]   = _load_glyphs()
@@ -67,6 +68,8 @@ class GraphicsDevice(Device):
 
         self.write_dispatch[0x40] = self._set_control
         self.read_dispatch[0x40]  = lambda: 0x01 if self.enabled else 0x00
+
+        logger.debug(f"graphics device ready. ports open: {self._get_port_list()}")
 
     def _set_control(self, value: int) -> None:
         self.enabled = bool(value & 0x01)
@@ -83,7 +86,8 @@ class GraphicsDevice(Device):
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
-                # closed button pressed, ignore
+                # closed button pressed, shut down emulator
+                self.shutdown()
                 return
 
             if event.type == pygame.KEYDOWN:
@@ -163,7 +167,7 @@ class GraphicsDevice(Device):
 
 
 def _load_glyphs() -> list[bytes]:
-    font_path = Path(__file__).parent / "VGA8.F16"
+    font_path = Path(__file__).parent / "data/VGA8.F16"
     try:
         with open(font_path, "rb") as f:
             return [bytes(f.read(GRAPHICS_CHAR_H)) for _ in range(256)]

@@ -1,9 +1,0 @@
-
-s_panic:
-    data "panic", 0
-s_panic_message:
-    data "everything has gone terribly wrong", 0
-s_cat:
-    data ":3", 0
-s_prompt:
-    data "$ ", 0

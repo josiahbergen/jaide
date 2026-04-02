@@ -14,6 +14,7 @@ class Device:
         # by default, no read or write handlers are defined
         self.read_dispatch: dict[int, Callable[..., int]] = {}
         self.write_dispatch: dict[int, Callable[[int], None]] = {}
+        
 
     def port_read(self, port: int) -> int:
         """Dispatch a request to read from a device."""
@@ -33,9 +34,25 @@ class Device:
 
         write_handler(value)
 
+    def _get_port_list(self) -> str:
+        """ return a string of format "port1 (r/w), port2 (r), ..."
+        """
+        #                port      [0]=r, [1]=w
+        open_ports: dict[int, list[bool]] = {}
+
+        for port, _ in self.read_dispatch.items():
+            if port not in open_ports:
+                open_ports[port] = [False, False]
+            open_ports[port][0] = True
+        for port, _ in self.write_dispatch.items():
+            if port not in open_ports:
+                open_ports[port] = [False, False]
+            open_ports[port][1] = True
+        return ", ".join([f"0x{port:02X} ({'r/w' if open_ports[port][0] and open_ports[port][1] else 'r' if open_ports[port][0] else 'w'})" for port in open_ports])
+
     def tick(self) -> None:
         """Tick the device. Runs once per CPU cycle."""
         pass
 
     def __str__(self) -> str:
-        return f"generic device"
+        return f"{self.__class__.__name__.lower()}: {self._get_port_list()}"

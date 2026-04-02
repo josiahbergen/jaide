@@ -315,7 +315,7 @@ def handle_cmp(emu, decoded: tuple[int, ...]) -> None:
     if modes == (MODES.REG, MODES.REG):
         emu._sub_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
     else:
-        emu._sub_core(emu.reg_get(reg_b), imm16)
+        emu._sub_core(emu.reg_get(reg_a), imm16)
 
 
 def handle_jmp(emu, decoded: tuple[int, ...]) -> None:

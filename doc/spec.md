@@ -84,17 +84,17 @@ jaide supports up to 128 Kib of memory.
 
 | Range             | Size      | Purpose                      |
 | ----------------- | --------- | ---------------------------- |
-| `0xFF00...0xFFFF` | 512 bytes | interrupt table              |
+| `0xFF00...0xFFFF` | 512 bytes | interrupt vector table       |
 | `0xFE00...0xFEFF` | 512 bytes | stack (recommended)          |
-| `0x4200...0xFDFF` | 94 Kib    | general purpose RAM          |
-| `0x0200...0x41FF` | 32 KiB    | general purpose RAM (banked) |
+| `0xBC00...0xFDFF` | 32 KiB    | general purpose RAM (banked) |
+| `0x0200...0xBBFF` | 94 Kib    | general purpose RAM          |
 | `0x0000...0x01FF` | 1 KiB     | BIOS ROM                     |
 
 *the stack grows downwards. it is recommended that SP be set to 0xFEFF.*
 
-*this memory can be swapped using the MB register.*
+*banked memory can be swapped using the MB register.*
 
-ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM).
+ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM -- but you have bigger problems if SP points to ROM...)
 
 ### memory banking
 

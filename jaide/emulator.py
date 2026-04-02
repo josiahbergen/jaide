@@ -21,8 +21,8 @@ from .constants import (
     REGISTERS,
 )
 from .devices.device import Device
-from .devices.graphics import GraphicsDevice
-from .devices.keyboard import KeyboardDevice
+from .devices.graphics import Graphics
+from .devices.keyboard import Keyboard
 from .devices.pit import PIT
 from .devices.rtc import RTC
 from .exceptions import EmulatorException
@@ -64,9 +64,12 @@ class Emulator:
 
         # graphics and keyboard devices
         if "graphics" in enabled_devices:
+            # shared queue for keyboard and graphics
+            # we need this because the keyboard and graphics controllers need to both pull data from the pygame window,
+            # and this is the simplest way to do that.
             _key_queue = deque()
-            self.devices.append(GraphicsDevice(self.raise_interrupt, _key_queue, self.banks[0]))
-            self.devices.append(KeyboardDevice(self.raise_interrupt, _key_queue))
+            self.devices.append(Graphics(self.raise_interrupt, _key_queue, self.banks[0], self.shutdown))
+            self.devices.append(Keyboard(self.raise_interrupt, _key_queue))
 
         # interrupt handling
         self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled
@@ -106,11 +109,11 @@ class Emulator:
     def read16(self, addr: int) -> int:
         # fetch a 16-bit little-endian value from memory using word addressing
         bank = self.mb.value % 32
-        # banked view (MB != 0): RAM window 0x0200–0x41FF maps to the start of banks[MB-1].
-        # flat memory (MB == 0): use absolute word addresses — do not strip 0x0200.
-        if bank != 0 and 0x0200 <= addr < 0x4200:
+        # banked view (MB != 0): window 0xBC00–0xFDFF maps to the start of banks[MB-1].
+        # flat memory (MB == 0): use absolute word addresses.
+        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
             memory = self.banks[bank - 1]
-            addr = addr - 0x0200
+            addr = addr - 0xBC00
         else:
             memory = self.memory
 
@@ -127,9 +130,9 @@ class Emulator:
             return
 
         bank = self.mb.value % 32
-        if bank != 0 and 0x0200 <= addr < 0x4200:
+        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
             memory = self.banks[bank - 1]
-            addr = addr - 0x0200
+            addr = addr - 0xBC00
         else:
             memory = self.memory
 
@@ -298,7 +301,7 @@ class Emulator:
 
         if self.interrupts_pending():
             # interrupt called!
-            # logger.debug(f"interrupt called! {self.pending_interrupts}")
+            logger.debug(f"interrupt called! {self.pending_interrupts}")
             interrupt_id = self.pending_interrupts.pop()
             self._execute_interrupt(interrupt_id)
 

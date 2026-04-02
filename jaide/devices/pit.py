@@ -25,6 +25,8 @@ class PIT(Device):
         self.read_dispatch[0x11]  = self._get_flags
         self.write_dispatch[0x11] = self._set_flags
 
+        logger.debug(f"pit device ready. ports open: {self._get_port_list()}")
+
     def _set_reload(self, value: int) -> None:
         self.reload = value
 
