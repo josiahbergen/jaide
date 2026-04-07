@@ -1,0 +1,191 @@
+; this code lives at 0x200, and will eventually be in a separate file,
+; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
+main:
+
+    string_at 0, 0, s_ready
+
+    string_at 0, 1, s_prompt
+    blink_at 2, 1
+    jmp loop
+
+loop:
+    halt ; wait around for interrupts to come in
+    jmp loop
+
+keyboard_interrupt:
+    inb a, 0x01 ; get key
+
+    ; non-printable characters
+    ; cmp a, 20
+    ; jb keyboard_interrupt__end
+    cmp a, 0x7F
+    ja keyboard_interrupt__end
+
+    ; normal (non-special) key pressed!
+
+    ; get current string length  
+    mov c, var_command_len
+    get c, [c]
+
+    ; position of the end of the string in vram
+    mov z, command_vram_start
+    add z, c
+    add z, c ; multiply by 2, because each character takes 2 words
+
+    cmp a, 0x0D ; enter
+    jz keyboard_interrupt__enter
+
+    cmp a, 0x08 ; backspace
+    jz keyboard_interrupt__backspace
+
+keyboard_interrupt__append:
+
+    cmp c, command_buffer_length
+    jae keyboard_interrupt__end ; buffer is full, ignore
+    
+    ; put glyph to vram
+    put [z], a      ; word 0: character code
+    inc z
+    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
+    inc z
+    ; re-draw blinker (we just overwrote it)
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
+    ; save character to command buffer
+    mov e, var_command_buffer
+    add e, c
+    put [e], a
+
+    ; increment and save the new string length
+    inc c 
+    mov e, var_command_len
+    put [e], c
+
+    jmp keyboard_interrupt__end
+
+keyboard_interrupt__backspace:
+
+    cmp c, 0x00
+    jz keyboard_interrupt__end ; buffer is empty, ignore
+
+    ; overwrite the blinker
+    put [z], 0x00
+    inc z
+    put [z], 0x00
+    sub z, 3
+    ; draw new blinker
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
+    ; decrement and save string length
+    dec c
+    mov e, var_command_len
+    put [e], c
+
+    ; zero out the last character in the command buffer
+    mov e, var_command_buffer
+    add e, c
+    put [e], 0
+
+    jmp keyboard_interrupt__end
+
+keyboard_interrupt__enter:
+    
+    mov a, var_command_buffer
+    mov b, s_dir
+    call util__string_compare
+    cmp c, 0
+    jnz keyboard_interrupt__enter__not_dir
+    
+    call dir
+    jmp keyboard_interrupt__enter__done
+
+keyboard_interrupt__enter__not_dir:
+
+    mov a, var_command_buffer
+    mov b, s_help
+    call util__string_compare
+    cmp c, 0
+    jnz keyboard_interrupt__enter__not_help
+    
+    call help
+    jmp keyboard_interrupt__enter__done
+
+keyboard_interrupt__enter__not_help:
+    call invalid_command
+
+keyboard_interrupt__enter__done:
+
+    ; clear the buffer
+    mov b, var_command_buffer
+    mov c, command_buffer_length
+    add c, b ; end of buffer
+
+keyboard_interrupt__enter__end__buffer_loop:
+    put [b], 0
+    inc b
+    cmp b, c
+    jnz keyboard_interrupt__enter__end__buffer_loop
+
+    ; clear vram
+    mov z, command_vram_start
+    mov b, z
+    add b, command_buffer_length ; end of used vram
+    add b, command_buffer_length ; gotta multiply by 2
+
+keyboard_interrupt__enter__end__vram_loop:
+    put [z], 0
+    inc z
+    cmp z, b
+    jnz keyboard_interrupt__enter__end__vram_loop
+
+    ; save string length to 0
+    mov e, var_command_len
+    put [e], 0
+
+    ; draw blinker
+    blink_at 2, 1
+
+keyboard_interrupt__end:
+    iret
+
+dir:
+    string_at 0, 2, s_dir_message
+    ret
+
+help:
+    string_at 0, 2, s_help_message
+    ret
+
+invalid_command:
+    string_at 0, 2, s_invalid_command_message
+    ret
+
+import "os/graphics.jasm"
+import "os/util.jasm"
+
+var_command_len:
+    data 0
+var_command_buffer:
+    times 17, 0
+
+define command_buffer_length 20
+define command_vram_start 0xBCA4
+
+s_prompt:
+    data "$ ", 0
+s_ready:
+    data "ready.", 0
+s_help:
+    data "help", 0
+s_dir:
+    data "dir", 0
+s_help_message:
+    data "jaideos version 0.0.1 alpha", 0
+s_invalid_command_message:
+    data "invalid command            ", 0
+s_dir_message:
+    data "no filesystem mounted.     ", 0

@@ -1,0 +1,55 @@
+; jaide bootloader
+; josiah bergen, march 2026
+
+org 0x0000
+define indicator_position 0xBC00
+
+
+start:
+    ; booloader entry point. lives at 0x0000.
+
+    ; setup our registers
+    mov mb, 0x01 ; set memory bank to vram
+    mov sp, 0xfeff ; set the stack pointer to recommended location
+
+    mov x, indicator_position ; start of message location
+    put [x], 0x20   ; word 0: space
+    inc x
+    put [x], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
+    ; populate hardware fault interrupt handlers
+    mov d, 0xffff ; start of ivt
+
+    ; unhandled fault (div by zero, etc.)
+    put [d], generic_fault_hander
+    dec d
+
+    ; invalid instruction
+    put [d], generic_fault_hander
+    dec d
+    
+    ; protection fault (future)
+    put [d], generic_fault_hander
+    dec d
+
+    ; vector 3 is reserved
+    dec d 
+
+    ; keyboard interrupt
+    put [d], kernel__keyboard_interrupt
+    dec d
+
+    jmp kernel__main ; jump to end of rom (i.e. where the loaded kernel is loaded)
+
+generic_fault_hander:
+    and f, 0x00 ; clear flags (disables interrupts)
+    ; attempt to halt cpu via system interface port
+    mov a, 0x02 ; halt command
+    outb 0xFF, a
+    halt ; if that didn't work, hang cpu permanently
+    jmp generic_fault_hander
+
+align 0x200 ; fill entire rom
+
+; kernel, "loaded" at 0x200
+import "os/kernel.jasm"

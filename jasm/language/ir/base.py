@@ -12,10 +12,11 @@ from ...util.logger import logger
 
 class IRNode:
     """ Super simple base node class for the IR. """
-    
-    def __init__(self, line: int):
+
+    def __init__(self, line: int, filename: str):
         self.line: int = line
-        self.pc: int = 0 # where the instruction will be placed in the binary
+        self.pc: int = 0  # where the instruction will be placed in the binary
+        self.filename: str = filename # source file this node came from
 
     def __str__(self) -> str:
         scope = "ir.py:IRNode.__str__()"
@@ -43,8 +44,8 @@ class IRNode:
 class Operand(IRNode):
     # base operand class. all operands inherit from this.
     # useful for type hinting.
-    def __init__(self, line: int, mode: MODES):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, mode: MODES):
+        super().__init__(line, filename)
         self.mode: MODES = mode # the addressing mode of the operand
 
     def get_value(self) -> int:
@@ -55,9 +56,9 @@ class Operand(IRNode):
 class InstructionNode(IRNode):
     """ A node representing an instruction. """
 
-    def __init__(self, line: int, mnemonic: str, operands: list[Operand]):
-        super().__init__(line)
-
+    def __init__(self, line: int, filename: str, mnemonic: str, operands: list[Operand]):
+        super().__init__(line, filename)
+        
         self.mnemonic: INSTRUCTIONS = INSTRUCTIONS[mnemonic.upper()]
         self.operands: list[Operand] = operands
 
@@ -85,9 +86,14 @@ class InstructionNode(IRNode):
 
 class LabelNode(IRNode):
 
-    def __init__(self, line: int, name: str):
-        super().__init__(line)
-        self.name: str = name.upper().strip()  # normalize
+    def __init__(self, line: int, filename: str, name: str):
+        super().__init__(line, filename)
+        name = name.upper().strip()  # normalize
+        filename = os.path.basename(filename).split(".")[0].upper() # the actual name, no path or extension
+
+        self.name: str = f"{filename}__{name}"  # mangle with filename
+        self.short_name: str = name
+        
 
     def __str__(self) -> str:
         return f"{self.name.lower()}:"
@@ -98,19 +104,21 @@ class LabelNode(IRNode):
 
 class ImportDirectiveNode(IRNode):
 
-    def __init__(self, line: int, filename: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, import_path: str):
+        super().__init__(line, filename)
         scope = "ir.py:ImportDirectiveNode.__init__()"
 
         try:
             # normalize to improve robustness of circular import detection
-            filename = os.path.normcase(os.path.realpath(filename))
+            import_path = os.path.normcase(os.path.realpath(import_path))
         except Exception as e:
-            logger.fatal(f"invalid filename: {e}", scope)
-        self.filename: str = filename
+            logger.fatal(f"invalid import path: {e}", scope)
+       
+        self.import_path: str = import_path
+        
 
     def __str__(self) -> str:
-        return f"import \"{self.filename}\""
+        return f"import \"{self.import_path}\""
 
 
 class DataDirectiveNode(IRNode):
@@ -119,8 +127,9 @@ class DataDirectiveNode(IRNode):
         NUMBER = 0
         STRING = 1
 
-    def __init__(self, line: int, items: list[tuple[Type, str]]):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, items: list[tuple[Type, str]]):
+        super().__init__(line, filename)
+        
         self.items: list[tuple[DataDirectiveNode.Type, str]] = items
         self.data: list[int] = self.parse_bytes()
         self.size: int = self.get_size()
@@ -158,8 +167,9 @@ class DataDirectiveNode(IRNode):
 
 
 class OrgDirectiveNode(IRNode):
-    def __init__(self, line: int, address: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, address: str):
+        super().__init__(line, filename)
+        
         self.address: int = self.parse_number(address)
 
     def __str__(self) -> str:
@@ -170,8 +180,8 @@ class OrgDirectiveNode(IRNode):
 
 
 class DefineDirectiveNode(IRNode):
-    def __init__(self, line: int, name: str, value: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, name: str, value: str):
+        super().__init__(line, filename)
         self.name: str = name.upper().strip()  # normalize
         self.value: int = self.parse_number(value)
 
@@ -183,10 +193,11 @@ class DefineDirectiveNode(IRNode):
 
 
 class TimesDirectiveNode(IRNode):
-    def __init__(self, line: int, count: str, value: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, count: str, value: str):
+        super().__init__(line, filename)
         self.count: int = self.parse_number(count)
         self.value: int = self.parse_number(value)
+        
 
     def __str__(self) -> str:
         return f"times {self.count} {self.value}"
@@ -204,8 +215,9 @@ class TimesDirectiveNode(IRNode):
 
 
 class AlignDirectiveNode(IRNode):
-    def __init__(self, line: int, alignment: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, alignment: str):
+        super().__init__(line, filename)
+        
         self.alignment: int = self.parse_number(alignment)
         self.size: int | None = None  # we don't know the size at creation
 
@@ -231,9 +243,10 @@ class AlignDirectiveNode(IRNode):
 
 class MacroDefinitionNode(IRNode):
 
-    def __init__(self, line: int, name: str, args: list[str], body: list[IRNode]):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, name: str, args: list[str], body: list[IRNode]):
+        super().__init__(line, filename)
         self.name: str = name.upper() # macro name
+        
         self.placeholders: list[str] = args # placeholder identifiers for the arguments
         self.body: list[IRNode] = body
 
@@ -302,19 +315,21 @@ class MacroDefinitionNode(IRNode):
 
 class MacroCallNode(IRNode):
 
-    def __init__(self, line: int, name: str, args: list[Operand]):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, name: str, args: list[Operand]):
+        super().__init__(line, filename)
         self.name: str = name.upper() # macro being called
         self.args: list[Operand] = args # real values to substitute for the placeholders
+        
 
     def __str__(self) -> str:
         return f"macro call: {self.name} with {', '.join([str(op) for op in self.args])}"
 
 
 class ExpressionNode(IRNode):
-    def __init__(self, line: int, expression: str):
-        super().__init__(line)
+    def __init__(self, line: int, filename: str, expression: str):
+        super().__init__(line, filename)
         self.expression: str = expression
+        
 
     def __str__(self) -> str:
         return f"expression: {self.expression}"

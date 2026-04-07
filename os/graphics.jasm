@@ -1,0 +1,80 @@
+define vram_start 0xBC00
+
+; xy_to_vram
+; convert x and y coordinates to a vram address.
+;   dest = destination register for the vram address
+;   x = x coordinate
+;   y = y coordinate
+;   trashes e
+macro xy_to_vram %dest, %reg_x, %reg_y
+    mov %dest, vram_start ; start of vram
+    push %reg_y ; save y value (we multiply this to get offset)
+    mul %reg_y, 160 ; get y offset to vram
+    add %dest, %reg_y
+    add %dest, %reg_x
+    add %dest, %reg_x ; hack to multiply x by 2
+    pop %reg_y ; restore y value
+end macro
+
+; imm_xy_to_vram
+; convert immediate x and y coordinates to a vram address.
+;   dest = destination register for the vram address
+;   ximm = immediate x coordinate
+;   yimm = immediate y coordinate
+;   trashes e
+macro imm_xy_to_vram %dest, %ximm, %yimm
+    mov %dest, vram_start ; start of vram
+    mov e, %yimm
+    mul e, 160 ; get y offset to vram
+    add %dest, e
+    add %dest, %ximm
+    add %dest, %ximm ; hack to multiply x by 2
+end macro
+
+macro string_at %x, %y, %string
+    mov x, %x
+    mov y, %y
+    mov a, %string
+    call print
+end macro
+
+macro blink_at %ximm, %yimm
+    mov z, vram_start ; start of vram
+    mov e, %yimm
+    mul e, 160 ; get y offset to vram
+    add z, e
+    add z, %ximm
+    add z, %ximm ; hack to multiply x by 2
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+end macro
+
+; print a white-on-black string. wraps around screen.
+; clobbers e
+;   a = string pointer
+;   x = x position
+;   y = y position
+print:
+    push a ; string pointer
+    push z ; memory address
+    xy_to_vram z, x, y ; prepare starting address
+
+print_loop:
+    get e, [a] ; get next character
+    cmp e, 0
+    jz print_end ; we done, onto the next step
+
+    ; put glyph to vram
+    put [z], e      ; word 0: character code
+    inc z
+    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
+    inc z
+
+    inc a ; next character
+    jmp print_loop ; loop 'til we're done
+
+print_end:
+    pop z ; restore registers
+    pop a
+    ret

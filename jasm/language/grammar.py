@@ -18,7 +18,7 @@ GRAMMAR = r"""
     import_directive: IMPORT STRING
     org_directive: ORG NUMBER
     define_directive: DEFINE IDENTIFIER NUMBER
-    times_directive: TIMES NUMBER NUMBER
+    times_directive: TIMES NUMBER "," NUMBER
     align_directive: ALIGN NUMBER
 
     # Macros 

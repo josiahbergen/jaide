@@ -1,0 +1,69 @@
+
+; serial_out
+; print a character to the serial port.
+;   char_reg = character to print (register/immediate)
+;   trashes e
+define serial_port 0x00
+macro serial_out %char
+    mov e, %char
+    outb serial_port, e
+end macro
+
+
+; dereference_into
+; dereference a pointer into a register.
+;   dest = destination register for the dereferenced value
+;   ptr = pointer to dereference
+;   trashes e
+macro dereference_into %dest_reg, %ptr_label
+    mov e, %ptr_label
+    get %dest_reg, [e]
+    mov %dest_reg, e
+end macro
+
+
+; put_value_at
+; put a value at a pointer.
+;   ptr_label = pointer to the value
+;   value = value to put
+;   trashes e
+macro put_value_at %ptr_label, %value
+    mov e, %ptr_label
+    put [e], %value
+end macro
+
+; compare two strings at addresses a and b.
+; result in c. 0 if equal, nonzero if not.
+string_compare:
+    push a ; we don't overwrite a or b, so we preserve them
+    push b
+    mov c, 0
+
+string_compare_loop:
+    get x, [a]
+    get y, [b]
+
+    ; main comparison logic
+    ; if not equal, we exit early with a nonzero result
+    ; this includes one of them ending, where one will be 0 and the other not.
+    cmp x, y
+    jnz string_compare_not_equal
+    
+    cmp x, 0
+    ; both are 0, we are at the end of both strings
+    ; and they remain equal.
+    jz string_compare_end 
+
+    inc a
+    inc b
+    jmp string_compare_loop
+
+
+string_compare_not_equal:
+    mov c, 1
+    jmp string_compare_end
+
+string_compare_end:
+    pop b
+    pop a
+    ret

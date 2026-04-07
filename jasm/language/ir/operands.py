@@ -2,6 +2,8 @@
 # ir instruction operand nodes.
 # josiah bergen, march 2026
 
+import os
+
 from .base import Operand, ExpressionNode
 from .terminals import (
     NumberTerminal, 
@@ -14,8 +16,8 @@ from ...util.logger import logger
 
 
 class RegisterOperand(Operand):
-    def __init__(self, line: int, register: RegisterTerminal):
-        super().__init__(line, MODES.REG)
+    def __init__(self, line: int, filename: str, register: RegisterTerminal):
+        super().__init__(line, filename, MODES.REG)
         # adds a reference to the numeric register value
         self.register: REGISTERS = REGISTERS[register.value]
 
@@ -27,8 +29,8 @@ class RegisterOperand(Operand):
 
 
 class ImmediateOperand(Operand):
-    def __init__(self, line: int, number: NumberTerminal):
-        super().__init__(line, MODES.IMM)
+    def __init__(self, line: int, filename: str, number: NumberTerminal):
+        super().__init__(line, filename, MODES.IMM)
         self.string: str = number.value # string representation
         self.value: int = int(self.string, 0)
         
@@ -45,17 +47,25 @@ class ImmediateOperand(Operand):
 
 
 class LabelOperand(Operand):
-    def __init__(self, line: int, identifier: IdentifierTerminal):
-        super().__init__(line, MODES.RELATIVE)
-        self.name: str = identifier.value.upper().strip() # normalize
+    def __init__(self, line: int, filename: str, identifier: IdentifierTerminal):
+        super().__init__(line, filename, MODES.RELATIVE)
+
+        name = identifier.value.upper().strip() # normalize
+        already_mangled = "__" in name and "_" not in name.split("__")[0]  
+        filename = os.path.basename(filename).split(".")[0].upper() # the actual name, no path or extension
+
+        self.name: str = f"{filename}__{name}" if not already_mangled else name # mangle with filename
+        self.short_name: str = name if not already_mangled else name.split("__")[-1]
+
+        logger.verbose(f"label: {self.short_name} -> {self.name} (in {filename}, {"not " if not already_mangled else ""}already mangled)")
 
     def __str__(self) -> str:
-        return f"{self.name}"        
+        return f"{self.name}"
 
 
 class PointerOperand(Operand):
-    def __init__(self, line: int, register: RegisterTerminal):
-        super().__init__(line, MODES.REG_POINTER)
+    def __init__(self, line: int, filename: str, register: RegisterTerminal):
+        super().__init__(line, filename, MODES.REG_POINTER)
         self.register: REGISTERS = REGISTERS[register.value]
 
     def __str__(self) -> str:
@@ -66,8 +76,8 @@ class PointerOperand(Operand):
 
 
 class RelativePointerOperand(Operand):
-    def __init__(self, line: int, label: IdentifierTerminal):
-        super().__init__(line, MODES.REL_POINTER)
+    def __init__(self, line: int, filename: str, label: IdentifierTerminal):
+        super().__init__(line, filename, MODES.REL_POINTER)
         self.label: str = label.value.upper().strip() # normalize
 
     def __str__(self) -> str:
@@ -75,8 +85,8 @@ class RelativePointerOperand(Operand):
 
 
 class OffsetPointerOperand(Operand):
-    def __init__(self, line: int, label: IdentifierTerminal, register: RegisterTerminal):
-        super().__init__(line, MODES.OFF_POINTER)
+    def __init__(self, line: int, filename: str, label: IdentifierTerminal, register: RegisterTerminal):
+        super().__init__(line, filename, MODES.OFF_POINTER)
         # we add two new values! wow!
         self.label: str = label.value.upper().strip() # normalize
         self.register: REGISTERS = REGISTERS[register.value]
@@ -89,8 +99,8 @@ class OffsetPointerOperand(Operand):
 
 
 class MacroArgumentOperand(Operand):
-    def __init__(self, line: int, argument: IdentifierTerminal):
-        super().__init__(line, MODES.NULL)
+    def __init__(self, line: int, filename: str, argument: IdentifierTerminal):
+        super().__init__(line, filename, MODES.NULL)
         # only valid inside macro body; refers to a provided argument by name.
         self.placeholder: str = argument.value
 
@@ -100,8 +110,8 @@ class MacroArgumentOperand(Operand):
 
 class ExpressionOperand(Operand):
     """Future: an expression operand. Not yet supported."""
-    def __init__(self, line: int, expression: ExpressionNode):
-        super().__init__(line, MODES.NULL)
+    def __init__(self, line: int, filename: str, expression: ExpressionNode):
+        super().__init__(line, filename, MODES.NULL)
         self.expression: str = expression.expression
 
     def __str__(self) -> str:

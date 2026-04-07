@@ -54,6 +54,35 @@ numbers can be expressed in base `2`, `10`, or `16`. standard prefixes are used.
 
 strings (only valid in data directives, see below) must be encased in quotes (`"`).
 
+## labels and mangling
+
+labels are automatically mangled with their filename, to allow for a pseudo-module system.
+
+for example, if a label `my_function` is in `functions.jasm`, the label will become `functions__my_function`.
+
+if you want to reference a label in another file, simply mangle the name yourself. the assembler will parse this out and populate the proper reference for you!
+
+note that only labels in the form `filename__some_label_title` are parsed this way. `some_label_title__loop` is not parsed as an external reference.
+
+example:
+
+```jasm
+functions.jasm
+------------------------
+my_function:
+    mov a, b
+    ret
+
+main.jasm
+------------------------
+import "functions.jasm"
+
+mov b, 0x10
+call functions__my_function
+; 0x10 is now in register a!
+
+```
+
 ## addressing modes
 
 jasm uses the following addressing modes:

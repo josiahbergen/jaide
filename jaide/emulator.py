@@ -301,8 +301,8 @@ class Emulator:
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
-        # if logger.level == logger.log_level.VERBOSE:
-            # time.sleep(0.001)
+        if logger.level == logger.log_level.VERBOSE:
+            time.sleep(0.0001)
 
         if self.interrupts_pending():
             # interrupt called!
@@ -334,7 +334,7 @@ class Emulator:
 
         logger.verbose(
             f"{disassemble(decoded):<13}"
-            f"{" ".join([f"{r}: 0x{self.reg[r].value:04X} " for r in self.reg if r != "F"])}  "
+            f'{" ".join([f"{r}: {self.reg[r].value:0>4X} " if len(f"{self.reg[r].value:X}") >= 4 else f"{r}: {self.reg[r].value:X}{' ' * (4 - len(f'{self.reg[r].value:X}'))} " for r in self.reg if r != "F"])}  '
             f"{" ".join([f"{FLAG_STRINGS[i]}" if self.flag_get(i) else "-" for i in FLAG_STRINGS])}"
         )
 

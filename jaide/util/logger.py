@@ -17,11 +17,12 @@ class Logger:
         INFO: int = 1
         ERROR: int = 0
 
-
     def __init__(self, level: int = log_level.DEBUG, warnings: bool = True):
         cl.init()
         self.level: int = level
         self.warnings: bool = warnings
+        self.traceback: list[str] = []
+        self.traceback_limit: int = 100
 
     def set_level(self, level: int):
         self.level = level
@@ -30,6 +31,11 @@ class Logger:
 
     def set_warnings(self, warnings: bool):
         self.warnings = warnings
+
+    def add_traceback(self, message: str):
+        self.traceback.append(f"{message}")
+        if len(self.traceback) > self.traceback_limit:
+            self.traceback.pop(0)
 
     def verbose(self, message: str):
         """ Print a verbose message. Only prints if level is VERBOSE or higher. """

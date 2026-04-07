@@ -47,7 +47,7 @@ def _compute_labels_and_constants(context: AssemblyContext) -> None:
                 logger.fatal(f"label \"{node.name.lower()}\" already defined as a constant (line {node.line})", scope)
 
             logger.debug(f"labels: \"{node.name}\" defined at PC {pc}")
-            context.labels[node.name] = pc
+            context.labels[node.name] = pc  # mangle with filename
             continue
 
         # resolve constants, parser emits them as labels
@@ -55,10 +55,10 @@ def _compute_labels_and_constants(context: AssemblyContext) -> None:
             for i, operand in enumerate(node.operands):
 
                 # resolve constants
-                if isinstance(operand, LabelOperand) and operand.name in context.constants:
-                    logger.debug(f"labels: populating constant operand {operand} -> {context.constants[operand.name]} on line {node.line}")
-                    number = NumberTerminal(operand.line, str(context.constants[operand.name]))
-                    node.operands[i] = ImmediateOperand(operand.line, number)
+                if isinstance(operand, LabelOperand) and operand.short_name in context.constants:
+                    logger.debug(f"labels: populating constant operand {operand} -> {context.constants[operand.short_name]} on line {node.line}")
+                    number = NumberTerminal(operand.line, operand.filename, str(context.constants[operand.short_name]))
+                    node.operands[i] = ImmediateOperand(operand.line, operand.filename, number)
 
                 # resolve expressions
                 # if isinstance(operand, ExpressionOperand):
@@ -74,9 +74,7 @@ def _compute_labels_and_constants(context: AssemblyContext) -> None:
 
         if isinstance(node, InstructionNode):
             node.size = size
-            # NOTE: opcode computation is deferred to after pass 2 (label→IMM conversion),
-            # because label operands still carry MODES.RELATIVE here and opcode lookup
-            # requires the final modes. see _convert_labels_to_absolute() below.
+            # opcode computation is deferred to after pass 2.
 
         # increment pc!
         logger.verbose(f"labels: pc {pc} -> {pc + size}")
@@ -113,6 +111,6 @@ def _resolve_label_references(context: AssemblyContext) -> None:
 
             abs_addr = context.labels[operand.name]
             logger.debug(f"labels: '{operand.name}' -> absolute {abs_addr:#06x} on line {node.line}")
-            node.operands[i] = ImmediateOperand(operand.line, NumberTerminal(operand.line, str(abs_addr)))
+            node.operands[i] = ImmediateOperand(operand.line, operand.filename, NumberTerminal(operand.line, operand.filename, str(abs_addr)))
 
         node.opcode = node.get_opcode()

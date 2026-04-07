@@ -9,7 +9,15 @@ from lark import Lark
 from .language.context import AssemblyContext
 from .language.grammar import GRAMMAR
 from .language.transformer import IRTransformer
-from .language.ir.base import ImportDirectiveNode, IRNode, MacroDefinitionNode, DefineDirectiveNode, OrgDirectiveNode
+from .language.ir.base import (
+    ImportDirectiveNode,
+    IRNode,
+    MacroDefinitionNode,
+    MacroCallNode,
+    InstructionNode,
+    DefineDirectiveNode,
+    OrgDirectiveNode,
+)
 from .util.logger import logger
 
 
@@ -83,7 +91,7 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
         logger.fatal(f"parser error in file {file}: {e}", scope)
 
     # generate the IR
-    ir_nodes: list[IRNode] = IRTransformer().transform(tree)
+    ir_nodes: list[IRNode] = IRTransformer(source_file=file).transform(tree)
     ir[file] = ir_nodes
 
     # find all import nodes
@@ -92,13 +100,13 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
         logger.debug(f"parse: found {len(imports)} import file(s): {', '.join([import_node.filename for import_node in imports])}")
 
     for import_node in imports:
-        if import_node.filename in ir:
+        if import_node.import_path in ir:
             # skip if already parsed
             logger.warning(f"circular or double import detected: {import_node.filename} already parsed, skipping...", scope)
             continue
 
         # recursively parse import files
-        parse_file(import_node.filename, ir)
+        parse_file(import_node.import_path, ir)
     return
 
 
@@ -107,15 +115,15 @@ def update_context_from_file(context: AssemblyContext, ir: dict[str, list[IRNode
 
     for node in ir[file]:
         if isinstance(node, ImportDirectiveNode):
-            if node.filename in context.files:
+            if node.import_path in context.files:
                 # skip if already added
                 continue
 
-            logger.debug(f"parse: adding {node.filename} to main list at index {len(context.ir)}")
-            context.files.add(node.filename)
+            logger.debug(f"parse: adding {node.import_path} to main list at index {len(context.ir)}")
+            context.files.add(node.import_path)
 
             # found import, recursively update the context
-            update_context_from_file(context, ir, node.filename)
+            update_context_from_file(context, ir, node.import_path)
 
         elif isinstance(node, MacroDefinitionNode):
             logger.debug(f"parse: adding macro definition {node.name} to assembly context")
