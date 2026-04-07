@@ -164,7 +164,7 @@ def handle_mod(emu, decoded: tuple[int, ...]) -> None:
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
     if src == 0:
         # division by zero, request hardware fault interrupt
-        logger.warning(f"division by zero at 0x{emu.pc.value:04x}. hardware fault interrupt called.")
+        logger.warning(f"division by zero at 0x{emu.pc.value:04x}.")
         emu.raise_interrupt(0)
         return
     result = mask16(dest % src)
@@ -179,7 +179,7 @@ def handle_div(emu, decoded: tuple[int, ...]) -> None:
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
 
     if src == 0:
-        logger.warning(f"division by zero at 0x{emu.pc.value:04x}. hardware fault interrupt called.")
+        logger.warning(f"division by zero at 0x{emu.pc.value:04x}.")
         emu.raise_interrupt(0)
         return
 

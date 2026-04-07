@@ -49,19 +49,23 @@ align 0x200 ; fill entire rom
 ; this code now lives at 0x200, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 kernel__main:
+    div a, 0
+
     string_at 0, 0, kernel__s_ready
     call kernel_draw_tty_prompt ; draw the empty prompt
     jmp kernel__loop
 
 kernel_draw_tty_prompt:
     ; clear the input line
+    mov c, kernel__s_command_len ; length pointer
+    get c, [c] ; dereference length value
     mov a, 0
     imm_xy_to_vram z, 0, 1
 kernel_draw_tty_prompt__loop:
     put [z], 0x00
     inc z
     inc a
-    cmp a, 80 ; end of line
+    cmp a, 46 ; end of buffer (23 characters * 2 bytes per char)
     jnz kernel_draw_tty_prompt__loop
 
     string_at 0, 1, kernel__s_prompt

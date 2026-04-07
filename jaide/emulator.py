@@ -4,10 +4,12 @@
 
 import os
 import sys
+import time
 from collections import deque
 from typing import Callable
 
 from common.isa import INSTRUCTIONS, OPCODE_FORMATS
+from .util.disasm import disassemble
 
 from .constants import (
     BANK_SIZE,
@@ -16,6 +18,7 @@ from .constants import (
     FLAG_N,
     FLAG_O,
     FLAG_Z,
+    FLAG_STRINGS,
     MEMORY_SIZE,
     NUM_BANKS,
     REGISTERS,
@@ -59,11 +62,11 @@ class Emulator:
         self.devices: list[Device] = []
 
         # simple read/write devices
-        if "pit" in enabled_devices: self.devices.append(PIT(self.raise_interrupt))
-        if "rtc" in enabled_devices: self.devices.append(RTC(self.raise_interrupt))
+        if enabled_devices.get("pit", False): self.devices.append(PIT(self.raise_interrupt))
+        if enabled_devices.get("rtc", False): self.devices.append(RTC(self.raise_interrupt))
 
         # graphics and keyboard devices
-        if "graphics" in enabled_devices:
+        if enabled_devices.get("graphics", False):
             # shared queue for keyboard and graphics
             # we need this because the keyboard and graphics controllers need to both pull data from the pygame window,
             # and this is the simplest way to do that.
@@ -137,7 +140,7 @@ class Emulator:
             memory = self.memory
 
         if addr * 2 >= len(memory):
-            logger.error(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}). requesting hardware fault interrupt.")
+            logger.warning(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}).")
             self.raise_interrupt(0)
             return
 
@@ -298,9 +301,12 @@ class Emulator:
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
+        # if logger.level == logger.log_level.VERBOSE:
+            # time.sleep(0.001)
+
         if self.interrupts_pending():
             # interrupt called!
-            # logger.debug(f"interrupt called! {self.pending_interrupts}")
+            logger.verbose(f"interrupt called! {self.pending_interrupts}")
             interrupt_id = self.pending_interrupts.pop()
             self._execute_interrupt(interrupt_id)
 
@@ -316,14 +322,23 @@ class Emulator:
         if self.waiting_for_interrupt:
             # halt was called, we are simply waiting for an interrupt
             # reduce cpu usage a little and skip executing any instructions
-            # time.sleep(0.1)
+            # self._halted_step_count = (self._halted_step_count + 1) % 10000000
+            # if self._halted_step_count == 0:
+            #     logger.verbose("waiting for interrupt...")
+            time.sleep(0.001)
             return
 
         # normal fetch/decode/execute
         decoded = self.decode()
         opcode = decoded[0]
-        self.handlers[OPCODE_FORMATS[opcode].mnemonic](self, decoded)
 
+        logger.verbose(
+            f"{disassemble(decoded):<13}"
+            f"{" ".join([f"{r}: 0x{self.reg[r].value:04X} " for r in self.reg if r != "F"])}  "
+            f"{" ".join([f"{FLAG_STRINGS[i]}" if self.flag_get(i) else "-" for i in FLAG_STRINGS])}"
+        )
+
+        self.handlers[OPCODE_FORMATS[opcode].mnemonic](self, decoded)
 
     # core helpers
 

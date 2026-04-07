@@ -69,7 +69,7 @@ class Graphics(Device):
         self.write_dispatch[0x40] = self._set_control
         self.read_dispatch[0x40]  = lambda: 0x01 if self.enabled else 0x00
 
-        logger.debug(f"graphics device ready. ports open: {self._get_port_list()}")
+        self._log_ready()
 
     def _set_control(self, value: int) -> None:
         self.enabled = bool(value & 0x01)

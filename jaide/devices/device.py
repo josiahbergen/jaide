@@ -5,6 +5,7 @@
 from typing import Callable
 
 from ..exceptions import EmulatorException
+from ..util.logger import logger
 
 
 class Device:
@@ -21,7 +22,7 @@ class Device:
 
         read_handler = self.read_dispatch.get(port)
         if read_handler is None:
-            raise EmulatorException(f"no read handler for port {port} on {self.__class__.__name__}.")
+            raise EmulatorException(f"{self.__class__.__name__} has no read handler for port {port}.")
 
         return read_handler()
 
@@ -30,14 +31,14 @@ class Device:
 
         write_handler = self.write_dispatch.get(port)
         if write_handler is None:
-            raise EmulatorException(f"no write handler for port {port} on {self.__class__.__name__}.")
+            raise EmulatorException(f"{self.__class__.__name__} has no write handler for port {port}.")
 
         write_handler(value)
 
     def _get_port_list(self) -> str:
         """ return a string of format "port1 (r/w), port2 (r), ..."
         """
-        #                port      [0]=r, [1]=w
+        # [0] = read, [1] = write
         open_ports: dict[int, list[bool]] = {}
 
         for port, _ in self.read_dispatch.items():
@@ -53,6 +54,9 @@ class Device:
     def tick(self) -> None:
         """Tick the device. Runs once per CPU cycle."""
         pass
+
+    def _log_ready(self) -> None:
+        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_port_list()}")
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__.lower()}: {self._get_port_list()}"

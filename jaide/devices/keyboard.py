@@ -5,7 +5,6 @@
 from collections import deque
 from typing import Callable
 
-from ..util.logger import logger
 from .device import Device
 
 KEYBOARD_INTERRUPT_VECTOR = 4
@@ -26,7 +25,7 @@ class Keyboard(Device):
         self.read_dispatch[0x01] = self._read_key
         self.read_dispatch[0x02] = lambda: 0x01 if self._has_key else 0x00
 
-        logger.debug(f"keyboard device ready. ports open: {self._get_port_list()}")
+        self._log_ready()
 
     def _read_key(self) -> int:
         """Return the pending scancode and clear it."""

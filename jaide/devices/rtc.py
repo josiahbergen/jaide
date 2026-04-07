@@ -5,7 +5,6 @@
 import time
 from typing import Callable
 
-from ..util.logger import logger
 from .device import Device
 
 
@@ -19,7 +18,7 @@ class RTC(Device):
         self.read_dispatch[0x32] = self._get_hour
         self.read_dispatch[0x33] = self._get_day_of_year
 
-        logger.debug(f"rtc device ready. ports open: {self._get_port_list()}")
+        self._log_ready()
 
     def _get_second(self) -> int:
         return time.localtime().tm_sec
