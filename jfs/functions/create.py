@@ -146,6 +146,7 @@ def create(args: JFSArgs) -> None:
     full_path = os.path.abspath(image)
     with open(full_path, "wb") as f:
         logger.verbose(f"full output path is {full_path}")
+        logger.verbose(f"writing to file...")
         disk.tofile(f)
 
-    logger.success(f"wrote {BLOCKS} blocks, {BLOCKS * BLOCK_SIZE:,} words.")
+    logger.success(f"wrote {BLOCKS} blocks, {BLOCKS * BLOCK_SIZE * 2:,} bytes.")
