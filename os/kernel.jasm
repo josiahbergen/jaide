@@ -4,7 +4,7 @@ main:
 
     string_at 0, 0, s_ready
 
-    string_at 0, 1, s_prompt
+    string_at 0, 1, s_promptt 
     blink_at 2, 1
     jmp loop
 

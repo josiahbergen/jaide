@@ -22,7 +22,8 @@ def get_image_info(args: JFSArgs) -> None:
 
     # read contents
     with open(image_path, "rb") as f:
-        image_contents = array('H', f.read())
+        image_contents = array[int]("H")
+        image_contents.frombytes(f.read())
 
     # verify magic number
     if image_contents[BOOT_INDICES.MAGIC] != MAGIC:
@@ -55,7 +56,7 @@ def get_image_info(args: JFSArgs) -> None:
         filename = decode_packed_null_terminated(name_data)
         extension = decode_packed_null_terminated(ext_data)
 
-        file_size = size * 2  # convert words to kibibytes
+        file_size = size  # bytes
 
         file_list.append(f"{filename}.{extension} ({file_size} bytes) at block {start_block}")
     

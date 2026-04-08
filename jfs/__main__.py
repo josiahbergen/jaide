@@ -4,11 +4,13 @@
 
 from .functions.create import create
 from .functions.info import get_image_info
+from .functions.read import read_file
 from .util import JFSArgs, logger
 
 commands = {
     "create": create,
     "info": get_image_info,
+    "read": read_file,
 }
 
 def main():
@@ -23,7 +25,7 @@ def main():
         commands[args.command](args)
     except KeyError:
         logger.warn(f"unknown command {args.command}")
-        logger.warn(f"valid commands are: {", ".join(commands.keys())}")
+        logger.warn(f"valid commands are: {', '.join(commands.keys())}")
     except Exception as e:
         logger.error(f"{e}", scope)
         raise e
