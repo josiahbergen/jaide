@@ -126,44 +126,70 @@ class DataDirectiveNode(IRNode):
     class Type(IntEnum):
         NUMBER = 0
         STRING = 1
+        LABEL = 2  # payload is (mangled_name, short_name) for lookup
 
-    def __init__(self, line: int, filename: str, items: list[tuple[Type, str]]):
+    def __init__(self, line: int, filename: str, items: list[tuple[Type, str | tuple[str, str]]],):
         super().__init__(line, filename)
-        
-        self.items: list[tuple[DataDirectiveNode.Type, str]] = items
-        self.data: list[int] = self.parse_bytes()
-        self.size: int = self.get_size()
+        self.items = items
+        self.data: list[int] = []  # filled in labels.prepare_instructions pass 2
 
     def __str__(self) -> str:
-        strs = [f"{d[1]}" if d[0] == self.Type.NUMBER else f'"{d[1]}"' for d in self.items]
-        return f"data {', '.join(strs)}"
-
-    def parse_bytes(self) -> list[int]:
-        bytes: list[int] = []
-        logger.verbose(f"parse_bytes: parsing {len(self.items)} items")
-        for type, value in self.items:
-            if type == self.Type.NUMBER:
-                bytes.append(self.parse_number(value))
-            else:
-                bytes.extend(self.parse_string(value))
-        return bytes
+        parts: list[str] = [
+            # all three types need a slightly different string representation. sigh.
+            str(val) if typ == self.Type.NUMBER else f'"{val}"' if typ == self.Type.STRING else str(val[1]).lower()
+            for typ, val in self.items
+        ]
+        return f"data {', '.join(parts)}"
 
     def parse_string(self, string: str) -> list[int]:
-        bytes: list[int] = [ord(char) for char in string]
-        logger.verbose(f"parse_bytes: got bytes of string \"{string}\": {', '.join([str(byte) for byte in bytes])}")
-        return bytes
+        out = [ord(c) for c in string]
+        logger.verbose(f"parse_bytes: string \"{string}\": {out}")
+        return out
 
     def get_size(self) -> int:
-        logger.verbose(f"data directive: got size {len(self.data)} for {', '.join([f'{d[1]}' for d in self.items])}")
-        return len(self.data)
+        # labels and numbers are 1 word, strings whatever the number of characters is.
+        count = sum(1 if typ in (self.Type.NUMBER, self.Type.LABEL) else len(str(val)) for typ, val in self.items)
+        logger.verbose(f"data directive: size {count} words for {self}")
+        return count
+
+    def resolve_words(self, labels: dict[str, int], constants: dict[str, int]) -> list[int]:
+        scope = "ir.py:DataDirectiveNode.resolve_words()"
+        words: list[int] = []
+        # used to resolve what to put into self.data.
+        # see labels.py pass 2.
+
+        for typ, val in self.items:
+            if typ == self.Type.NUMBER:
+                words.append(self.parse_number(str(val)))
+
+            elif typ == self.Type.STRING:
+                words.extend(self.parse_string(str(val)))
+
+            elif typ == self.Type.LABEL:
+                mangled_name, short_name = val
+
+                # resolve identifier to a number (i.e. constant or label)
+                if short_name in constants:
+                    words.append(constants[short_name] & 0xFFFF)
+                elif mangled_name in labels:
+                    words.append(labels[mangled_name] & 0xFFFF)
+                else:
+                    logger.fatal(f'undefined symbol "{short_name.lower()}" in data directive on line {self.line}',scope)
+        return words
 
     def encode(self) -> bytearray:
-        bits = bytearray()
+        scope = "ir.py:DataDirectiveNode.encode()"
+
+        if len(self.data) != self.get_size():
+            logger.fatal(f"data not resolved before encode (line {self.line})", scope)
+        
+        binary = bytearray()
         for word in self.data:
-            bits.append(word & 0xFF)
-            bits.append((word >> 8) & 0xFF)
-        logger.verbose(f"get_bytes: {" ".join([f'{byte:04X}' for byte in bits])[:100]}... ({len(bits)} bytes from {', '.join([f'{d[1]}' for d in self.items])})")
-        return bits
+            binary.append(word & 0xFF)
+            binary.append((word >> 8) & 0xFF)
+
+        logger.verbose(f"get_bytes: {", ".join([f"{word:04X}" for word in binary[:12]])}{f", {len(binary)//2 - 6} more..." if len(binary) > 12 else ""}")
+        return binary
 
 
 class OrgDirectiveNode(IRNode):

@@ -14,7 +14,8 @@ GRAMMAR = r"""
     # Directives 
     directive: data_directive | import_directive | org_directive | define_directive | times_directive | align_directive
 
-    data_directive: DATA constant ("," constant)*
+    data_directive: DATA data_constant ("," data_constant)*
+    ?data_constant: NUMBER | STRING | IDENTIFIER
     import_directive: IMPORT STRING
     org_directive: ORG NUMBER
     define_directive: DEFINE IDENTIFIER NUMBER
@@ -72,8 +73,6 @@ GRAMMAR = r"""
              | expression
 
     label: IDENTIFIER ":"
-
-    ?constant: NUMBER | STRING
 
     # Terminals & Lexer 
 

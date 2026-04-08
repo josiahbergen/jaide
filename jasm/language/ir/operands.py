@@ -4,15 +4,10 @@
 
 import os
 
-from .base import Operand, ExpressionNode
-from .terminals import (
-    NumberTerminal, 
-    RegisterTerminal, 
-    IdentifierTerminal
-)
-
-from ...language.isa import REGISTERS, MODES
+from ...language.isa import MODES, REGISTERS
 from ...util.logger import logger
+from .base import ExpressionNode, Operand
+from .terminals import IdentifierTerminal, NumberTerminal, RegisterTerminal
 
 
 class RegisterOperand(Operand):

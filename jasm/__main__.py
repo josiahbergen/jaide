@@ -18,6 +18,12 @@ class JasmArgumentParser(Tap):
     nolink: bool = False  # enable low-level capabilities, makes binary unlinkable
     verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
 
+    def configure(self):
+        # configure short flags
+        self.add_argument("-o",  "--output")
+        self.add_argument("-v",  "--verbosity")
+
+
 
 def check_files(file: str, output: str):
     """Check if the file is a valid JASM source file."""

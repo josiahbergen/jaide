@@ -93,42 +93,20 @@ keyboard_interrupt__backspace:
     jmp keyboard_interrupt__end
 
 keyboard_interrupt__enter:
+
+    ; execute command
+    call dispatch_command
     
-    mov a, var_command_buffer
-    mov b, s_dir
-    call util__string_compare
-    cmp c, 0
-    jnz keyboard_interrupt__enter__not_dir
-    
-    call dir
-    jmp keyboard_interrupt__enter__done
-
-keyboard_interrupt__enter__not_dir:
-
-    mov a, var_command_buffer
-    mov b, s_help
-    call util__string_compare
-    cmp c, 0
-    jnz keyboard_interrupt__enter__not_help
-    
-    call help
-    jmp keyboard_interrupt__enter__done
-
-keyboard_interrupt__enter__not_help:
-    call invalid_command
-
-keyboard_interrupt__enter__done:
-
     ; clear the buffer
     mov b, var_command_buffer
     mov c, command_buffer_length
     add c, b ; end of buffer
 
-keyboard_interrupt__enter__end__buffer_loop:
+keyboard_interrupt__enter__buffer_loop:
     put [b], 0
     inc b
     cmp b, c
-    jnz keyboard_interrupt__enter__end__buffer_loop
+    jnz keyboard_interrupt__enter__buffer_loop
 
     ; clear vram
     mov z, command_vram_start
@@ -136,11 +114,11 @@ keyboard_interrupt__enter__end__buffer_loop:
     add b, command_buffer_length ; end of used vram
     add b, command_buffer_length ; gotta multiply by 2
 
-keyboard_interrupt__enter__end__vram_loop:
+keyboard_interrupt__enter__vram_loop:
     put [z], 0
     inc z
     cmp z, b
-    jnz keyboard_interrupt__enter__end__vram_loop
+    jnz keyboard_interrupt__enter__vram_loop
 
     ; save string length to 0
     mov e, var_command_len
@@ -152,16 +130,61 @@ keyboard_interrupt__enter__end__vram_loop:
 keyboard_interrupt__end:
     iret
 
-dir:
-    string_at 0, 2, s_dir_message
+
+dispatch_command:
+    mov a, var_command_buffer
+    ; x = command_list cursor
+    ; string_compare trashes x/y, so save x around the call.
+    mov x, command_list
+
+dispatch_command__loop:
+    get b, [x] ; string pointer of the command we are checking
+    cmp b, 0
+    jz dispatch_command__not_found ; end of list, no match found
+
+    push x
+    call util__string_compare ; result in c (0 = equal); clobbers x, y
+    cmp c, 0
+    jz dispatch_command__found
+
+    pop x
+    add x, 2 ; next entry (two words)
+    jmp dispatch_command__loop
+
+dispatch_command__found:
+    ; match found! c has the string pointer of the matching command,
+    ; so the next word is the function pointer
+    pop x
+    inc x
+    get b, [x] ; now b has the function pointer
+    call b ; finally, call!
+    ret 
+
+dispatch_command__not_found:
+    call invalid_command
+    ret
+
+list:
+    string_at 0, 2, s_list_message
     ret
 
 help:
     string_at 0, 2, s_help_message
     ret
 
+mount:
+    string_at 0, 2, s_mount_message
+    ret
+
+shutdown:
+    ; send shutdown command to system interface port
+    mov a, 0x03
+    outb 0xFF, a
+    halt
+    jmp shutdown ; loop forever just in case
+
 invalid_command:
-    string_at 0, 2, s_invalid_command_message
+    string_at 0, 2, s_invalid_message
     ret
 
 import "os/graphics.jasm"
@@ -175,17 +198,22 @@ var_command_buffer:
 define command_buffer_length 20
 define command_vram_start 0xBCA4
 
-s_prompt:
-    data "$ ", 0
-s_ready:
-    data "ready.", 0
-s_help:
-    data "help", 0
-s_dir:
-    data "dir", 0
-s_help_message:
-    data "jaideos version 0.0.1 alpha", 0
-s_invalid_command_message:
-    data "invalid command            ", 0
-s_dir_message:
-    data "no filesystem mounted.     ", 0
+s_prompt: data "$ ",     0
+s_ready:  data "ready.", 0
+s_help_message:    data "jaideos version 0.0.1 alpha", 0
+s_list_message:    data "no filesystem mounted.     ", 0
+s_mount_message:   data "no mountable disk found.   ", 0
+s_invalid_message: data "invalid command.           ", 0
+
+s_cmd_help:     data "help",     0
+s_cmd_list:     data "list",     0
+s_cmd_mount:    data "mount",    0
+s_cmd_shutdown: data "shutdown", 0
+
+command_list:
+    ; maps string pointers to function pointers
+    data s_cmd_help,     help
+    data s_cmd_list,     list
+    data s_cmd_mount,    mount
+    data s_cmd_shutdown, shutdown
+    data 0,              0 ; end of list

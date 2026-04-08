@@ -3,40 +3,38 @@
 # josiah bergen, march 2026
 
 
-from lark import Transformer, v_args, Token
-
+from lark import Token, Transformer, v_args
 
 from ..util.logger import logger
-
 from .ir.base import (
-    IRNode,
-    Operand,
-    InstructionNode, 
-    LabelNode,
-    DataDirectiveNode,
-    ImportDirectiveNode,
-    OrgDirectiveNode,
-    DefineDirectiveNode,
-    TimesDirectiveNode,
     AlignDirectiveNode,
-    MacroDefinitionNode,
+    DataDirectiveNode,
+    DefineDirectiveNode,
+    ImportDirectiveNode,
+    InstructionNode,
+    IRNode,
+    LabelNode,
     MacroCallNode,
+    MacroDefinitionNode,
+    Operand,
+    OrgDirectiveNode,
+    TimesDirectiveNode,
 )
 from .ir.operands import (
-    LabelOperand,
     ImmediateOperand,
-    RegisterOperand,
-    PointerOperand,
-    OffsetPointerOperand,
-    RelativePointerOperand,
+    LabelOperand,
     MacroArgumentOperand,
+    OffsetPointerOperand,
+    PointerOperand,
+    RegisterOperand,
+    RelativePointerOperand,
 )
 from .ir.terminals import (
-    IdentifierTerminal, 
-    StringTerminal, 
+    IdentifierTerminal,
+    MnemonicTerminal,
     NumberTerminal,
     RegisterTerminal,
-    MnemonicTerminal,
+    StringTerminal,
 )
 
 
@@ -130,17 +128,27 @@ class IRTransformer(Transformer):
         # "ALIGN" NUMBER
         return AlignDirectiveNode(line(alignment), self.filename, alignment.value)
 
-    def data_directive(self, _data: Token, *constants: NumberTerminal | StringTerminal):
-        # we get a bunch of terminals, and gotta convert/annotate them into a list
-        # of tuples of (Type, str) that the DataDirectiveNode expects.
-        items: list[tuple[DataDirectiveNode.Type, str]] = []
-        for constant in constants:
-            if isinstance(constant, NumberTerminal):
-                items.append((DataDirectiveNode.Type.NUMBER, constant.value))
-            else: # StringTerminal
-                items.append((DataDirectiveNode.Type.STRING, constant.value))
+    def data_directive(self, _data: Token, *values: NumberTerminal | StringTerminal | IdentifierTerminal) -> DataDirectiveNode:
+        scope = "transformer.py:data_directive()"
+        items: list[tuple[DataDirectiveNode.Type, str | tuple[str, str]]] = []
         
-        # return parsed information!
+        for v in values:
+            # loop through each value in the data directive,
+            # parse it out, and add it to the data directive node's list of items.
+            if isinstance(v, NumberTerminal):
+                items.append((DataDirectiveNode.Type.NUMBER, v.value))
+
+            elif isinstance(v, StringTerminal):
+                items.append((DataDirectiveNode.Type.STRING, v.value))
+
+            elif isinstance(v, IdentifierTerminal):
+                # label. we gotta create an intermediate label operand 
+                # to get the name and short name, which we save as a tuple.
+                op = LabelOperand(line(v), self.filename, v)
+                items.append((DataDirectiveNode.Type.LABEL, (op.name, op.short_name)))
+            else:
+                logger.fatal(f"transformer: bad data constant type {type(v)}",scope)
+
         return DataDirectiveNode(line(_data), self.filename, items)
 
     # macros
@@ -164,9 +172,6 @@ class IRTransformer(Transformer):
         return LabelNode(line(name), self.filename, name.value)
 
     # terminals
-
-    def constant(self, constant: NumberTerminal | StringTerminal):
-        return constant
 
     def IDENTIFIER(self, identifier: Token):
         return IdentifierTerminal(line(identifier), self.filename, identifier.value)

@@ -9,7 +9,6 @@ from collections import deque
 from typing import Callable
 
 from common.isa import INSTRUCTIONS, OPCODE_FORMATS
-from .util.disasm import disassemble
 
 from .constants import (
     BANK_SIZE,
@@ -17,8 +16,8 @@ from .constants import (
     FLAG_I,
     FLAG_N,
     FLAG_O,
-    FLAG_Z,
     FLAG_STRINGS,
+    FLAG_Z,
     MEMORY_SIZE,
     NUM_BANKS,
     REGISTERS,
@@ -30,6 +29,7 @@ from .devices.pit import PIT
 from .devices.rtc import RTC
 from .exceptions import EmulatorException
 from .register import Register
+from .util.disasm import disassemble
 from .util.logger import logger
 
 
@@ -48,7 +48,7 @@ class Emulator:
         # special registers
         self.pc: Register = self.reg["PC"]  # program counter
         self.sp: Register = self.reg["SP"]  # stack pointer
-        self.f: Register = self.reg["F"]  # flags
+        self.f: Register = self.reg["F"]    # flags
         self.mb: Register = self.reg["MB"]  # memory bank
 
         # set stack pointer to 0xFEFF as recommended by the spec
@@ -88,8 +88,8 @@ class Emulator:
         from .handlers import handler_map
         self.handlers: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = handler_map
 
-
     # memory
+
     def load_binary(self, file: str, addr: int = 0):
 
         # check if file exists
@@ -148,8 +148,8 @@ class Emulator:
         memory[addr * 2] = value & 0xFF
         memory[addr * 2 + 1] = (value >> 8) & 0xFF
 
-
     # registers
+
     def reg_get(self, index: int) -> int:
         if index < 0 or index >= len(REGISTERS):
             raise EmulatorException(f"invalid register index {index}.")
@@ -183,8 +183,8 @@ class Emulator:
         self.flag_set(FLAG_N, bool(n))
         self.flag_set(FLAG_O, bool(o))
 
-
     # port helpers
+
     def port_get(self, port: int) -> int:
 
         for device in self.devices:
@@ -218,8 +218,8 @@ class Emulator:
                 device.port_write(port, value)
                 break
 
-
     # interrupt helpers
+
     def raise_interrupt(self, vector: int) -> None:
         if self.halted:
             return
@@ -242,8 +242,8 @@ class Emulator:
         print("shutting down...")
         sys.exit(0)
 
-
     # main fetch/decode
+
     def fetch(self) -> int:
         # fetch word and increment program counter
         value = self.read16(self.pc.value)
@@ -302,7 +302,7 @@ class Emulator:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
         if logger.level == logger.log_level.VERBOSE:
-            time.sleep(0.0001)
+            time.sleep(0.001)
 
         if self.interrupts_pending():
             # interrupt called!
@@ -325,7 +325,7 @@ class Emulator:
             # self._halted_step_count = (self._halted_step_count + 1) % 10000000
             # if self._halted_step_count == 0:
             #     logger.verbose("waiting for interrupt...")
-            time.sleep(0.001)
+            # time.sleep(0.001)
             return
 
         # normal fetch/decode/execute
@@ -334,7 +334,7 @@ class Emulator:
 
         logger.verbose(
             f"{disassemble(decoded):<13}"
-            f'{" ".join([f"{r}: {self.reg[r].value:0>4X} " if len(f"{self.reg[r].value:X}") >= 4 else f"{r}: {self.reg[r].value:X}{' ' * (4 - len(f'{self.reg[r].value:X}'))} " for r in self.reg if r != "F"])}  '
+            f'{" ".join([f"{r}: {self.reg[r].value:0>4X} " if len(f"{self.reg[r].value:X}") >= 4 else f"{r}: {self.reg[r].value:X}{' ' * (4 - len(f'{self.reg[r].value:X}'))} " for r in self.reg if r != "F"])} '
             f"{" ".join([f"{FLAG_STRINGS[i]}" if self.flag_get(i) else "-" for i in FLAG_STRINGS])}"
         )
 

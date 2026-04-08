@@ -125,7 +125,13 @@ data_example:
 
 hello:
     data "hello, world!", 0 ; string literal
+
+; identifier → one word (define or absolute label; same rules as operands).
+ptr:
+    data other_label
 ```
+
+future PIC/linking may resolve these to relative words or relocs instead (`DataDirectiveNode.resolve_words` in `jasm/language/ir/base.py`).
 
 ### import
 
