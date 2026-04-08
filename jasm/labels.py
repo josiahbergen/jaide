@@ -2,6 +2,8 @@
 # label resolution functions.
 # josiah bergen, december 2025
 
+from jasm.language.ir.base import Operand
+
 from .language.context import AssemblyContext
 from .language.ir.base import AlignDirectiveNode, DataDirectiveNode, InstructionNode, LabelNode
 from .language.ir.operands import ImmediateOperand, LabelOperand
@@ -38,7 +40,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
             continue
 
         if isinstance(node, InstructionNode):
-            for i, operand in enumerate(node.operands):
+            for i, operand in enumerate[Operand](node.operands):
                 # search for constants (initially parsed as labels),
                 # and replace them with immediate operands.
                 if isinstance(operand, LabelOperand) and operand.short_name in context.constants:
@@ -78,7 +80,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
 
     for node in context.ir:
         if isinstance(node, InstructionNode):
-            for i, operand in enumerate(node.operands):
+            for i, operand in enumerate[Operand](node.operands):
 
                 # search entire ir for label operands in instructions.
                 if not isinstance(operand, LabelOperand):
@@ -89,7 +91,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
 
                 # try IMM encoding: same mnemonic but with immediate operand instead of label operand
                 # there's probably a better way to do this.
-                candidate_modes = tuple(MODES.IMM if j == i else op.mode for j, op in enumerate(node.operands))
+                candidate_modes = tuple(MODES.IMM if j == i else op.mode for j, op in enumerate[Operand](node.operands))
                 if (node.mnemonic, candidate_modes) not in OPCODE_MAP:
                     logger.verbose(f"labels: no IMM variant for {node.mnemonic.name} (line {node.line}), keeping RELATIVE")
                     continue

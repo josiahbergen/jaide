@@ -41,6 +41,11 @@ test:
 	@echo "running test suite..."
 	@uv run -m pytest -q
 
+disk:
+	@echo "creating disk image..."
+	@uv run -m jfs create disk.img --add boot.bin --add kernel.bin
+	@echo "successfully created disk image."
+
 clean:
 	@echo "cleaning up..."
 	@rm -rf $(BIN_DIR)

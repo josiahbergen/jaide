@@ -2,16 +2,21 @@
 # shared isa definitions for the jaide project.
 # josiah bergen, march 2026
 
-from tap import Tap
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
-class INSTRUCTIONS(IntEnum):
-    """all supported instructions"""
+from tap import Tap
+
+
+class ZeroIndexedIntEnum(IntEnum):
+    """zero-indexed int enum."""
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return count # ensure 0-indexing
+
+class INSTRUCTIONS(ZeroIndexedIntEnum):
+    """all supported instructions"""
 
     NOP  = auto()
     HALT = auto()
@@ -37,6 +42,10 @@ class INSTRUCTIONS(IntEnum):
     NOT  = auto()
     XOR  = auto()
     SWP  = auto()
+    STI  = auto()
+    CLI  = auto()
+    STC  = auto()
+    CLC  = auto()
     INB  = auto()
     OUTB = auto()
     CMP  = auto()
@@ -59,12 +68,8 @@ class INSTRUCTIONS(IntEnum):
     IRET = auto()
 
 
-class REGISTERS(IntEnum):
+class REGISTERS(ZeroIndexedIntEnum):
     """all the registers"""
-
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values):
-        return count # ensure 0-indexing
 
     A  = auto()
     B  = auto()
@@ -80,7 +85,8 @@ class REGISTERS(IntEnum):
     PC = auto()
 
 
-class MODES(IntEnum):
+class MODES(ZeroIndexedIntEnum):
+
     """addressing modes for instructions"""
 
                           # syntax       parsed         where does the value come from?
@@ -125,6 +131,10 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
     INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.SWP:  [ (MODES.REG, MODES.REG) ],
+    INSTRUCTIONS.STI:  [ () ],
+    INSTRUCTIONS.CLI:  [ () ],
+    INSTRUCTIONS.STC:  [ () ],
+    INSTRUCTIONS.CLC:  [ () ],
     INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
@@ -252,6 +262,11 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
     (INSTRUCTIONS.XOR, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.XOR, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
+
+    (INSTRUCTIONS.STI, ()):                                (None, None, None),
+    (INSTRUCTIONS.CLI, ()):                                (None, None, None),
+    (INSTRUCTIONS.STC, ()):                                (None, None, None),
+    (INSTRUCTIONS.CLC, ()):                                (None, None, None),
 
     # I/O
     # INB dest, port_src: ssss=port_reg(op1)  dddd=dest(op0)
