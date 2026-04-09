@@ -1,274 +1,381 @@
-# Jaide: Tech Demo to OS-Ready Hardware -- Roadmap
+# Jaide: Revised Roadmap (April 2026)
 
 ## Context
 
-Jaide is a 16-bit custom computing architecture with a working emulator, assembler, and graphics subsystem. It can run simple programs (blink demos, fibonacci). The goal is to close every gap in the ISA, assembler, emulator, and spec that would prevent writing an operating system capable of running a shell, text editor, and loading/executing user binaries. This plan does NOT cover building the OS itself -- only preparing the platform.
+Jaide is a 16-bit custom computing architecture with a working emulator, assembler, graphics
+subsystem, filesystem tooling, and a partial kernel. The platform goal is a DOS-like operating
+system: a command-line shell from which you can navigate, run programs, and manage files. The
+flagship demo applications are a **word processor** (render and save markdown-like text files) and
+an **assembly editor** (write machine code, assemble in-memory, load and execute it).
 
-The user's three stated priorities: **position-independent code**, **software interrupts / syscalls**, and **proper device interfaces** (disk, GPU, keyboard, timer).
+A second hard constraint is **physical buildability**. Every architectural decision should remain
+within reach of discrete logic ICs, a small FPGA, or off-the-shelf microcontrollers. No MMU,
+no privilege levels, no virtual memory.
 
-## Phase 2: Assembler Modernization
+---
 
-**Goal**: Make the assembler capable of producing the code an OS developer needs.
+## What is already done
 
-### 2.3 -- Expression evaluation
+The following items from the previous roadmap are complete and do not need revisiting.
 
-- `ExpressionOperand` already parsed by grammar but throws `logger.fatal("not yet implemented")`
-- Implement recursive evaluator for `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `&`, `|`, `^`, `~`
-- Operates on numeric literals and EQU constants
-- Returns `ImmediateOperand` with computed value
+| Item | Notes |
+|---|---|
+| Device abstraction layer | `jaide/devices/device.py` — base `Device` class with port dispatch and `tick()` |
+| PIT timer | `jaide/devices/pit.py` — ports 0x10/0x11, interrupt vector 5 |
+| Keyboard device | `jaide/devices/keyboard.py` — port 0x01/0x02, interrupt vector 4 |
+| RTC device | `jaide/devices/rtc.py` — ports 0x30-0x33, read-only |
+| JFS disk image tool | `jfs/` package — `create`, `info`, `read` subcommands working |
+| Bootloader | `os/boot.jasm` — sets IVT entries for vectors 0-4, sets SP, aligns to 0x200 |
+| Kernel shell | `os/kernel.jasm` — keyboard input, command buffer, `dispatch_command`, stubs for `help`/`list`/`mount`/`shutdown` |
+| Graphics macros | `os/graphics.jasm` — `string_at`, `blink_at`, `xy_to_vram`, `print` |
+| String utilities | `os/util.jasm` — `string_compare`, `serial_out`, `dereference_into`, `put_value_at` |
+
+---
+
+## Phase A: Disk Controller (hard blocker)
+
+**Goal**: Give the emulator a working disk device so the kernel can load files and executables.
+
+The JFS filesystem format is already specced and the image creation tool is done. This phase
+wires the emulator to a `.img` file via a port-mapped disk controller, matching what a physical
+SPI SD-card controller would expose.
+
+### A.1 — Disk controller device (`jaide/devices/disk.py`)
+
+The disk controller exposes five ports and fires interrupt vector 6 on transfer completion.
+
+**Ports:**
+
+| Port | Direction | Purpose |
+|------|-----------|---------|
+| 0x20 | W | Command: `0x01` = READ_SECTOR, `0x02` = WRITE_SECTOR |
+| 0x21 | W | Sector number (0-indexed) |
+| 0x22 | W | Destination/source memory address (high byte) |
+| 0x23 | W | Destination/source memory address (low byte) |
+| 0x24 | R | Status: bit 0 = busy, bit 1 = done, bit 2 = error |
+
+**Transfer behavior:**
+
+When a READ or WRITE command is issued (write to port 0x20), the controller enters BUSY state and
+begins transferring one word per `tick()` call. After `BLOCK_SIZE` (256) words, it clears BUSY,
+sets DONE, and fires interrupt vector 6. This pacing mirrors real SPI SD-card behavior and avoids
+instantaneous memory copies that would be impossible to replicate in hardware.
+
+The address written to ports 0x22/0x23 is split hi/lo so that it fits within 8-bit port writes.
+The kernel assembles the full 16-bit address before issuing the command.
+
+**Backend**: reads/writes to the host `.img` file opened at startup. Sector size = 256 words =
+512 bytes (matching JFS `BLOCK_SIZE`).
+
+- **File**: `jaide/devices/disk.py`
+
+### A.2 — Wire disk device into the emulator (`jaide/emulator.py`, `jaide/__main__.py`)
+
+- Add `--disk <path>` CLI flag.
+- When `--disk` is provided, instantiate `DiskController(path, self.raise_interrupt)` and append
+  to `self.devices`.
+- The device's `tick()` is already called in the main `step()` loop via the device list.
+- Log which devices are active at startup.
+
+- **Files**: `jaide/__main__.py`, `jaide/emulator.py`
+
+### A.3 — Kernel disk interface (`os/kernel.jasm`, `os/util.jasm`)
+
+Add assembly-language wrappers for the disk controller so the rest of the kernel can call a
+clean subroutine instead of manually poking ports.
+
+```
+; disk_read_sector
+; read one sector from disk into memory.
+;   sector = sector index (immediate or register)
+;   dest   = destination word address
+; fires interrupt on completion; caller should halt and wait.
+```
+
+Wire up the disk interrupt handler in the bootloader IVT (vector 6 → `kernel__disk_interrupt`).
+The simplest strategy for now: disk operations are synchronous from the kernel's point of view —
+issue the command, loop on HALT until the disk interrupt sets a flag, then proceed.
+
+- **Files**: `os/boot.jasm` (IVT entry for vector 6), `os/util.jasm` (disk subroutines)
+
+### A.4 — Implement `mount` and `list` commands
+
+Once the disk device exists, replace the hardcoded error strings in `kernel.jasm`:
+
+- `mount`: read block 0 (the JFS boot block) from sector 0, validate the magic number
+  (`0x333A`), store the filesystem header fields in kernel variables.
+- `list`: walk the root directory table (location stored from `mount`), print each entry's
+  filename and extension to the screen.
+
+This is the first real end-to-end disk I/O test.
+
+---
+
+## Phase B: EXEC and the User Program ABI
+
+**Goal**: Load a binary from disk and run it. Return to the shell when it exits.
+
+### B.1 — Executable format and memory map
+
+User programs are flat binaries assembled to load at address `0x4000`. This is above the kernel
+(which lives at `0x0200–~0x3FFF`) and below the stack (`0xFE00`).
+
+```
+0x0000 - 0x01FF   ROM (bootloader, 512 words)
+0x0200 - 0x3FFF   Kernel (~15.5 KiB)
+0x4000 - 0xFDFF   User program space (~47 KiB)
+0xFE00 - 0xFEFF   Stack (256 words, grows down)
+0xFF00 - 0xFFFF   IVT (256 vectors)
+```
+
+User programs:
+- Are assembled with `org 0x4000`.
+- Have their entry point at the first word of the binary (address 0x4000).
+- Use `INT 0x10` to make kernel syscalls.
+- Signal exit by returning from the entry point (RET) or calling `INT 0x10` with syscall `exit`.
+
+The kernel's `exec` implementation: look up the filename in the root directory, compute the
+sector list from the FAT, read all sectors into memory starting at 0x4000, then `CALL 0x4000`.
+When that call returns, control is back in the shell.
+
+- **Files**: `os/kernel.jasm` (exec logic), document in `doc/abi.md`
+
+### B.2 — Syscall interface
+
+User programs need kernel services without hardcoding kernel addresses. The convention:
+
+- **Instruction**: `INT 0x10` (vector 16)
+- **Syscall number**: register A
+- **Arguments**: B, C, D, E
+- **Return value**: A
+- Caller-saved registers: A, B, C, D, E. Callee-saved: X, Y, Z, SP, MB.
+
+Initial syscall table:
+
+| Number | Name | Args | Returns |
+|--------|------|------|---------|
+| 0x00 | `exit` | — | never |
+| 0x01 | `write_char` | B = char code | — |
+| 0x02 | `write_string` | B = string address | — |
+| 0x03 | `read_char` | — | A = char code (blocks) |
+| 0x04 | `open_file` | B = filename address | A = file handle or error |
+| 0x05 | `read_file` | B = handle, C = dest addr | A = bytes read |
+| 0x06 | `write_file` | B = handle, C = src addr, D = length | A = 0 or error |
+| 0x07 | `exec` | B = filename address | A = 0 or error |
+
+The bootloader (`boot.jasm`) must install a handler for vector 16 that dispatches to the kernel's
+syscall router. The kernel's syscall router is a jump table indexed by A.
+
+- **Files**: `os/boot.jasm` (IVT entry 16), `os/kernel.jasm` (syscall dispatch table and
+  handlers), `doc/syscalls.md` (new)
+
+### B.3 — `exec` shell command
+
+Wire a new `exec` command (or use a bare filename as the default shell behavior) that calls the
+kernel's exec routine. Minimal version:
+
+```
+exec <filename>
+```
+
+Looks up `<filename>` in the root directory, loads it to 0x4000, calls it, returns to shell when
+done.
+
+---
+
+## Phase C: Shell Quality of Life
+
+**Goal**: Make the shell usable as a real interactive environment.
+
+### C.1 — Display scrolling
+
+Currently, command output is always written to row 2 and subsequent commands overwrite it. The
+shell needs a scrolling output region (rows 2–24) so output accumulates naturally.
+
+Implementation:
+- Maintain a cursor tracking the next output row.
+- When the cursor reaches row 24, shift VRAM rows 2–24 up by one row (copy 160 words at a time),
+  clear row 24, write output there.
+- The VRAM shift is done by the kernel; user programs call the `write_string` syscall and the
+  kernel handles scrolling transparently.
+
+- **File**: `os/kernel.jasm` (scroll routine, cursor tracking)
+
+### C.2 — Cursor and input line management
+
+Currently the input line is hardcoded to row 1. After scrolling is implemented, the input line
+should stay fixed at the bottom (row 24) while output scrolls in the region above.
+
+Alternative (simpler, more DOS-like): the prompt is always at the bottom of the output stream.
+After each command, print a new prompt on the next available line. This is easier to implement
+and feels more natural.
+
+- **File**: `os/kernel.jasm`
+
+### C.3 — Additional built-in commands
+
+Once disk I/O and exec work:
+
+| Command | Behavior |
+|---------|----------|
+| `help` | List available commands |
+| `list` | List files on disk (already planned in A.4) |
+| `exec <file>` | Load and run a program from disk |
+| `shutdown` | Halt via system port (already exists) |
+| `clear` | Fill output region with spaces, reset cursor |
+
+---
+
+## Phase D: Assembler Expression Evaluation
+
+**Goal**: Remove the last `logger.fatal("not yet implemented")` in the assembler.
+
+### D.1 — Expression evaluator (`jasm/language/transformer.py`)
+
+`ExpressionOperand` is already parsed by the grammar but hits a fatal error in `transformer.py:101`.
+Implement a recursive evaluator supporting:
+
+- Operators: `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `&`, `|`, `^`, `~`
+- Operands: numeric literals and `define`/`EQU` constants
+- Returns an `ImmediateOperand` with the computed value
+
+This removes hacks like `add z, %ximm; add z, %ximm` (multiply-by-2 workaround) and makes
+writing position-sensitive VRAM math much cleaner.
+
 - **Files**: `jasm/language/transformer.py`, `jasm/language/ir/operands.py`
 
 ---
 
-## Phase 3: Device Layer
+## Phase E: Demo Applications
 
-**Goal**: Give the emulated CPU enough peripherals to run an OS.
+These are user programs assembled with `org 0x4000` and loaded from disk via `exec`. They use
+syscalls for all kernel interaction.
 
-### 3.0 -- Device abstraction layer
+### E.1 — Word processor (`apps/editor.jasm`)
 
-Create a base `Device` class and `DeviceManager` so the emulator manages all devices uniformly:
+A full-screen text editor for reading and writing plain text files.
 
-```python
-class Device:
-    def port_read(self, port: int) -> int: ...
-    def port_write(self, port: int, value: int): ...
-    def tick(self): ...  # called once per CPU cycle
+Features:
+- Load a file from disk by name (passed as argument via convention TBD)
+- Display file contents in the 80x25 VRAM grid, with line wrapping
+- Cursor navigation: arrow keys move within the text buffer
+- Insert and delete characters
+- Save to disk on command (e.g., Ctrl+S)
+- Exit and return to shell (e.g., Ctrl+Q)
+
+The text buffer lives in user program memory (above 0x4000). Files are read via the `read_file`
+syscall. Saving uses `write_file`.
+
+Markdown-like rendering (bold, italic) is a stretch goal — the VRAM color attribute byte can
+encode text color, so headers could display in a different color than body text.
+
+### E.2 — Assembly editor / REPL (`apps/asm.jasm`)
+
+A combined text editor and in-memory assembler. The user types assembly code, presses a key to
+assemble, and the assembled binary is executed immediately.
+
+This requires a minimal assembler implemented in JASM itself — a significant but achievable
+project. A simpler first version could just be a hex editor that writes words directly to a
+scratchpad region and jumps to it.
+
+Phased approach:
+1. **Hex editor**: type hex values, write them to a scratch buffer at `0x8000`, execute.
+2. **Macro assembler**: parse a small subset of JASM syntax (MOV, JMP, CALL, RET, basic ALU),
+   assemble to the scratch buffer, execute.
+
+---
+
+## Phase F: Physical Hardware
+
+**Goal**: Everything above should be feasible to implement in hardware.
+
+### Design principles
+
+- **Port-mapped I/O only**. No memory-mapped I/O, no DMA bus master. Every device interaction
+  goes through `INB`/`OUTB`. This keeps the address bus simple.
+- **Interrupt-driven peripherals**. Devices signal completion via an IRQ line; the CPU polls a
+  status port only when needed (e.g., RTC).
+- **16-bit word-addressed memory**. SRAM chips are the natural fit (e.g., 128K×8 pairs used as
+  128K×16). No DRAM complexity.
+
+### Hardware device candidates
+
+| Device | Emulator | Physical candidate |
+|--------|----------|-------------------|
+| CPU | `jaide/emulator.py` | Custom FPGA or TTL discrete logic |
+| ROM | `memory[0x0000-0x01FF]` | Small EEPROM (AT28C16 or similar) |
+| RAM | `memory[0x0200-0xFDFF]` | SRAM (62256 or similar) |
+| VRAM | `banks[1]` | Dedicated SRAM bank, read by video controller |
+| Video controller | `jaide/devices/graphics.py` | FPGA with VGA output |
+| Keyboard | `jaide/devices/keyboard.py` | PS/2 decoder (ATmega or discrete) |
+| Timer (PIT) | `jaide/devices/pit.py` | 8253/8254 PIT chip, or 555 + counter |
+| RTC | `jaide/devices/rtc.py` | DS1307 (I²C, needs small glue logic) |
+| Disk controller | `jaide/devices/disk.py` | SD card module over SPI + port decoder |
+
+The disk controller is the most interesting physical design challenge. The emulator's model
+(sector-addressed, port-mapped, one-word-per-tick DMA, completion interrupt) maps directly onto
+a microcontroller (e.g., ATmega328) acting as an SPI SD card bridge: the host CPU writes the
+sector number and destination address to ports, the bridge reads from the SD card over SPI and
+writes words into shared SRAM, then asserts an IRQ line when done.
+
+### What is explicitly out of scope for physical hardware
+
+- **MMU / memory protection**: not feasible without radical architecture changes.
+- **Virtual memory / paging**: same.
+- **Multiple privilege levels**: not needed for a single-user system.
+
+---
+
+## Execution order and dependencies
+
 ```
+Phase A (Disk Controller) ─────────────────────── CRITICAL PATH
+  A.1  disk.py device
+  A.2  --disk CLI arg, emulator wiring
+  A.3  kernel disk subroutines + disk interrupt handler
+  A.4  mount + list commands work
+       │
+Phase B (EXEC + Syscalls) ─────────────────────── CRITICAL PATH
+  B.1  memory map + executable format decided
+  B.2  INT 0x10 syscall handler in kernel
+  B.3  exec shell command
+       │
+    ┌──┴───────────────────────────────┐
+Phase C (Shell UX)              Phase D (Assembler)
+  C.1  display scrolling          D.1  expression evaluator
+  C.2  input line management
+  C.3  built-in commands
+    └──┬───────────────────────────────┘
+       │
+Phase E (Applications) ─────────────────── depends on B + C
+  E.1  word processor
+  E.2  assembly editor / hex editor
 
-Refactor `port_get`/`port_set` to dispatch to owning device. Add `tick()` call in the `step()` loop.
-
-- **Files**: `jaide/devices/__init__.py` (new base class), `jaide/emulator.py` (refactor port dispatch, add tick loop)
-
-### 3.1 -- Programmable Interval Timer (PIT) [CRITICAL for OS]
-
-Without a timer, there is no preemptive multitasking, no `sleep()`, no time-slicing.
-
-- **Ports**: 0x10 (control: enable/mode bits), 0x11 (reload value in cycles), 0x12 (current count, read-only)
-- **Interrupt**: Vector 5
-- **Behavior**: Each `tick()` decrements counter. At zero: fire interrupt, reload if periodic mode.
-- **File**: `jaide/devices/timer.py` (new)
-
-### 3.2 -- Disk Controller [CRITICAL for OS]
-
-Without disk I/O, the OS can't load programs or persist data. The user already has a JFS filesystem spec in `doc/file.md`.
-
-- **Ports**: 0x20 (command: READ_SECTOR/WRITE_SECTOR/STATUS), 0x21 (sector number), 0x22 (memory address hi), 0x23 (memory address lo), 0x24 (status: busy/error/done bits)
-- **Interrupt**: Vector 6 on transfer complete
-- **Backend**: Host filesystem binary file (`--disk disk.img` CLI arg)
-- **DMA-style transfer**: On READ command, copy 256 words into emulator memory over 256 ticks (one word per tick), then fire completion interrupt. Avoids word-by-word programmed I/O.
-- **File**: `jaide/devices/disk.py` (new), `jaide/__main__.py` (add `--disk` arg)
-
-### 3.3 -- Keyboard device refactor
-
-Currently hardcoded in `emulator.py:282-289` with direct queue polling and magic constants. Move to a `KeyboardDevice` subclass.
-
-- Port 1, interrupt vector 4 become device constants
-- `key_queue` passed to device instead of emulator
-- **Files**: `jaide/devices/keyboard.py` (new), `jaide/emulator.py` (remove hardcoded logic)
-
-### 3.4 -- Real-Time Clock (RTC)
-
-Simple read-only device providing wall-clock time through ports.
-
-- **Ports**: 0x30 (seconds), 0x31 (minutes), 0x32 (hours), 0x33 (day-of-year)
-- No interrupt; software polls when needed.
-- **File**: `jaide/devices/rtc.py` (new)
-
-### 3.5 -- Console device (upgrade port 0)
-
-Port 0 currently does `print(chr(value))` inline. Wrap in a proper `ConsoleDevice` with status port (0x02: output ready, input available bits). Enables headless/debug operation alongside the graphics display.
-
-- **File**: `jaide/devices/console.py` (new)
-
----
-
-## Phase 4: Conventions, Spec, and ABI
-
-**Goal**: Document everything an OS programmer needs to know without reading emulator source.
-
-### 4.1 -- Calling convention / ABI (`doc/abi.md`, new)
-
-- Arguments: first 4 in A, B, C, D; extras on stack right-to-left
-- Return value: A
-- Caller-saved: A, B, C, D, E (volatile)
-- Callee-saved: X, Y, Z, SP, MB (non-volatile)
-- Stack frame: no mandatory frame pointer; Z optionally used as FP
-- SP must be word-aligned at all times
-
-### 4.2 -- Syscall convention (`doc/syscalls.md`, new)
-
-- Syscalls use `INT 0x80` (vector 128) -- or pick a vector in the 16-47 range
-- Syscall number in A, arguments in B, C, D, E
-- Return value in A
-- OS installs handler at corresponding IVT entry
-- Define initial syscall numbers: read, write, open, close, exec, exit, sbrk
-
-### 4.3 -- Formalize interrupt vector allocation (update `doc/spec.md`)
-
-| Vector | Type      | Purpose                          |
-| ------ | --------- | -------------------------------- |
-| 0      | Exception | Division by zero / general fault |
-| 1      | Exception | Invalid opcode                   |
-| 2      | Exception | Protection fault (future)        |
-| 3      | Reserved  | Reserved                         |
-| 4      | Hardware  | Keyboard                         |
-| 5      | Hardware  | Timer (PIT)                      |
-| 6      | Hardware  | Disk controller                  |
-| 7-15   | Hardware  | Reserved for future devices      |
-| 16-47  | Software  | OS syscalls                      |
-| 48-255 | Software  | User-defined                     |
-
-### 4.4 -- Formalize port allocation (update `doc/spec.md`)
-
-| Port Range | Device                 |
-| ---------- | ---------------------- |
-| 0x00-0x02  | Console (serial)       |
-| 0x10-0x12  | Timer (PIT)            |
-| 0x20-0x24  | Disk controller        |
-| 0x30-0x33  | RTC                    |
-| 0x40-0x4F  | Reserved (GPU control) |
-| 0xFF       | System control         |
-
-### 4.5 -- Boot sequence document (`doc/boot.md`, new)
-
-1. CPU starts at PC=0x0000 (ROM)
-2. ROM bootloader initializes SP to 0xFEFF
-3. Bootloader reads sector 0 from disk into memory at a defined address (e.g., 0x0200 or 0x4200)
-4. Bootloader jumps to loaded code
-5. Kernel sets up IVT, initializes devices, enables interrupts
-
-### 4.6 -- Fix graphics.md and consolidate VRAM spec
-
-- Correct resolution discrepancy (80x25 / 8x16, not 80x50 / 8x8)
-- Ensure VRAM word structure, color palette, and bank assignment are fully documented
-
----
-
-## Phase 5: Tooling and Developer Experience
-
-**Goal**: Make it practical to develop and debug OS-level code.
-
-### 5.1 -- Improved REPL disassembler
-
-Current `disasm_at` shows raw register indices. Upgrade to:
-
-- Show register names in context (`MOV A, 0x0200` not `MOV 0 1 0200`)
-- Resolve PC-relative targets to absolute addresses
-- Range disassembly: `disasm 0x0000 0x0020`
-- Show hex bytes alongside mnemonics
-- **File**: `jaide/repl.py`
-
-### 5.2 -- Symbol file output from assembler
-
-- Add `-s` / `--symbols` flag that writes a `.sym` file (label name -> word address)
-- REPL `loadsym` command loads symbol file, shows labels in disassembly
-- **Files**: `jasm/__main__.py`, `jasm/jasm.py`, `jaide/repl.py`
-
-### 5.3 -- Memory watchpoints
-
-- `watch 0xFE00` breaks when any instruction writes to that address
-- Essential for debugging memory corruption
-- **Files**: `jaide/repl.py`, `jaide/emulator.py` (check in `write16`)
-
-### 5.4 -- Instruction counter / cycle profiling
-
-- Track instruction count, per-opcode frequency
-- `profile` REPL command shows stats
-- **Files**: `jaide/emulator.py`, `jaide/repl.py`
-
-### 5.5 -- Disk image creation tool
-
-- Python utility to create JFS-formatted disk images per `doc/file.md` spec
-- `python -m jfs create disk.img --add boot.bin --add kernel.bin`
-- **Files**: `jfs/` (new package)
-
-### 5.6 -- Linker (stretch goal, builds on existing `doc/plan.md` design)
-
-The existing `doc/plan.md` already designs a `.jo` object format and `jlink` linker. Implementation:
-
-- Add `EXPORT` / `EXTERN` directives to assembler grammar
-- Add `-c` (compile-only) flag to emit `.jo` relocatable objects instead of flat binary
-- Build `jlink` package that reads `.jo` files, resolves symbols, patches relocations, emits final binary
-- Not strictly required for a first OS (single-file assembly with IMPORT works), but needed for multi-module builds
-- **Files**: `jlink/` (new), `jasm/language/grammar.py`, `jasm/binary.py`
-
----
-
-## Execution Order and Dependencies
-
-```txt
-Phase 0 (Foundation) ──────────────────────────────────────
-  0.1 Test infrastructure
-  0.2 Fix CMP ←─ needs tests from 0.1
-  0.3 Fix LSH/RSH flags
-  0.4 Fix exception interrupts (div-by-zero, invalid opcode)
-  0.5 Fix documentation
-         │
-Phase 1 (ISA) ─────────────────────────────────────────────
-  1.1 DIV ──────────┐
-  1.2 ASR ──────────┤ all independent, can parallelize
-  1.3 PUT [label] ──┘
-         │
-    ┌────┴────┐
-Phase 2       Phase 3
-(Assembler)   (Devices)         ← can develop in parallel
-  2.1 ORG       3.0 Device abstraction
-  2.2 EQU       3.1 Timer (PIT)
-  2.3 Exprs     3.2 Disk controller
-  2.4 RESW      3.3 Keyboard refactor
-  2.5 Escapes   3.4 RTC
-  2.6 ALIGN     3.5 Console device
-    └────┬────┘
-         │
-Phase 4 (Conventions & Spec) ──────────────────────────────
-  4.1-4.6 Documentation (can be written as features land)
-         │
-Phase 5 (Tooling) ─────────────────────────────────────────
-  5.1 Disassembler
-  5.2 Symbol files
-  5.3 Watchpoints
-  5.4 Profiling
-  5.5 Disk image tool ←─ depends on 3.2
-  5.6 Linker (stretch)
+Phase F (Physical Hardware) ────────────── parallel, ongoing
+  informed by all prior phases
 ```
 
 ---
 
-## What is intentionally NOT in this roadmap
+## Verification milestones
 
-- **Privilege levels / supervisor mode / MMU**: Important for a production OS but not required for a first OS on an emulated single-user system. The OS author can enforce discipline without hardware protection. Add in a future "Phase 6: Hardening" after the first OS boots.
-- **Virtual memory / paging**: Not feasible without radical architecture changes. Defer indefinitely.
-- **Mouse / audio / networking**: Not needed for shell + text editor.
-- **High-level language / compiler**: Far future. The assembler must be solid first.
-- **The OS itself**: Out of scope per user request.
-
----
-
-## Verification Plan
-
-After each phase, verify with an end-to-end smoke test:
-
-- **Phase 0**: Run existing `programs/blink.jasm` -- should still work. Run new test suite -- all pass.
-- **Phase 1**: Write a small PIC test program using `PUT [label], reg`, `DIV`, `ASR`. Assemble, load at a non-zero origin, verify correct execution.
-- **Phase 2**: Write a program using `ORG 0x0200`, `EQU`, `RESW`, `ALIGN`, expressions. Assemble and verify binary output.
-- **Phase 3**: Write a program that sets up a timer interrupt handler, reads a sector from disk, and echoes keyboard input. Run with `--disk` and `-g` flags.
-- **Phase 4**: N/A (documentation review).
-- **Phase 5**: Assemble with `--symbols`, load symbols in REPL, disassemble with labels showing, set a watchpoint, verify it fires.
+| Milestone | Pass condition |
+|-----------|----------------|
+| **A done** | `make test`, then run emulator with `--disk disk.img -g`; type `mount`, see JFS header info; type `list`, see filenames from the image |
+| **B done** | Assemble a trivial "hello world" user program to `org 0x4000`, add it to the disk image, type `exec hello` in the shell, see output, return to shell prompt |
+| **C done** | Fill the shell with 30+ lines of output, verify scrolling; input line remains usable throughout |
+| **D done** | Assemble a program using constant arithmetic expressions (e.g., `mov a, VRAM_BASE + 80 * 2`), verify correct binary output |
+| **E.1 done** | Open a text file from disk in the editor, make edits, save, re-open, verify changes persisted |
+| **E.2 done** | Type a small JASM program in the editor, assemble and execute it, verify behavior without leaving the OS |
 
 ---
 
-## Critical Files Summary
+## What is intentionally out of scope
 
-| File                           | Touched In                                               |
-| ------------------------------ | -------------------------------------------------------- |
-| `common/isa.py`                | Phase 0 (CMP fix), Phase 1 (all ISA additions)           |
-| `jaide/emulator.py`            | Phase 0, 1, 3 (handlers, exceptions, device integration) |
-| `jasm/language/grammar.py`     | Phase 1 (new mnemonics), Phase 2 (all directives)        |
-| `jasm/language/ir/base.py`     | Phase 2 (new IR node types)                              |
-| `jasm/language/transformer.py` | Phase 2 (directive handlers, expression eval)            |
-| `jasm/labels.py`               | Phase 2 (ORG, ALIGN, EQU resolution)                     |
-| `jasm/binary.py`               | Phase 2 (RESW/ALIGN encoding)                            |
-| `jaide/devices/`               | Phase 3 (all new device modules)                         |
-| `jaide/repl.py`                | Phase 5 (disassembler, watchpoints, profiling)           |
-| `doc/spec.md`                  | Phase 0, 4 (all spec updates)                            |
-| `doc/inst.txt`                 | Phase 0, 1 (instruction reference updates)               |
+- **Linker**: single-file assembly with `import` is sufficient for all target applications.
+  Multi-module builds are a future "Phase G" if ever needed.
+- **Privilege levels / supervisor mode**: not needed for a single-user emulated system.
+- **Virtual memory / paging**: not feasible without radical architecture changes.
+- **Mouse, audio, networking**: not needed for the target demo applications.
+- **The OS filesystem itself written in assembly**: the JFS tool (`python -m jfs`) fills this
+  role from the host side. On-device file creation/deletion can be added later.

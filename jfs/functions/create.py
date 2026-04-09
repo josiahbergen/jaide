@@ -149,4 +149,4 @@ def create(args: JFSArgs) -> None:
         logger.verbose(f"writing to file...")
         disk.tofile(f)
 
-    logger.success(f"wrote {BLOCKS} blocks, {BLOCKS * BLOCK_SIZE * 2:,} bytes.")
+    logger.success(f"wrote {BLOCKS} blocks, {BLOCKS * BLOCK_SIZE * 2 // 1024:,} KiB.")

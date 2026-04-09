@@ -1,4 +1,3 @@
-define vram_start 0xBC00
 
 ; xy_to_vram
 ; convert x and y coordinates to a vram address.
@@ -35,7 +34,7 @@ macro string_at %x, %y, %string
     mov x, %x
     mov y, %y
     mov a, %string
-    call print
+    call graphics__print
 end macro
 
 macro blink_at %ximm, %yimm

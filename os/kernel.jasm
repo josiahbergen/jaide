@@ -1,11 +1,7 @@
 ; this code lives at 0x200, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 main:
-
-    string_at 0, 0, s_ready
-
-    string_at 0, 1, s_promptt 
-    blink_at 2, 1
+    call shell_draw_prompt
     jmp loop
 
 loop:
@@ -93,10 +89,19 @@ keyboard_interrupt__backspace:
     jmp keyboard_interrupt__end
 
 keyboard_interrupt__enter:
+    cmp c, 0x00
+    ; empty command, scroll up and draw prompt
+    jz keyboard_interrupt__enter__empty
 
     ; execute command
     call dispatch_command
+    jmp keyboard_interrupt__enter__clear
+
+keyboard_interrupt__enter__empty:
+    call shell_scroll_up_one
+    call shell_draw_prompt
     
+keyboard_interrupt__enter__clear:
     ; clear the buffer
     mov b, var_command_buffer
     mov c, command_buffer_length
@@ -108,24 +113,9 @@ keyboard_interrupt__enter__buffer_loop:
     cmp b, c
     jnz keyboard_interrupt__enter__buffer_loop
 
-    ; clear vram
-    mov z, command_vram_start
-    mov b, z
-    add b, command_buffer_length ; end of used vram
-    add b, command_buffer_length ; gotta multiply by 2
-
-keyboard_interrupt__enter__vram_loop:
-    put [z], 0
-    inc z
-    cmp z, b
-    jnz keyboard_interrupt__enter__vram_loop
-
     ; save string length to 0
     mov e, var_command_len
     put [e], 0
-
-    ; draw blinker
-    blink_at 2, 1
 
 keyboard_interrupt__end:
     iret
@@ -165,15 +155,18 @@ dispatch_command__not_found:
     ret
 
 list:
-    string_at 0, 2, s_list_message
+    mov a, s_list_message
+    call shell_print_line
     ret
 
 help:
-    string_at 0, 2, s_help_message
+    mov a, s_help_message
+    call shell_print_line
     ret
 
 mount:
-    string_at 0, 2, s_mount_message
+    mov a, s_mount_message
+    call shell_print_line
     ret
 
 shutdown:
@@ -184,19 +177,64 @@ shutdown:
     jmp shutdown ; loop forever just in case
 
 invalid_command:
-    string_at 0, 2, s_invalid_message
+    mov a, s_invalid_message
+    call shell_print_line
+    ret
+
+shell_draw_prompt:
+    ; draw to bottom row (24)
+    string_at 0, 24, s_prompt
+    blink_at 2, 24
+    ret
+
+shell_print_line:
+    ; scroll, print on line above prompt, redraw prompt
+    call shell_scroll_up_one
+    mov x, 0
+    mov y, 23 ; output line
+    call graphics__print
+    call shell_draw_prompt
+    ret
+
+shell_scroll_up_one:
+    ; vram layout is 80x25 chars, 2 words per char:
+    ; - 160 words per row (80 * 2)
+    ; - 4000 words total (25 * 160)
+    mov x, vram_start   ; destination cursor
+    mov y, vram_start   ; source cursor
+    add y, 160          ; start source at row 1 (skip top row)
+    mov z, vram_start   ; copy-end marker (start of last row)
+    add z, vram_length  ; end of vram
+
+shell_scroll_up_one__copy:
+    get a, [y]
+    put [x], a
+    inc x
+    inc y
+    cmp y, z
+    jnz shell_scroll_up_one__copy
+
+    ; after copy, x already points at row 23 (the output row)
+    mov z, x
+    add z, 160 ; clear exactly one row (row 23)
+
+shell_scroll_up_one__clear:
+    put [x], 0
+    inc x
+    cmp x, z
+    jnz shell_scroll_up_one__clear
     ret
 
 import "os/graphics.jasm"
 import "os/util.jasm"
 
-var_command_len:
-    data 0
-var_command_buffer:
-    times 17, 0
+var_command_len: data 0
+var_command_buffer: times 20, 0
 
 define command_buffer_length 20
-define command_vram_start 0xBCA4
+define command_vram_start 0xCB04
+define vram_start 0xBC00
+define vram_length 0x0FA0
 
 s_prompt: data "$ ",     0
 s_ready:  data "ready.", 0
