@@ -89,6 +89,8 @@ keyboard_interrupt__backspace:
     jmp keyboard_interrupt__end
 
 keyboard_interrupt__enter:
+    call shell_scroll
+
     cmp c, 0x00
     ; empty command, scroll up and draw prompt
     jz keyboard_interrupt__enter__empty
@@ -98,7 +100,6 @@ keyboard_interrupt__enter:
     jmp keyboard_interrupt__enter__clear
 
 keyboard_interrupt__enter__empty:
-    call shell_scroll_up_one
     call shell_draw_prompt
     
 keyboard_interrupt__enter__clear:
@@ -189,40 +190,37 @@ shell_draw_prompt:
 
 shell_print_line:
     ; scroll, print on line above prompt, redraw prompt
-    call shell_scroll_up_one
+    call shell_scroll
     mov x, 0
     mov y, 23 ; output line
     call graphics__print
     call shell_draw_prompt
     ret
 
-shell_scroll_up_one:
-    ; vram layout is 80x25 chars, 2 words per char:
-    ; - 160 words per row (80 * 2)
-    ; - 4000 words total (25 * 160)
+shell_scroll:
     mov x, vram_start   ; destination cursor
-    mov y, vram_start   ; source cursor
-    add y, 160          ; start source at row 1 (skip top row)
+    mov y, vram_start   
+    add y, 160          ; source cursor
     mov z, vram_start   ; copy-end marker (start of last row)
     add z, vram_length  ; end of vram
 
-shell_scroll_up_one__copy:
+shell_scroll__copy:
     get a, [y]
     put [x], a
     inc x
     inc y
     cmp y, z
-    jnz shell_scroll_up_one__copy
+    jnz shell_scroll__copy
 
     ; after copy, x already points at row 23 (the output row)
     mov z, x
     add z, 160 ; clear exactly one row (row 23)
 
-shell_scroll_up_one__clear:
+shell_scroll__clear:
     put [x], 0
     inc x
     cmp x, z
-    jnz shell_scroll_up_one__clear
+    jnz shell_scroll__clear
     ret
 
 import "os/graphics.jasm"
