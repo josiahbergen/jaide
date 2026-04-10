@@ -418,6 +418,32 @@ def handle_nop(_emu, _decoded: tuple[int, ...]) -> None:
     pass
 
 
+def handle_blkcpy(emu, decoded: tuple[int, ...]) -> None:
+    opcode, reg_a, reg_b, imm16 = decoded
+    modes = OPCODE_FORMATS[opcode].modes
+    dst = emu.reg_get(reg_b)   # dddd = dst address
+    src = emu.reg_get(reg_a)   # ssss = src address
+    count = imm16 if modes == (MODES.REG, MODES.REG, MODES.IMM) else emu.reg_get(2)  # C = index 2
+
+    bank = emu._cached_bank
+    if bank != 0 and 0xBC00 <= src <= 0xFDFF and 0xBC00 <= dst <= 0xFDFF:
+        mem = emu._banked_memory
+        s = (src - 0xBC00) * 2
+        d = (dst - 0xBC00) * 2
+    elif bank == 0:
+        mem = emu.memory
+        s = src * 2
+        d = dst * 2
+    else:
+        # cross-boundary copy: fall back to word-by-word
+        for i in range(count):
+            emu.write16(dst + i, emu.read16(src + i))
+        return
+
+    n = count * 2
+    mem[d:d + n] = mem[s:s + n]
+
+
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.HALT : handle_halt,
     INSTRUCTIONS.GET  : handle_get,
@@ -461,6 +487,7 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.CALL : handle_call,
     INSTRUCTIONS.RET  : handle_ret,
     INSTRUCTIONS.INT  : handle_int,
-    INSTRUCTIONS.IRET : handle_iret,
-    INSTRUCTIONS.NOP  : handle_nop,
+    INSTRUCTIONS.IRET  : handle_iret,
+    INSTRUCTIONS.NOP   : handle_nop,
+    INSTRUCTIONS.BLKCPY: handle_blkcpy,
 }

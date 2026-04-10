@@ -208,35 +208,26 @@ draw_prompt:
 scroll:
     dereference_into y, var_cursor_row
     cmp y, 24
-    jz scroll_necissary
+    jz scroll_necessary
 
     inc y
     save_to var_cursor_row, y
     ret
 
-scroll_necissary:
-    push a
+scroll_necessary:
     push x
     push z
     push y
 
-    mov x, vram_start   ; destination cursor
-    mov y, vram_start   
-    add y, 160          ; source cursor
-    mov z, vram_start   ; copy-end marker (start of last row)
-    add z, vram_length  ; end of vram
+    mov x, vram_start         ; dst = row 0
+    mov y, vram_start
+    add y, 160                ; src = row 1
+    blkcpy x, y, 0x0F00      ; copy rows 1-24 up to rows 0-23 (3840 words)
 
-scroll_copy:
-    get a, [y]
-    put [x], a
-    inc x
-    inc y
-    cmp y, z
-    jnz scroll_copy
-
-    ; after copy, x already points at row 23 (the output row)
-    mov z, x
-    add z, 160 ; clear exactly one row (row 23)
+    ; set up clear of the last row (row 24)
+    add x, 0x0F00             ; x = start of last row
+    mov z, vram_start
+    add z, vram_length        ; z = end of vram
 
 scroll_clear:
 
@@ -246,10 +237,9 @@ scroll_clear:
     cmp x, z ; end of row is in z
     jnz scroll_clear
 
-    pop z ; restore registers
     pop y
+    pop z
     pop x
-    pop a
     ret
 
 ; print a white-on-black string. scrolls up the screen if an overflow occurs.
