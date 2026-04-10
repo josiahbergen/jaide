@@ -1,255 +1,28 @@
 ; this code lives at 0x200, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
+
 main:
-    call shell_draw_prompt
-    jmp loop
+    ; init code. nothing to do here for now.
+    mov a, s_ready
+    mov x, 0
+    mov y, 0
+    call shell__print
+    call shell__init
 
 loop:
-    halt ; wait around for interrupts to come in
+    ; wait around for interrupts to come in...
+    halt
+    ; we did something! loop back around.
     jmp loop
 
 keyboard_interrupt:
-    inb a, 0x01 ; get key
+    ; keyboard input, handled by the shell.
+    jmp shell__keyboard_interrupt
 
-    ; non-printable characters
-    ; cmp a, 20
-    ; jb keyboard_interrupt__end
-    cmp a, 0x7F
-    ja keyboard_interrupt__end
+; in the future, the syscall interface (filesystem, exec, etc.) will live here.
+; for now, we are literally just plunking stuff in vram with the shell.
 
-    ; normal (non-special) key pressed!
-
-    ; get current string length  
-    mov c, var_command_len
-    get c, [c]
-
-    ; position of the end of the string in vram
-    mov z, command_vram_start
-    add z, c
-    add z, c ; multiply by 2, because each character takes 2 words
-
-    cmp a, 0x0D ; enter
-    jz keyboard_interrupt__enter
-
-    cmp a, 0x08 ; backspace
-    jz keyboard_interrupt__backspace
-
-keyboard_interrupt__append:
-
-    cmp c, command_buffer_length
-    jae keyboard_interrupt__end ; buffer is full, ignore
-    
-    ; put glyph to vram
-    put [z], a      ; word 0: character code
-    inc z
-    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
-    inc z
-    ; re-draw blinker (we just overwrote it)
-    put [z], 0x20   ; word 0: space
-    inc z
-    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
-
-    ; save character to command buffer
-    mov e, var_command_buffer
-    add e, c
-    put [e], a
-
-    ; increment and save the new string length
-    inc c 
-    mov e, var_command_len
-    put [e], c
-
-    jmp keyboard_interrupt__end
-
-keyboard_interrupt__backspace:
-
-    cmp c, 0x00
-    jz keyboard_interrupt__end ; buffer is empty, ignore
-
-    ; overwrite the blinker
-    put [z], 0x00
-    inc z
-    put [z], 0x00
-    sub z, 3
-    ; draw new blinker
-    put [z], 0x20   ; word 0: space
-    inc z
-    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
-
-    ; decrement and save string length
-    dec c
-    mov e, var_command_len
-    put [e], c
-
-    ; zero out the last character in the command buffer
-    mov e, var_command_buffer
-    add e, c
-    put [e], 0
-
-    jmp keyboard_interrupt__end
-
-keyboard_interrupt__enter:
-    call shell_scroll
-
-    cmp c, 0x00
-    ; empty command, scroll up and draw prompt
-    jz keyboard_interrupt__enter__empty
-
-    ; execute command
-    call dispatch_command
-    jmp keyboard_interrupt__enter__clear
-
-keyboard_interrupt__enter__empty:
-    call shell_draw_prompt
-    
-keyboard_interrupt__enter__clear:
-    ; clear the buffer
-    mov b, var_command_buffer
-    mov c, command_buffer_length
-    add c, b ; end of buffer
-
-keyboard_interrupt__enter__buffer_loop:
-    put [b], 0
-    inc b
-    cmp b, c
-    jnz keyboard_interrupt__enter__buffer_loop
-
-    ; save string length to 0
-    mov e, var_command_len
-    put [e], 0
-
-keyboard_interrupt__end:
-    iret
-
-
-dispatch_command:
-    mov a, var_command_buffer
-    ; x = command_list cursor
-    ; string_compare trashes x/y, so save x around the call.
-    mov x, command_list
-
-dispatch_command__loop:
-    get b, [x] ; string pointer of the command we are checking
-    cmp b, 0
-    jz dispatch_command__not_found ; end of list, no match found
-
-    push x
-    call util__string_compare ; result in c (0 = equal); clobbers x, y
-    cmp c, 0
-    jz dispatch_command__found
-
-    pop x
-    add x, 2 ; next entry (two words)
-    jmp dispatch_command__loop
-
-dispatch_command__found:
-    ; match found! c has the string pointer of the matching command,
-    ; so the next word is the function pointer
-    pop x
-    inc x
-    get b, [x] ; now b has the function pointer
-    call b ; finally, call!
-    ret 
-
-dispatch_command__not_found:
-    call invalid_command
-    ret
-
-list:
-    mov a, s_list_message
-    call shell_print_line
-    ret
-
-help:
-    mov a, s_help_message
-    call shell_print_line
-    ret
-
-mount:
-    mov a, s_mount_message
-    call shell_print_line
-    ret
-
-shutdown:
-    ; send shutdown command to system interface port
-    mov a, 0x03
-    outb 0xFF, a
-    halt
-    jmp shutdown ; loop forever just in case
-
-invalid_command:
-    mov a, s_invalid_message
-    call shell_print_line
-    ret
-
-shell_draw_prompt:
-    ; draw to bottom row (24)
-    string_at 0, 24, s_prompt
-    blink_at 2, 24
-    ret
-
-shell_print_line:
-    ; scroll, print on line above prompt, redraw prompt
-    call shell_scroll
-    mov x, 0
-    mov y, 23 ; output line
-    call graphics__print
-    call shell_draw_prompt
-    ret
-
-shell_scroll:
-    mov x, vram_start   ; destination cursor
-    mov y, vram_start   
-    add y, 160          ; source cursor
-    mov z, vram_start   ; copy-end marker (start of last row)
-    add z, vram_length  ; end of vram
-
-shell_scroll__copy:
-    get a, [y]
-    put [x], a
-    inc x
-    inc y
-    cmp y, z
-    jnz shell_scroll__copy
-
-    ; after copy, x already points at row 23 (the output row)
-    mov z, x
-    add z, 160 ; clear exactly one row (row 23)
-
-shell_scroll__clear:
-    put [x], 0
-    inc x
-    cmp x, z
-    jnz shell_scroll__clear
-    ret
-
-import "os/graphics.jasm"
-import "os/util.jasm"
-
-var_command_len: data 0
-var_command_buffer: times 20, 0
-
-define command_buffer_length 20
-define command_vram_start 0xCB04
-define vram_start 0xBC00
-define vram_length 0x0FA0
-
-s_prompt: data "$ ",     0
 s_ready:  data "ready.", 0
-s_help_message:    data "jaideos version 0.0.1 alpha", 0
-s_list_message:    data "no filesystem mounted.     ", 0
-s_mount_message:   data "no mountable disk found.   ", 0
-s_invalid_message: data "invalid command.           ", 0
 
-s_cmd_help:     data "help",     0
-s_cmd_list:     data "list",     0
-s_cmd_mount:    data "mount",    0
-s_cmd_shutdown: data "shutdown", 0
-
-command_list:
-    ; maps string pointers to function pointers
-    data s_cmd_help,     help
-    data s_cmd_list,     list
-    data s_cmd_mount,    mount
-    data s_cmd_shutdown, shutdown
-    data 0,              0 ; end of list
+; all the shell interface code lives here.
+import "os/shell.jasm"

@@ -1,0 +1,327 @@
+
+define command_buffer_length 20
+define vram_start 0xBC00
+define vram_length 0x0FA0
+
+import "os/graphics.jasm"
+import "os/util.jasm"
+
+var_cursor_row: data 0 ; cursor starts at top of screen
+var_command_len: data 0
+var_command_buffer: times 85, 0
+
+init:
+    call draw_prompt
+    ret
+
+keyboard_interrupt:
+    inb a, 0x01 ; get key
+
+    ; non-printable characters
+    ; cmp a, 20
+    ; jb keyboard_interrupt__end
+    cmp a, 0x7F
+    ja keyboard_interrupt__end
+
+    ; normal (non-special) key pressed!
+
+    ; get current string length  
+    mov c, var_command_len
+    get c, [c]
+
+    ; get start of string
+    dereference_into z, var_cursor_row
+    mul z, 160
+    add z, vram_start ; z now points to the start of the string's row in vram
+    add z, 4 ; account for the prompt string
+
+    add z, c ; add string length to vram position
+    add z, c ; multiply by 2, because each character takes 2 words
+   
+    ; z now points to the end of the string in vram
+
+    cmp a, 0x0D ; enter
+    jz keyboard_interrupt__enter
+
+    cmp a, 0x08 ; backspace
+    jz keyboard_interrupt__backspace
+
+keyboard_interrupt__append:
+
+    cmp c, command_buffer_length
+    jae keyboard_interrupt__end ; buffer is full, ignore
+    
+    ; put glyph to vram
+    put [z], a      ; word 0: character code
+    inc z
+    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
+    inc z
+    ; re-draw blinker (we just overwrote it)
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
+    ; save character to command buffer
+    mov e, var_command_buffer
+    add e, c
+    put [e], a
+
+    ; increment and save the new string length
+    inc c 
+    mov e, var_command_len
+    put [e], c
+
+    jmp keyboard_interrupt__end
+
+keyboard_interrupt__backspace:
+
+    cmp c, 0x00
+    jz keyboard_interrupt__end ; buffer is empty, ignore
+
+    ; overwrite the blinker
+    put [z], 0x00
+    inc z
+    put [z], 0x00
+    sub z, 3
+    ; draw new blinker
+    put [z], 0x20   ; word 0: space
+    inc z
+    put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
+
+    ; decrement and save string length
+    dec c
+    mov e, var_command_len
+    put [e], c
+
+    ; zero out the last character in the command buffer
+    mov e, var_command_buffer
+    add e, c
+    put [e], 0
+
+    jmp keyboard_interrupt__end
+
+keyboard_interrupt__enter:
+
+    ; get vram of end of commannd buffer
+    dereference_into z, var_cursor_row
+    mul z, 160 ; offset into vram
+    add z, vram_start ; start of the string's row in vram
+    add z, 4 ; account for the prompt string
+    add z, c
+    add z, c ; multiply by 2
+
+    ; zero out the blinker
+    put [z], 0
+    inc z
+    put [z], 0
+
+    ; save the input line, so the user can see their prompt
+    ; call scroll
+
+    cmp c, 0x00
+    ; empty command, redraw prompt
+    jz keyboard_interrupt__enter__empty
+
+    ; execute command
+    call dispatch_command
+    jmp keyboard_interrupt__enter__clear
+
+keyboard_interrupt__enter__empty:
+    call draw_prompt
+    
+keyboard_interrupt__enter__clear:
+    ; clear the buffer
+    mov b, var_command_buffer
+    mov c, command_buffer_length
+    add c, b ; end of buffer
+
+keyboard_interrupt__enter__buffer_loop:
+    put [b], 0
+    inc b
+    cmp b, c
+    jnz keyboard_interrupt__enter__buffer_loop
+
+    ; save string length to 0
+    mov e, var_command_len
+    put [e], 0
+
+keyboard_interrupt__end:
+    iret
+
+
+dispatch_command:
+    mov a, var_command_buffer
+    ; x = command_list cursor
+    ; string_compare trashes x/y, so save x around the call.
+    mov x, command_list
+
+dispatch_command__loop:
+    get b, [x] ; string pointer of the command we are checking
+    cmp b, 0
+    jz dispatch_command__not_found ; end of list, no match found
+
+    push x
+    call util__string_compare ; result in c (0 = equal); clobbers x, y
+    cmp c, 0
+    jz dispatch_command__found
+
+    pop x
+    add x, 2 ; next entry (two words)
+    jmp dispatch_command__loop
+
+dispatch_command__found:
+    ; match found! c has the string pointer of the matching command,
+    ; so the next word is the function pointer
+    pop x
+    inc x
+    get b, [x] ; now b has the function pointer
+    call b ; finally, call!
+    ret 
+
+dispatch_command__not_found:
+    mov a, s_invalid_message
+    call echo
+    ret
+
+; print command output, increment cursor (or scroll), and redraw prompt
+;   a = string pointer
+echo:
+    call scroll
+    dereference_into y, var_cursor_row ; output line
+    mov x, 0
+    call print
+
+draw_prompt:
+    call scroll
+    mov a, s_prompt
+    mov x, 0
+    dereference_into y, var_cursor_row
+    call print
+
+    ; draw the blinker
+    blink_at 2, y
+    ret
+
+; scroll the entire screen up by one row.
+; no arguments.
+; saves all registers.
+scroll:
+    dereference_into y, var_cursor_row
+    cmp y, 24
+    jz scroll_necissary
+
+    inc y
+    save_to var_cursor_row, y
+    ret
+
+scroll_necissary:
+    push a
+    push x
+    push z
+    push y
+
+    mov x, vram_start   ; destination cursor
+    mov y, vram_start   
+    add y, 160          ; source cursor
+    mov z, vram_start   ; copy-end marker (start of last row)
+    add z, vram_length  ; end of vram
+
+scroll_copy:
+    get a, [y]
+    put [x], a
+    inc x
+    inc y
+    cmp y, z
+    jnz scroll_copy
+
+    ; after copy, x already points at row 23 (the output row)
+    mov z, x
+    add z, 160 ; clear exactly one row (row 23)
+
+scroll_clear:
+
+    ; we are at the last row, clear it.
+    put [x], 0
+    inc x
+    cmp x, z ; end of row is in z
+    jnz scroll_clear
+
+    pop z ; restore registers
+    pop y
+    pop x
+    pop a
+    ret
+
+; print a white-on-black string. scrolls up the screen if an overflow occurs.
+; clobbers e
+;   a = string pointer
+;   x = x position
+;   y = y position
+print:
+    push a ; string pointer
+    push z ; memory address
+    xy_to_vram z, x, y ; prepare starting address
+
+print_loop:
+    get e, [a] ; get next character
+    cmp e, 0
+    jz print_end ; we done, onto the next step
+
+    ; put glyph to vram
+    put [z], e      ; word 0: character code
+    inc z
+    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
+    inc z
+
+    inc a ; next character
+    jmp print_loop ; loop 'til we're done
+
+print_end:
+    pop z ; restore registers
+    pop a
+    ret
+
+; command handlers
+
+handler_list:
+    ; TODO: syscall to list files
+    mov a, s_list_message
+    call echo
+    ret
+
+handler_help:
+    mov a, s_help_message
+    call echo
+    ret
+
+handler_mount:
+    ; TODO: syscall to mount disk
+    mov a, s_mount_message
+    call echo
+    ret
+
+handler_shutdown:
+    ; send shutdown command to system interface port
+    mov a, 0x03
+    outb 0xFF, a
+    halt
+    jmp handler_shutdown ; loop forever just in case
+
+s_prompt: data "$ ", 0
+s_help_message:    data "jaideos version 0.0.1 alpha", 0
+s_list_message:    data "no filesystem mounted.     ", 0
+s_mount_message:   data "no mountable disk found.   ", 0
+s_invalid_message: data "invalid command.           ", 0
+
+s_cmd_help:     data "help",     0
+s_cmd_list:     data "list",     0
+s_cmd_mount:    data "mount",    0
+s_cmd_shutdown: data "shutdown", 0
+
+command_list:
+    ; maps string pointers to function pointers
+    data s_cmd_help,     handler_help
+    data s_cmd_list,     handler_list
+    data s_cmd_mount,    handler_mount
+    data s_cmd_shutdown, handler_shutdown
+    data 0,              0 ; end of list

@@ -30,13 +30,6 @@ macro imm_xy_to_vram %dest, %ximm, %yimm
     add %dest, %ximm ; hack to multiply x by 2
 end macro
 
-macro string_at %x, %y, %string
-    mov x, %x
-    mov y, %y
-    mov a, %string
-    call graphics__print
-end macro
-
 macro blink_at %ximm, %yimm
     mov z, vram_start ; start of vram
     mov e, %yimm
@@ -49,31 +42,3 @@ macro blink_at %ximm, %yimm
     put [z], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
 end macro
 
-; print a white-on-black string. wraps around screen.
-; clobbers e
-;   a = string pointer
-;   x = x position
-;   y = y position
-print:
-    push a ; string pointer
-    push z ; memory address
-    xy_to_vram z, x, y ; prepare starting address
-
-print_loop:
-    get e, [a] ; get next character
-    cmp e, 0
-    jz print_end ; we done, onto the next step
-
-    ; put glyph to vram
-    put [z], e      ; word 0: character code
-    inc z
-    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
-    inc z
-
-    inc a ; next character
-    jmp print_loop ; loop 'til we're done
-
-print_end:
-    pop z ; restore registers
-    pop a
-    ret

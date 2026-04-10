@@ -18,7 +18,16 @@ end macro
 macro dereference_into %dest_reg, %ptr_label
     mov e, %ptr_label
     get %dest_reg, [e]
-    mov %dest_reg, e
+end macro
+
+; save_to
+; save a word value to a memory location at a label.
+;   src = source register for the value
+;   dest = destination label for the value
+;   trashes e
+macro save_to %dest_label, %src_reg
+    mov e, %dest_label
+    put [e], %src_reg
 end macro
 
 

@@ -2,7 +2,7 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define indicator_position 0xCB00
+define indicator_position 0xBC00
 
 
 start:
