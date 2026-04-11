@@ -326,7 +326,7 @@ handler_disk:
 handler_mount:
 
     sti ; enable interrupts so we can syscall
-    mov a, 0x00 ; mount syscall
+    mov a, 0x30 ; mount syscall
     int 0x10
 
     cmp a, 0x00
@@ -371,7 +371,7 @@ s_help_message:     data "list:   show files in current directory", 0xA
 s_not_implemented:  data "not implemented.", 0
 s_invalid_command:  data "invalid command.", 0
 s_success:          data "success!", 0
-s_error:            data "syscall returned error status.", 0
+s_error:            data "syscall returned with error status.", 0
 
 s_cmd_list:         data "list",  0
 s_cmd_disk:         data "disk",  0

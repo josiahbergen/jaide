@@ -9,12 +9,12 @@ main:
     mov a, s_ready
     call shell__print
 
-    ; inc y
-    ; mov a, s_shell_version
-    ; call shell__print
-    ; inc y
-    ; mov a, s_shell_help
-    ; call shell__print
+    inc y
+    mov a, s_shell_version
+    call shell__print
+    inc y
+    mov a, s_shell_help
+    call shell__print
 
     inc y
     save_to shell__var_cursor_row, y
@@ -80,35 +80,108 @@ disk_interrupt:
     ; from wherever we called halt before
     iret
 
-; syscall interface
-; 
-; a = function code
-; b = arg1
-; c = arg2
-; d = arg3
-; returns: a = result
+; system call interface
+; a = syscall number (see table below)
+; arguments in b, c, d, e
+; returns: a = result (zero if success, nonzero if error)
+
 syscall:
+
+    ; decode syscall function from the function table
+    mov z, sc_function_table
+
+syscall_search_loop:
+    get y, [z]
+
+    cmp y, a
+    ; we found a handler!
+    jz syscall_found
+
+    cmp y, 0
+    ; end of table, no handler found
+    jz syscall_not_found
+
+    ; move to the next entry
+    add z, 2
+    jmp syscall_search_loop
     
-    cmp a, 0x00
-    jz syscall_mount
-    cmp a, 0x01
-    jz syscall_disk_info
-    jmp syscall_return
+
+syscall_not_found:
+    mov a, 0x01 ; return with error
+    ret
+
+syscall_found:
+    inc z ; move to the function pointer
+    get y, [z]
+    call y ; execute handler
+    iret ; return!
 
 
-syscall_mount:
+sc_mount:
     mov a, 0x00 ; boot sector
     mov b, 0x1000 ; where to load
     call disk_read
-    jmp syscall_return
+    ret
 
-syscall_disk_info:
+sc_disk_info:
     mov a, 0x00
     ret
 
+sc_exit: ret
+sc_exec: ret
+sc_write_string: ret
+sc_write_char: ret
+sc_clear_screen: ret
+sc_set_cursor: ret
+sc_get_cursor: ret
+sc_put_char_at: ret
+sc_set_color: ret
+sc_read_char: ret
+sc_read_line: ret
+sc_fs_mount: ret
+sc_fs_list: ret
+sc_fs_open: ret
+sc_fs_read: ret
+sc_fs_write: ret
+sc_fs_seek: ret
+sc_fs_close: ret
+sc_fs_stat: ret
+sc_get_ticks: ret
+sc_get_time: ret
+sc_shutdown: ret
+sc_reset: ret
 
-syscall_return:
-    iret
+sc_function_table:
+
+    ; process
+    data 0x00, sc_exit
+    data 0x01, sc_exec
+    ; tty output
+    data 0x10, sc_write_string
+    data 0x11, sc_write_char
+    data 0x12, sc_clear_screen
+    data 0x13, sc_set_cursor
+    data 0x14, sc_get_cursor
+    data 0x15, sc_put_char_at
+    data 0x16, sc_set_color
+    ; tty input (blocking)
+    data 0x20, sc_read_char
+    data 0x21, sc_read_line
+    ; filesystem
+    data 0x30, sc_fs_mount
+    data 0x31, sc_fs_list
+    data 0x32, sc_fs_open
+    data 0x33, sc_fs_read
+    data 0x34, sc_fs_write
+    data 0x35, sc_fs_seek
+    data 0x36, sc_fs_close
+    data 0x37, sc_fs_stat
+    ; system
+    data 0x40, sc_get_ticks
+    data 0x41, sc_get_time
+    data 0x42, sc_shutdown
+    data 0x43, sc_reset
+    data 0,    0  ; end of table
 
 s_ready:  data "ready.", 0
 s_shell_version:  data "jadeos shell v0.0.1 alpha", 0
