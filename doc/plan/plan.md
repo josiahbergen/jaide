@@ -18,17 +18,17 @@ no privilege levels, no virtual memory.
 
 The following items from the previous roadmap are complete and do not need revisiting.
 
-| Item | Notes |
-|---|---|
-| Device abstraction layer | `jaide/devices/device.py` — base `Device` class with port dispatch and `tick()` |
-| PIT timer | `jaide/devices/pit.py` — ports 0x10/0x11, interrupt vector 5 |
-| Keyboard device | `jaide/devices/keyboard.py` — port 0x01/0x02, interrupt vector 4 |
-| RTC device | `jaide/devices/rtc.py` — ports 0x30-0x33, read-only |
-| JFS disk image tool | `jfs/` package — `create`, `info`, `read` subcommands working |
-| Bootloader | `os/boot.jasm` — sets IVT entries for vectors 0-4, sets SP, aligns to 0x200 |
-| Kernel shell | `os/kernel.jasm` — keyboard input, command buffer, `dispatch_command`, stubs for `help`/`list`/`mount`/`shutdown` |
-| Graphics macros | `os/graphics.jasm` — `string_at`, `blink_at`, `xy_to_vram`, `print` |
-| String utilities | `os/util.jasm` — `string_compare`, `serial_out`, `dereference_into`, `put_value_at` |
+| Item                     | Notes                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Device abstraction layer | `jaide/devices/device.py` — base `Device` class with port dispatch and `tick()`                                   |
+| PIT timer                | `jaide/devices/pit.py` — ports 0x10/0x11, interrupt vector 5                                                      |
+| Keyboard device          | `jaide/devices/keyboard.py` — port 0x01/0x02, interrupt vector 4                                                  |
+| RTC device               | `jaide/devices/rtc.py` — ports 0x30-0x33, read-only                                                               |
+| JFS disk image tool      | `jfs/` package — `create`, `info`, `read` subcommands working                                                     |
+| Bootloader               | `os/boot.jasm` — sets IVT entries for vectors 0-4, sets SP, aligns to 0x200                                       |
+| Kernel shell             | `os/kernel.jasm` — keyboard input, command buffer, `dispatch_command`, stubs for `help`/`list`/`mount`/`shutdown` |
+| Graphics macros          | `os/graphics.jasm` — `string_at`, `blink_at`, `xy_to_vram`, `print`                                               |
+| String utilities         | `os/util.jasm` — `string_compare`, `serial_out`, `dereference_into`, `put_value_at`                               |
 
 ---
 
@@ -46,13 +46,13 @@ The disk controller exposes five ports and fires interrupt vector 6 on transfer 
 
 **Ports:**
 
-| Port | Direction | Purpose |
-|------|-----------|---------|
-| 0x20 | W | Command: `0x01` = READ_SECTOR, `0x02` = WRITE_SECTOR |
-| 0x21 | W | Sector number (0-indexed) |
-| 0x22 | W | Destination/source memory address (high byte) |
-| 0x23 | W | Destination/source memory address (low byte) |
-| 0x24 | R | Status: bit 0 = busy, bit 1 = done, bit 2 = error |
+| Port | Direction | Purpose                                              |
+| ---- | --------- | ---------------------------------------------------- |
+| 0x20 | W         | Command: `0x01` = READ_SECTOR, `0x02` = WRITE_SECTOR |
+| 0x21 | W         | Sector number (0-indexed)                            |
+| 0x22 | W         | Destination/source memory address (high byte)        |
+| 0x23 | W         | Destination/source memory address (low byte)         |
+| 0x24 | R         | Status: bit 0 = busy, bit 1 = done, bit 2 = error    |
 
 **Transfer behavior:**
 
@@ -84,7 +84,7 @@ The kernel assembles the full 16-bit address before issuing the command.
 Add assembly-language wrappers for the disk controller so the rest of the kernel can call a
 clean subroutine instead of manually poking ports.
 
-```
+```txt
 ; disk_read_sector
 ; read one sector from disk into memory.
 ;   sector = sector index (immediate or register)
@@ -120,7 +120,7 @@ This is the first real end-to-end disk I/O test.
 User programs are flat binaries assembled to load at address `0x4000`. This is above the kernel
 (which lives at `0x0200–~0x3FFF`) and below the stack (`0xFE00`).
 
-```
+```txt
 0x0000 - 0x01FF   ROM (bootloader, 512 words)
 0x0200 - 0x3FFF   Kernel (~15.5 KiB)
 0x4000 - 0xFDFF   User program space (~47 KiB)
@@ -129,6 +129,7 @@ User programs are flat binaries assembled to load at address `0x4000`. This is a
 ```
 
 User programs:
+
 - Are assembled with `org 0x4000`.
 - Have their entry point at the first word of the binary (address 0x4000).
 - Use `INT 0x10` to make kernel syscalls.
@@ -147,24 +148,89 @@ User programs need kernel services without hardcoding kernel addresses. The conv
 - **Instruction**: `INT 0x10` (vector 16)
 - **Syscall number**: register A
 - **Arguments**: B, C, D, E
-- **Return value**: A
+- **Return value**: A (0 = success unless noted). Multi-value returns use B/C as additional output
+  registers where documented.
 - Caller-saved registers: A, B, C, D, E. Callee-saved: X, Y, Z, SP, MB.
-
-Initial syscall table:
-
-| Number | Name | Args | Returns |
-|--------|------|------|---------|
-| 0x00 | `exit` | — | never |
-| 0x01 | `write_char` | B = char code | — |
-| 0x02 | `write_string` | B = string address | — |
-| 0x03 | `read_char` | — | A = char code (blocks) |
-| 0x04 | `open_file` | B = filename address | A = file handle or error |
-| 0x05 | `read_file` | B = handle, C = dest addr | A = bytes read |
-| 0x06 | `write_file` | B = handle, C = src addr, D = length | A = 0 or error |
-| 0x07 | `exec` | B = filename address | A = 0 or error |
 
 The bootloader (`boot.jasm`) must install a handler for vector 16 that dispatches to the kernel's
 syscall router. The kernel's syscall router is a jump table indexed by A.
+
+#### Syscall table
+
+##### Group 0x00 — Process
+
+| #      | Name   | Args              | Returns                              | Notes                                                      |
+| ------ | ------ | ----------------- | ------------------------------------ | ---------------------------------------------------------- |
+| `0x00` | `exit` | B = exit code     | —                                    | Return to shell. No-op if called from shell context.       |
+| `0x01` | `exec` | B = filename addr | A = error (never returns on success) | Look up file in root dir, load to `0x4000`, `CALL 0x4000`. |
+
+`exit` is the only graceful way a user program terminates from deep in its call stack. A plain
+`RET` from address `0x4000` also works and returns to the shell naturally.
+
+##### Group 0x10 — Terminal output
+
+| #      | Name           | Args                   | Returns      | Notes                                                                                                                      |
+| ------ | -------------- | ---------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `0x10` | `write_string` | B = addr               | —            | Print null-terminated string at cursor. Scrolls.                                                                           |
+| `0x11` | `write_char`   | B = char               | —            | Print one character. Advances cursor. Scrolls at EOL.                                                                      |
+| `0x12` | `clear_screen` | —                      | —            | Blank VRAM, reset cursor to (0, 0).                                                                                        |
+| `0x13` | `set_cursor`   | B = x, C = y           | —            | Move kernel cursor. x: 0–79, y: 0–24.                                                                                      |
+| `0x14` | `get_cursor`   | —                      | B = x, C = y | Read current cursor position.                                                                                              |
+| `0x15` | `put_char_at`  | B = char, C = x, D = y | —            | Write one glyph directly to VRAM. No cursor update, no scroll.                                                             |
+| `0x16` | `set_color`    | B = attr               | —            | Set color attribute for subsequent `write_*` calls. Low nibble = fg, next nibble = bg. Default: `0x0001` (white on black). |
+
+`write_string`/`write_char` are for the shell's streaming output model. `put_char_at` is the
+primitive full-screen apps (word processor, assembly editor) use to redraw arbitrary cells
+without triggering scroll or cursor movement.
+
+##### Group 0x20 — Terminal input
+
+| #      | Name        | Args                      | Returns       | Notes                                                                                                         |
+| ------ | ----------- | ------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `0x20` | `read_char` | —                         | A = char      | **Blocking.** STI + HALT until a key arrives. Returns raw key code including special keys (arrows, Ctrl+key). |
+| `0x21` | `poll_key`  | —                         | A = char or 0 | **Non-blocking.** Returns next key from buffer, or 0 if empty.                                                |
+| `0x22` | `read_line` | B = buf addr, C = max len | A = length    | Collect input with echo and backspace until Enter; null-terminate buffer.                                     |
+
+`read_char` returns the raw 16-bit key code unfiltered. The shell uses `read_line`; full-screen
+apps use `read_char` in a tight event loop.
+
+##### Group 0x30 — Filesystem
+
+| #      | Name       | Args                                | Returns                                        | Notes                                                                                                                                                 |
+| ------ | ---------- | ----------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0x30` | `fs_mount` | —                                   | A = status                                     | Read boot sector, validate magic (`0x333A`), cache FS header in kernel vars. Must succeed before other `fs_*` calls. Replaces current syscall `0x00`. |
+| `0x31` | `fs_list`  | B = entry buf addr, C = max entries | A = count                                      | Copy root directory entries into caller-provided buffer. Each entry is 8 words (matches JFS layout).                                                  |
+| `0x32` | `fs_open`  | B = filename addr                   | A = fd                                         | Walk root dir, return index into kernel FD table. Error if not found.                                                                                 |
+| `0x33` | `fs_read`  | B = fd, C = dest addr, D = n_words  | A = words read                                 | Read words from current file position, following FAT chain.                                                                                           |
+| `0x34` | `fs_write` | B = fd, C = src addr, D = n_words   | A = status                                     | Write words at current file position. Allocates new blocks as needed.                                                                                 |
+| `0x35` | `fs_seek`  | B = fd, C = word offset             | A = status                                     | Move read/write position within file.                                                                                                                 |
+| `0x36` | `fs_close` | B = fd                              | —                                              | Release FD table slot. Flush any pending writes.                                                                                                      |
+| `0x37` | `fs_stat`  | B = filename addr                   | A = status, B = start block, C = size in words | Query file metadata without opening.                                                                                                                  |
+
+The kernel maintains a small FD table (~4 slots) in kernel RAM. Each slot stores: start block,
+current block, word offset within block, and total size in words.
+
+##### Group 0x40 — System
+
+| #      | Name        | Args | Returns                                              | Notes                                                          |
+| ------ | ----------- | ---- | ---------------------------------------------------- | -------------------------------------------------------------- |
+| `0x40` | `get_ticks` | —    | A = low word, B = high word                          | 32-bit kernel tick counter, incremented by PIT ISR (vector 5). |
+| `0x41` | `get_time`  | —    | A = year, B = month, C = day, D = hours, E = minutes | Read RTC (ports `0x30–0x33`).                                  |
+| `0x42` | `shutdown`  | —    | —                                                    | `OUTB 0xFF, 0x03`.                                             |
+| `0x43` | `reset`     | —    | —                                                    | `OUTB 0xFF, 0x01`.                                             |
+
+#### Migration from existing stubs
+
+| Current                          | Replacement                                        |
+| -------------------------------- | -------------------------------------------------- |
+| `syscall 0x00` (mount)           | `fs_mount` (`0x30`) — same behavior, new number    |
+| `syscall 0x01` (disk_info stub)  | `fs_stat` (`0x37`)                                 |
+| `handler_exit` direct OUTB       | `shutdown` (`0x42`)                                |
+| `echo`/`print`/`scroll` in shell | `write_string` (`0x10`) kernel-side implementation |
+| `clear_screen` in shell          | `clear_screen` (`0x12`) kernel-side implementation |
+
+The shell will call through the syscall layer for all output so the word processor and shell
+share one implementation.
 
 - **Files**: `os/boot.jasm` (IVT entry 16), `os/kernel.jasm` (syscall dispatch table and
   handlers), `doc/syscalls.md` (new)
@@ -174,7 +240,7 @@ syscall router. The kernel's syscall router is a jump table indexed by A.
 Wire a new `exec` command (or use a bare filename as the default shell behavior) that calls the
 kernel's exec routine. Minimal version:
 
-```
+```txt
 exec <filename>
 ```
 
@@ -193,6 +259,7 @@ Currently, command output is always written to row 2 and subsequent commands ove
 shell needs a scrolling output region (rows 2–24) so output accumulates naturally.
 
 Implementation:
+
 - Maintain a cursor tracking the next output row.
 - When the cursor reaches row 24, shift VRAM rows 2–24 up by one row (copy 160 words at a time),
   clear row 24, write output there.
@@ -216,13 +283,13 @@ and feels more natural.
 
 Once disk I/O and exec work:
 
-| Command | Behavior |
-|---------|----------|
-| `help` | List available commands |
-| `list` | List files on disk (already planned in A.4) |
-| `exec <file>` | Load and run a program from disk |
-| `shutdown` | Halt via system port (already exists) |
-| `clear` | Fill output region with spaces, reset cursor |
+| Command       | Behavior                                     |
+| ------------- | -------------------------------------------- |
+| `help`        | List available commands                      |
+| `list`        | List files on disk (already planned in A.4)  |
+| `exec <file>` | Load and run a program from disk             |
+| `shutdown`    | Halt via system port (already exists)        |
+| `clear`       | Fill output region with spaces, reset cursor |
 
 ---
 
@@ -256,6 +323,7 @@ syscalls for all kernel interaction.
 A full-screen text editor for reading and writing plain text files.
 
 Features:
+
 - Load a file from disk by name (passed as argument via convention TBD)
 - Display file contents in the 80x25 VRAM grid, with line wrapping
 - Cursor navigation: arrow keys move within the text buffer
@@ -279,6 +347,7 @@ project. A simpler first version could just be a hex editor that writes words di
 scratchpad region and jumps to it.
 
 Phased approach:
+
 1. **Hex editor**: type hex values, write them to a scratch buffer at `0x8000`, execute.
 2. **Macro assembler**: parse a small subset of JASM syntax (MOV, JMP, CALL, RET, basic ALU),
    assemble to the scratch buffer, execute.
@@ -300,17 +369,17 @@ Phased approach:
 
 ### Hardware device candidates
 
-| Device | Emulator | Physical candidate |
-|--------|----------|-------------------|
-| CPU | `jaide/emulator.py` | Custom FPGA or TTL discrete logic |
-| ROM | `memory[0x0000-0x01FF]` | Small EEPROM (AT28C16 or similar) |
-| RAM | `memory[0x0200-0xFDFF]` | SRAM (62256 or similar) |
-| VRAM | `banks[1]` | Dedicated SRAM bank, read by video controller |
-| Video controller | `jaide/devices/graphics.py` | FPGA with VGA output |
-| Keyboard | `jaide/devices/keyboard.py` | PS/2 decoder (ATmega or discrete) |
-| Timer (PIT) | `jaide/devices/pit.py` | 8253/8254 PIT chip, or 555 + counter |
-| RTC | `jaide/devices/rtc.py` | DS1307 (I²C, needs small glue logic) |
-| Disk controller | `jaide/devices/disk.py` | SD card module over SPI + port decoder |
+| Device           | Emulator                    | Physical candidate                            |
+| ---------------- | --------------------------- | --------------------------------------------- |
+| CPU              | `jaide/emulator.py`         | Custom FPGA or TTL discrete logic             |
+| ROM              | `memory[0x0000-0x01FF]`     | Small EEPROM (AT28C16 or similar)             |
+| RAM              | `memory[0x0200-0xFDFF]`     | SRAM (62256 or similar)                       |
+| VRAM             | `banks[1]`                  | Dedicated SRAM bank, read by video controller |
+| Video controller | `jaide/devices/graphics.py` | FPGA with VGA output                          |
+| Keyboard         | `jaide/devices/keyboard.py` | PS/2 decoder (ATmega or discrete)             |
+| Timer (PIT)      | `jaide/devices/pit.py`      | 8253/8254 PIT chip, or 555 + counter          |
+| RTC              | `jaide/devices/rtc.py`      | DS1307 (I²C, needs small glue logic)          |
+| Disk controller  | `jaide/devices/disk.py`     | SD card module over SPI + port decoder        |
 
 The disk controller is the most interesting physical design challenge. The emulator's model
 (sector-addressed, port-mapped, one-word-per-tick DMA, completion interrupt) maps directly onto
@@ -328,7 +397,7 @@ writes words into shared SRAM, then asserts an IRQ line when done.
 
 ## Execution order and dependencies
 
-```
+```txt
 Phase A (Disk Controller) ─────────────────────── CRITICAL PATH
   A.1  disk.py device
   A.2  --disk CLI arg, emulator wiring
@@ -359,14 +428,14 @@ Phase F (Physical Hardware) ────────────── parallel,
 
 ## Verification milestones
 
-| Milestone | Pass condition |
-|-----------|----------------|
-| **A done** | `make test`, then run emulator with `--disk disk.img -g`; type `mount`, see JFS header info; type `list`, see filenames from the image |
-| **B done** | Assemble a trivial "hello world" user program to `org 0x4000`, add it to the disk image, type `exec hello` in the shell, see output, return to shell prompt |
-| **C done** | Fill the shell with 30+ lines of output, verify scrolling; input line remains usable throughout |
-| **D done** | Assemble a program using constant arithmetic expressions (e.g., `mov a, VRAM_BASE + 80 * 2`), verify correct binary output |
-| **E.1 done** | Open a text file from disk in the editor, make edits, save, re-open, verify changes persisted |
-| **E.2 done** | Type a small JASM program in the editor, assemble and execute it, verify behavior without leaving the OS |
+| Milestone    | Pass condition                                                                                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A done**   | `make test`, then run emulator with `--disk disk.img -g`; type `mount`, see JFS header info; type `list`, see filenames from the image                      |
+| **B done**   | Assemble a trivial "hello world" user program to `org 0x4000`, add it to the disk image, type `exec hello` in the shell, see output, return to shell prompt |
+| **C done**   | Fill the shell with 30+ lines of output, verify scrolling; input line remains usable throughout                                                             |
+| **D done**   | Assemble a program using constant arithmetic expressions (e.g., `mov a, VRAM_BASE + 80 * 2`), verify correct binary output                                  |
+| **E.1 done** | Open a text file from disk in the editor, make edits, save, re-open, verify changes persisted                                                               |
+| **E.2 done** | Type a small JASM program in the editor, assemble and execute it, verify behavior without leaving the OS                                                    |
 
 ---
 
