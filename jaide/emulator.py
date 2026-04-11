@@ -58,11 +58,6 @@ class Emulator:
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
 
-        # cached bank state — refreshed whenever MB is written, so read16/write16
-        # don't recompute self.mb.value % 32 on every single memory access.
-        self._cached_bank: int = 0
-        self._banked_memory: bytearray = self.memory  # valid ref; only used when _cached_bank != 0
-
         self.ports: list[int] = [0] * 256
         self.devices: list[Device] = []
 
@@ -115,40 +110,44 @@ class Emulator:
 
 
     def read16(self, addr: int) -> int:
-        # fetch a 16-bit little-endian value from memory using word addressing.
-        # banked view (MB != 0): window 0xBC00–0xFDFF maps to banks[MB-1].
+        # fetch a 16-bit little-endian value from memory using word addressing
+        bank = self.mb.value % 32
+        # banked view (MB != 0): window 0xBC00–0xFDFF maps to the start of banks[MB-1].
         # flat memory (MB == 0): use absolute word addresses.
-        if self._cached_bank != 0 and 0xBC00 <= addr <= 0xFDFF:
-            a = (addr - 0xBC00) * 2
-            m = self._banked_memory
+        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
+            memory = self.banks[bank - 1]
+            addr = addr - 0xBC00
         else:
-            a = addr * 2
-            m = self.memory
-        return (m[a + 1] << 8) | m[a]
+            memory = self.memory
+
+        lo = memory[addr * 2]
+        hi = memory[addr * 2 + 1]
+        return (hi << 8) | lo
 
 
     def write16(self, addr: int, value: int):
-        # write a 16-bit little-endian value to memory using word addressing.
+        # write a 16-bit little-endian value to memory using word addressing
 
         if addr < 0x0200:  # writing to ROM (0x0000–0x01FF)
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
 
-        if self._cached_bank != 0 and 0xBC00 <= addr <= 0xFDFF:
-            m = self._banked_memory
-            a = (addr - 0xBC00) * 2
+        bank = self.mb.value % 32
+        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
+            memory = self.banks[bank - 1]
+            addr = addr - 0xBC00
         else:
-            m = self.memory
-            a = addr * 2
+            memory = self.memory
 
-        if a >= len(m):
-            logger.warning(f"attempted to write to out of bounds memory (0x{a:04X} in bank {self._cached_bank}).")
+        if addr * 2 >= len(memory):
+            logger.warning(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}).")
             self.raise_interrupt(0)
             return
 
         value = mask16(value)
-        m[a] = value & 0xFF
-        m[a + 1] = (value >> 8) & 0xFF
+        memory[addr * 2] = value & 0xFF
+        memory[addr * 2 + 1] = (value >> 8) & 0xFF
+
 
     # registers
 
@@ -162,11 +161,6 @@ class Emulator:
         if index < 0 or index >= len(REGISTERS):
             raise EmulatorException(f"invalid register index {index}.")
         self.reg[REGISTERS[index]].set(mask16(value))
-        if index == 9:  # MB changed — refresh bank cache
-            self._cached_bank = self.mb.value % 32
-            if self._cached_bank != 0:
-                self._banked_memory = self.banks[self._cached_bank - 1]
-
 
     # flag helpers
     def flag_get(self, bit: int) -> bool:

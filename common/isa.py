@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass
 from enum import IntEnum, auto
+from tkinter import OUTSIDE
 
 from tap import Tap
 
@@ -62,11 +63,11 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     JGE  = auto()
     JL   = auto()
     JLE  = auto()
-    CALL  = auto()
-    RET   = auto()
-    INT   = auto()
-    IRET  = auto()
-    BLKCPY = auto()
+    CALL = auto()
+    RET  = auto()
+    INT  = auto()
+    IRET = auto()
+    BCPY = auto()
 
 
 class REGISTERS(ZeroIndexedIntEnum):
@@ -162,12 +163,8 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.IRET: [ () ],
     INSTRUCTIONS.NOP:  [ () ],
 
-    # BLKCPY dst, src, count  — block copy count words from src to dst
-    # BLKCPY dst, src         — same, but count comes from C register
-    INSTRUCTIONS.BLKCPY: [
-        (MODES.REG, MODES.REG, MODES.IMM),
-        (MODES.REG, MODES.REG),
-    ],
+    # BCPY dst, src, count — block copy count words from src to dst
+    INSTRUCTIONS.BCPY: [ (MODES.REG, MODES.REG, MODES.IMM) ],
 }
 
 
@@ -329,10 +326,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # SWP: ssss=op0, dddd=op1
     (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
 
-    # BLKCPY dst, src, count_imm : ssss=src  dddd=dst  imm=count
-    # BLKCPY dst, src            : ssss=src  dddd=dst  count from C register
-    (INSTRUCTIONS.BLKCPY, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
-    (INSTRUCTIONS.BLKCPY, (MODES.REG, MODES.REG)):            (1, 0, None),
+    # BCPY dst, src, count : ssss=src  dddd=dst  imm=count
+    (INSTRUCTIONS.BCPY, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
 }
 
 

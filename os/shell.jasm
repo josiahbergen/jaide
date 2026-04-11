@@ -219,15 +219,15 @@ scroll_necessary:
     push z
     push y
 
-    mov x, vram_start         ; dst = row 0
+    mov x, vram_start ; dst = row 0
     mov y, vram_start
-    add y, 160                ; src = row 1
-    blkcpy x, y, 0x0F00      ; copy rows 1-24 up to rows 0-23 (3840 words)
+    add y, 160 ; src = row 1
+    bcpy x, y, 0x0F00 ; copy rows 1-24 up to rows 0-23 (3840 words)
 
     ; set up clear of the last row (row 24)
-    add x, 0x0F00             ; x = start of last row
+    add x, 0x0F00 ; x = start of last row
     mov z, vram_start
-    add z, vram_length        ; z = end of vram
+    add z, vram_length ; z = end of vram
 
 scroll_clear:
 
