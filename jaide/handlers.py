@@ -401,11 +401,12 @@ def handle_ret(emu, _decoded: tuple[int, ...]) -> None:
 def handle_int(emu, decoded: tuple[int, ...]) -> None:
     opcode, reg_a, reg_b, imm16 = decoded
     modes = OPCODE_FORMATS[opcode].modes
+    vector = emu.reg_get(reg_a) if modes == (MODES.REG,) else imm16
 
     if not emu.flag_get(FLAG_I):
+        logger.debug(f"interrupt {vector} ignored, mask is {emu.flag_get(FLAG_I)}.")
         return
 
-    vector = emu.reg_get(reg_a) if modes == (MODES.REG,) else imm16
     emu._execute_interrupt(vector)
 
 
@@ -418,7 +419,23 @@ def handle_nop(_emu, _decoded: tuple[int, ...]) -> None:
     pass
 
 
-def handle_bcpy(emu, decoded: tuple[int, ...]) -> None:
+def handle_sti(emu, _decoded: tuple[int, ...]) -> None:
+    emu.flag_set(FLAG_I, True)
+
+
+def handle_cli(emu, _decoded: tuple[int, ...]) -> None:
+    emu.flag_set(FLAG_I, False)
+
+
+def handle_stc(emu, _decoded: tuple[int, ...]) -> None:
+    emu.flag_set(FLAG_C, True)
+
+
+def handle_clc(emu, _decoded: tuple[int, ...]) -> None:
+    emu.flag_set(FLAG_C, False)
+
+
+def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
     opcode, reg_a, reg_b, imm16 = decoded
     modes = OPCODE_FORMATS[opcode].modes
     dst = emu.reg_get(reg_b)   # dddd = dst address
@@ -468,6 +485,10 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.NOT  : handle_not,
     INSTRUCTIONS.XOR  : handle_xor,
     INSTRUCTIONS.SWP  : handle_swp,
+    INSTRUCTIONS.STI  : handle_sti,
+    INSTRUCTIONS.CLI  : handle_cli,
+    INSTRUCTIONS.STC  : handle_stc,
+    INSTRUCTIONS.CLC  : handle_clc,
     INSTRUCTIONS.INB  : handle_inb,
     INSTRUCTIONS.OUTB : handle_outb,
     INSTRUCTIONS.CMP  : handle_cmp,
@@ -489,5 +510,5 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.INT  : handle_int,
     INSTRUCTIONS.IRET : handle_iret,
     INSTRUCTIONS.NOP  : handle_nop,
-    INSTRUCTIONS.BCPY : handle_bcpy,
+    INSTRUCTIONS.BCP : handle_bcp,
 }

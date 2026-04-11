@@ -20,15 +20,12 @@ class PIT(Device):
         self.reload: int = 0xFFFF  # arbitrary number for now, gets set by set_reload
 
         self.read_dispatch[0x10]  = lambda: self.reload
-        self.write_dispatch[0x10] = self._set_reload
+        self.write_dispatch[0x10] = lambda value: setattr(self, "reload", value)
 
         self.read_dispatch[0x11]  = self._get_flags
         self.write_dispatch[0x11] = self._set_flags
 
         self._log_ready()
-
-    def _set_reload(self, value: int) -> None:
-        self.reload = value
 
     def _set_flags(self, value: int) -> None:
         self.enabled = (value & 0b00000001) != 0

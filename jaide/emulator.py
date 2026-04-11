@@ -5,6 +5,7 @@
 import os
 import sys
 import time
+import traceback
 from collections import deque
 from typing import Callable
 
@@ -23,6 +24,7 @@ from .constants import (
     REGISTERS,
 )
 from .devices.device import Device
+from .devices.disk import Disk
 from .devices.graphics import Graphics
 from .devices.keyboard import Keyboard
 from .devices.pit import PIT
@@ -73,6 +75,10 @@ class Emulator:
             _key_queue = deque()
             self.devices.append(Graphics(self.raise_interrupt, _key_queue, self.banks[0], self.shutdown))
             self.devices.append(Keyboard(self.raise_interrupt, _key_queue))
+
+        # disk device
+        if enabled_devices.get("disk", False):
+            self.devices.append(Disk(self.raise_interrupt, "disk.img", self.read16, self.write16))
 
         # interrupt handling
         self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled
@@ -140,9 +146,11 @@ class Emulator:
             memory = self.memory
 
         if addr * 2 >= len(memory):
-            logger.warning(f"attempted to write to out of bounds memory (0x{addr * 2:04X} in bank {bank}).")
+            logger.warning(f"attempted to write to out of bounds memory (0x{addr:04X} in bank {bank}).")
             self.raise_interrupt(0)
             return
+
+        logger.verbose(f"writing 0x{value:04X} to 0x{addr:04X}{' in bank ' + str(bank) if 0xBC00 <= addr <= 0xFDFF else ''}...")
 
         value = mask16(value)
         memory[addr * 2] = value & 0xFF
@@ -213,8 +221,9 @@ class Emulator:
                     pass  # undefined behavior, so we'll just do nothing
 
         # TODO: refactor to not be a dumb ahh loop
+        logger.debug(f"writing 0x{value:04X} to port 0x{port:02X}")
         for device in self.devices:
-            if port in device.read_dispatch:
+            if port in device.write_dispatch:
                 device.port_write(port, value)
                 break
 
@@ -226,6 +235,7 @@ class Emulator:
         if vector < 0 or vector > 0xFF:
             raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
 
+        logger.debug(f"raising interrupt vector {vector}...")
         self.pending_interrupts.append(vector)
 
 
@@ -269,8 +279,8 @@ class Emulator:
 
         return opcode, reg_a, reg_b, imm16
 
-
     # main run loop
+
     def run(self) -> None:
 
         # we can restart while waiting for an interrupt
@@ -288,9 +298,13 @@ class Emulator:
             logger.error(f"emulator stopped: {e.message}")
             # breakpoints are a deliberate stop — leave halted clear so step/run can continue
         except KeyboardInterrupt:
-            # this prevents ctrl+c from bubbling up to the __main__() function,
+            # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
             print("! execution stopped (user interrupt).")
+        except Exception as e:
+            # general exception. this is an emulator code error, 
+            # not an assembly error. allow the repl to persist.
+            logger.error(f"fatal! while running instruction at 0x{(self.pc.value)}:\n{traceback.format_exc()}")
 
 
     def step(self) -> None:
@@ -306,7 +320,7 @@ class Emulator:
 
         if self.interrupts_pending():
             # interrupt called!
-            logger.verbose(f"interrupt called! {self.pending_interrupts}")
+            logger.debug(f"interrupt called! {self.pending_interrupts}")
             interrupt_id = self.pending_interrupts.pop()
             self._execute_interrupt(interrupt_id)
 
@@ -321,7 +335,6 @@ class Emulator:
 
         if self.waiting_for_interrupt:
             # halt was called, we are simply waiting for an interrupt
-            # reduce cpu usage a little and skip executing any instructions
             # self._halted_step_count = (self._halted_step_count + 1) % 10000000
             # if self._halted_step_count == 0:
             #     logger.verbose("waiting for interrupt...")

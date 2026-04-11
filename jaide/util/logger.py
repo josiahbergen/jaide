@@ -40,12 +40,12 @@ class Logger:
     def verbose(self, message: str):
         """ Print a verbose message. Only prints if level is VERBOSE or higher. """
         if self.level >= self.log_level.VERBOSE:
-            print(f"{f.LIGHTBLACK_EX}{f.RESET}{message}")
+            print(f"{f.LIGHTBLACK_EX}{message}{f.RESET}")
 
     def debug(self, message: str):
         """ Print a debug message. Only prints if level is DEBUG or higher. """
         if self.level >= self.log_level.DEBUG:
-            print(f"{f.LIGHTBLACK_EX}{f.RESET}{message}")
+            print(f"{message}")
 
     def info(self, message: str):
         """ Print an info message. Only prints if level is INFO or higher. """

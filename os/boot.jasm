@@ -38,6 +38,15 @@ start:
     ; keyboard interrupt
     put [d], kernel__keyboard_interrupt
     dec d
+    dec d
+
+    ; disk interrupt (vector 6)
+    put [d], kernel__disk_interrupt
+
+    ; syscall at vector 16 (0x10)
+    mov d, 0xffff
+    sub d, 0x10
+    put [d], kernel__syscall
 
     jmp kernel__main ; jump to end of rom (i.e. where the loaded kernel is loaded)
 

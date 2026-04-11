@@ -24,6 +24,7 @@ class Device:
         if read_handler is None:
             raise EmulatorException(f"{self.__class__.__name__} has no read handler for port {port}.")
 
+        logger.debug(f"dispatching read handler for port 0x{port:02X} on {self.__class__.__name__}...")
         return read_handler()
 
     def port_write(self, port: int, value: int):
@@ -33,6 +34,7 @@ class Device:
         if write_handler is None:
             raise EmulatorException(f"{self.__class__.__name__} has no write handler for port {port}.")
 
+        logger.debug(f"dispatching write handler for port 0x{port:02X} on {self.__class__.__name__} with value 0x{value:04X}...")
         write_handler(value)
 
     def _get_port_list(self) -> str:

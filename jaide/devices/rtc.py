@@ -3,6 +3,7 @@
 # josiah bergen, march 2026
 
 import time
+from re import T
 from typing import Callable
 
 from .device import Device
@@ -13,27 +14,16 @@ class RTC(Device):
         """Real-time clock."""
         super().__init__(irq)
 
-        self.read_dispatch[0x30] = self._get_second
-        self.read_dispatch[0x31] = self._get_minute
-        self.read_dispatch[0x32] = self._get_hour
-        self.read_dispatch[0x33] = self._get_day_of_year
+        self.read_dispatch[0x30] = lambda: time.localtime().tm_sec
+        self.read_dispatch[0x31] = lambda: time.localtime().tm_min
+        self.read_dispatch[0x32] = lambda: time.localtime().tm_hour
+        self.read_dispatch[0x33] = lambda: time.localtime().tm_yday
 
         self._log_ready()
-
-    def _get_second(self) -> int:
-        return time.localtime().tm_sec
-
-    def _get_minute(self) -> int:
-        return time.localtime().tm_min
-
-    def _get_hour(self) -> int:
-        return time.localtime().tm_hour
-
-    def _get_day_of_year(self) -> int:
-        return time.localtime().tm_yday
 
     def tick(self) -> None:
         pass
 
     def __str__(self) -> str:
-        return f"rtc: second={self._get_second()}, minute={self._get_minute()}, hour={self._get_hour()}, day_of_year={self._get_day_of_year()}"
+        t = time.localtime()
+        return f"rtc: second={t.tm_sec}, minute={t.tm_min}, hour={t.tm_hour}, day_of_year={t.tm_yday}"

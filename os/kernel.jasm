@@ -2,27 +2,117 @@
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 
 main:
-    ; init code. nothing to do here for now.
-    mov a, s_ready
+    ; print some strings, save the new cursor row,
+    ; and draw the prompt. then, the shell is ready to take over!
     mov x, 0
     mov y, 0
+    mov a, s_ready
     call shell__print
-    call shell__init
+
+    ; inc y
+    ; mov a, s_shell_version
+    ; call shell__print
+    ; inc y
+    ; mov a, s_shell_help
+    ; call shell__print
+
+    inc y
+    save_to shell__var_cursor_row, y
+    call shell__draw_prompt
 
 loop:
-    ; wait around for interrupts to come in...
-    halt
-    ; we did something! loop back around.
-    jmp loop
+    halt ; wait around for interrupts to come in...
+    jmp loop ; we did something! loop back around.
 
+; keyboard input. caught by the kernel and dispatched to the shell.
 keyboard_interrupt:
-    ; keyboard input, handled by the shell.
     jmp shell__keyboard_interrupt
 
-; in the future, the syscall interface (filesystem, exec, etc.) will live here.
-; for now, we are literally just plunking stuff in vram with the shell.
+; read a sector from the disk into memory.
+;  a = sector number
+;  b = memory address
+;  returns: a = result
+
+define disk_port_exec      0x20
+define disk_port_sector    0x21
+define disk_port_address   0x22
+define disk_port_status    0x23
+
+define disk_status_idle    0x00
+define disk_status_busy    0x01
+define disk_status_error   0x02
+
+define disk_command_read   0x00
+define disk_command_write  0x01
+
+
+; disk read
+;  a = sector number
+;  b = memory address
+;  returns: when done
+
+disk_read:
+    outb disk_port_sector, a
+    outb disk_port_address, b
+    
+    mov z, disk_command_read
+    outb disk_port_exec, z
+
+    sti
+    halt
+
+    mov e, 0x1000
+    get e, [e]
+    cmp e, 0x333A ; check for magic
+
+    jz disk_read_success
+    jmp disk_read_error
+
+disk_read_success:
+    mov a, 0x00
+    ret
+disk_read_error:
+    mov a, 0x01
+    ret
+
+disk_interrupt:
+    ; all this really does is resume exececution
+    ; from wherever we called halt before
+    iret
+
+; syscall interface
+; 
+; a = function code
+; b = arg1
+; c = arg2
+; d = arg3
+; returns: a = result
+syscall:
+    
+    cmp a, 0x00
+    jz syscall_mount
+    cmp a, 0x01
+    jz syscall_disk_info
+    jmp syscall_return
+
+
+syscall_mount:
+    mov a, 0x00 ; boot sector
+    mov b, 0x1000 ; where to load
+    call disk_read
+    jmp syscall_return
+
+syscall_disk_info:
+    mov a, 0x00
+    ret
+
+
+syscall_return:
+    iret
 
 s_ready:  data "ready.", 0
+s_shell_version:  data "jadeos shell v0.0.1 alpha", 0
+s_shell_help:  data "type 'help' for a list of commands.", 0
 
 ; all the shell interface code lives here.
 import "os/shell.jasm"

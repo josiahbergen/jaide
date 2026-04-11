@@ -67,7 +67,7 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     RET  = auto()
     INT  = auto()
     IRET = auto()
-    BCPY = auto()
+    BCP = auto()
 
 
 class REGISTERS(ZeroIndexedIntEnum):
@@ -163,8 +163,8 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.IRET: [ () ],
     INSTRUCTIONS.NOP:  [ () ],
 
-    # BCPY dst, src, count — block copy count words from src to dst
-    INSTRUCTIONS.BCPY: [ (MODES.REG, MODES.REG, MODES.IMM) ],
+    # BCP dst, src, count — block copy count words from src to dst
+    INSTRUCTIONS.BCP: [ (MODES.REG, MODES.REG, MODES.IMM) ],
 }
 
 
@@ -326,8 +326,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # SWP: ssss=op0, dddd=op1
     (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
 
-    # BCPY dst, src, count : ssss=src  dddd=dst  imm=count
-    (INSTRUCTIONS.BCPY, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
+    # BCP dst, src, count : ssss=src  dddd=dst  imm=count
+    (INSTRUCTIONS.BCP, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
 }
 
 

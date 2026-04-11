@@ -1,6 +1,7 @@
 
 define command_buffer_length 20
 define vram_start 0xBC00
+define vram_row_length 0xA0
 define vram_length 0x0FA0
 
 import "os/graphics.jasm"
@@ -9,10 +10,6 @@ import "os/util.jasm"
 var_cursor_row: data 0 ; cursor starts at top of screen
 var_command_len: data 0
 var_command_buffer: times 85, 0
-
-init:
-    call draw_prompt
-    ret
 
 keyboard_interrupt:
     inb a, 0x01 ; get key
@@ -31,7 +28,7 @@ keyboard_interrupt:
 
     ; get start of string
     dereference_into z, var_cursor_row
-    mul z, 160
+    mul z, vram_row_length
     add z, vram_start ; z now points to the start of the string's row in vram
     add z, 4 ; account for the prompt string
 
@@ -104,7 +101,7 @@ keyboard_interrupt__enter:
 
     ; get vram of end of commannd buffer
     dereference_into z, var_cursor_row
-    mul z, 160 ; offset into vram
+    mul z, vram_row_length ; offset into vram
     add z, vram_start ; start of the string's row in vram
     add z, 4 ; account for the prompt string
     add z, c
@@ -179,7 +176,7 @@ dispatch_command__found:
     ret 
 
 dispatch_command__not_found:
-    mov a, s_invalid_message
+    mov a, s_invalid_command
     call echo
     ret
 
@@ -193,6 +190,8 @@ echo:
 
 draw_prompt:
     call scroll
+
+draw_prompt_no_scroll:
     mov a, s_prompt
     mov x, 0
     dereference_into y, var_cursor_row
@@ -221,8 +220,8 @@ scroll_necessary:
 
     mov x, vram_start ; dst = row 0
     mov y, vram_start
-    add y, 160 ; src = row 1
-    bcpy x, y, 0x0F00 ; copy rows 1-24 up to rows 0-23 (3840 words)
+    add y, vram_row_length ; src = row 1
+    bcp x, y, 0x0F00 ; copy rows 1-24 up to rows 0-23 (3840 words)
 
     ; set up clear of the last row (row 24)
     add x, 0x0F00 ; x = start of last row
@@ -242,7 +241,37 @@ scroll_clear:
     pop x
     ret
 
-; print a white-on-black string. scrolls up the screen if an overflow occurs.
+clear_screen:
+    ; the stratgy here is to clear the first row,
+    ; then copy the first row the the remaining rows.
+    mov x, vram_start
+    mov y, x
+    add y, vram_row_length ; end of first row
+
+clear_screen_first_row:
+    put [x], 0
+    inc x
+    cmp x, y ; are we at the end of the row?
+    jnz clear_screen_first_row
+
+    mov z, vram_start
+    add z, vram_length
+    
+    mov x, vram_start
+    mov y, x
+
+clear_screen_full_rows:
+    add y, vram_row_length
+    bcp y, x, vram_row_length
+
+    cmp y, z ; are we at the end of vram?
+    jnz clear_screen_full_rows
+
+    save_to var_cursor_row, 0
+    ret
+
+; print a white-on-black string. 
+; TODO: scroll up the screen if an overflow occurs
 ; clobbers e
 ;   a = string pointer
 ;   x = x position
@@ -257,6 +286,9 @@ print_loop:
     cmp e, 0
     jz print_end ; we done, onto the next step
 
+    cmp e, 0xA ; line feed
+    jz print_newline
+
     ; put glyph to vram
     put [z], e      ; word 0: character code
     inc z
@@ -265,6 +297,12 @@ print_loop:
 
     inc a ; next character
     jmp print_loop ; loop 'til we're done
+    
+print_newline:
+    call scroll
+    inc a ; move to next character
+    xy_to_vram z, x, y ; recalculate where we are drawing
+    jmp print_loop
 
 print_end:
     pop z ; restore registers
@@ -275,8 +313,39 @@ print_end:
 
 handler_list:
     ; TODO: syscall to list files
-    mov a, s_list_message
+    mov a, s_not_implemented
     call echo
+    ret
+
+handler_disk:
+    ; TODO: syscall to show disk information
+    mov a, s_not_implemented
+    call echo
+    ret
+
+handler_mount:
+
+    sti ; enable interrupts so we can syscall
+    mov a, 0x00 ; mount syscall
+    int 0x10
+
+    cmp a, 0x00
+    jz handler_mount_success
+    jmp handler_mount_error
+
+handler_mount_success:
+    mov a, s_success
+    call echo
+    ret
+
+handler_mount_error:
+    mov a, s_error
+    call echo
+    ret
+
+handler_clear:
+    call clear_screen
+    call draw_prompt_no_scroll
     ret
 
 handler_help:
@@ -284,34 +353,39 @@ handler_help:
     call echo
     ret
 
-handler_mount:
-    ; TODO: syscall to mount disk
-    mov a, s_mount_message
-    call echo
-    ret
-
-handler_shutdown:
+handler_exit:
     ; send shutdown command to system interface port
     mov a, 0x03
     outb 0xFF, a
     halt
-    jmp handler_shutdown ; loop forever just in case
+    jmp handler_exit ; loop forever just in case
 
-s_prompt: data "$ ", 0
-s_help_message:    data "jaideos version 0.0.1 alpha", 0
-s_list_message:    data "no filesystem mounted.     ", 0
-s_mount_message:   data "no mountable disk found.   ", 0
-s_invalid_message: data "invalid command.           ", 0
+s_prompt:           data "$ ", 0
+s_help_message:     data "list:   show files in current directory", 0xA
+                    data "disk:   show disk information", 0xA
+                    data "mount:  mount a disk", 0xA
+                    data "clear:  clear the screen", 0xA
+                    data "help:   show this message", 0
+                    data "exit:   shutdown the system", 0xA
 
-s_cmd_help:     data "help",     0
-s_cmd_list:     data "list",     0
-s_cmd_mount:    data "mount",    0
-s_cmd_shutdown: data "shutdown", 0
+s_not_implemented:  data "not implemented.", 0
+s_invalid_command:  data "invalid command.", 0
+s_success:          data "success!", 0
+s_error:            data "syscall returned error status.", 0
+
+s_cmd_list:         data "list",  0
+s_cmd_disk:         data "disk",  0
+s_cmd_mount:        data "mount", 0
+s_cmd_clear:        data "clear", 0
+s_cmd_help:         data "help",  0
+s_cmd_exit:         data "exit",  0
 
 command_list:
     ; maps string pointers to function pointers
-    data s_cmd_help,     handler_help
-    data s_cmd_list,     handler_list
-    data s_cmd_mount,    handler_mount
-    data s_cmd_shutdown, handler_shutdown
-    data 0,              0 ; end of list
+    data s_cmd_list,  handler_list
+    data s_cmd_disk,  handler_disk
+    data s_cmd_mount, handler_mount
+    data s_cmd_clear, handler_clear
+    data s_cmd_help,  handler_help
+    data s_cmd_exit,  handler_exit
+    data 0,           0 ; end of list

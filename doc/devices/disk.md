@@ -31,13 +31,13 @@ there are two supported commands:
 
 ### status flags
 
-reading from the status port returns a value with this encoding:
+reading from the status port returns a value from this table:
 
-| bit | flag     | meaning                           |
-| --- | -------- | --------------------------------- |
-| 0   | idle     | device is idle                    |
-| 1   | busy     | device is executing data transfer |
-| 2   | error    | device error                      |
+| value | flag     | meaning                           |
+| ----- | -------- | --------------------------------- |
+| 0     | idle     | device is idle                    |
+| 1     | busy     | device is executing data transfer |
+| 2     | error    | device error                      |
 
 ## jfs (jaide file system)
 
