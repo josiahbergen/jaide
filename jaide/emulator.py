@@ -315,8 +315,8 @@ class Emulator:
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
-        if logger.level == logger.log_level.VERBOSE:
-            time.sleep(0.001)
+        # if logger.level == logger.log_level.VERBOSE:
+            # time.sleep(0.001)
 
         if self.interrupts_pending():
             # interrupt called!

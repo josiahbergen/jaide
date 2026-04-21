@@ -19,6 +19,9 @@ GRAPHICS_CHAR_H = 16
 GRAPHICS_WIDTH  = GRAPHICS_COLS * GRAPHICS_CHAR_W  # 640
 GRAPHICS_HEIGHT = GRAPHICS_ROWS * GRAPHICS_CHAR_H  # 400
 VRAM_CELLS      = GRAPHICS_COLS * GRAPHICS_ROWS    # 2000
+SCALE           = 2
+SCALED_WIDTH    = GRAPHICS_WIDTH * SCALE
+SCALED_HEIGHT   = GRAPHICS_HEIGHT * SCALE
 
 FRAME_INTERVAL  = 1 / 30  # seconds between renders, smoooth 30fps
 
@@ -63,7 +66,7 @@ class Graphics(Device):
         self._last_hash: int | None = None
 
         pygame.init()
-        self.screen: pygame.Surface = pygame.display.set_mode((GRAPHICS_WIDTH, GRAPHICS_HEIGHT))
+        self.screen: pygame.Surface = pygame.display.set_mode((SCALED_WIDTH, SCALED_HEIGHT))
         pygame.display.set_caption("jaide graphics controller output")
 
         self.write_dispatch[0x40] = self._set_control
@@ -150,17 +153,16 @@ class Graphics(Device):
                     fb[px + 1] = color[1]
                     fb[px + 2] = color[2]
 
-        self.screen.blit(
-            pygame.image.frombuffer(fb, (GRAPHICS_WIDTH, GRAPHICS_HEIGHT), "RGB"),
-            (0, 0),
-        )
+        native_surface = pygame.image.frombuffer(fb, (GRAPHICS_WIDTH, GRAPHICS_HEIGHT), "RGB")
+        scaled_surface = pygame.transform.scale(native_surface, (SCALED_WIDTH, SCALED_HEIGHT))
+        self.screen.blit(scaled_surface, (0, 0))
 
     def _render_inactive(self) -> None:
         # draw a red bar and little message to indicate that graphics are disabled
         # ugly ahh code though
-        pygame.draw.rect(self.screen, COLORS[2], (0, 0, GRAPHICS_WIDTH, GRAPHICS_CHAR_H))
-        font = pygame.font.SysFont(None, GRAPHICS_CHAR_H + 1)
-        self.screen.blit(font.render("graphics disabled", True, COLORS[0], COLORS[2]), (4, 0))
+        pygame.draw.rect(self.screen, COLORS[2], (0, 0, SCALED_WIDTH, GRAPHICS_CHAR_H * SCALE))
+        font = pygame.font.SysFont(None, (GRAPHICS_CHAR_H + 1) * SCALE)
+        self.screen.blit(font.render("graphics disabled", True, COLORS[0], COLORS[2]), (4 * SCALE, 0))
 
     def __str__(self) -> str:
         return f"graphics: enabled={self.enabled}"

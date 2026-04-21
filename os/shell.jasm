@@ -360,18 +360,27 @@ handler_exit:
     halt
     jmp handler_exit ; loop forever just in case
 
+handler_marko:
+    mov a, s_marko_message
+    call echo
+    ret
+
 s_prompt:           data "$ ", 0
 s_help_message:     data "list:   show files in current directory", 0xA
                     data "disk:   show disk information", 0xA
-                    data "mount:  mount a disk", 0xA
+                    data "mount:  mount the connected disk", 0xA
+                    data "exec:   execute a loaded program", 0xA
                     data "clear:  clear the screen", 0xA
-                    data "help:   show this message", 0
-                    data "exit:   shutdown the system", 0xA
+                    data "help:   show this message", 0xA
+                    data "exit:   shutdown the system", 0
 
 s_not_implemented:  data "not implemented.", 0
 s_invalid_command:  data "invalid command.", 0
 s_success:          data "success!", 0
 s_error:            data "syscall returned with error status.", 0
+s_marko_message:    data "hi marko! you are looking at at this text through a custom shell written in my", 0xA
+                    data "custom assembly language, completely powered by my custom cpu architecture.", 0xA
+                    data "i think it's pretty cool!", 0
 
 s_cmd_list:         data "list",  0
 s_cmd_disk:         data "disk",  0
@@ -379,6 +388,7 @@ s_cmd_mount:        data "mount", 0
 s_cmd_clear:        data "clear", 0
 s_cmd_help:         data "help",  0
 s_cmd_exit:         data "exit",  0
+s_cmd_marko:         data "marko",  0
 
 command_list:
     ; maps string pointers to function pointers
@@ -388,4 +398,5 @@ command_list:
     data s_cmd_clear, handler_clear
     data s_cmd_help,  handler_help
     data s_cmd_exit,  handler_exit
+    data s_cmd_marko, handler_marko
     data 0,           0 ; end of list

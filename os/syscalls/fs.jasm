@@ -1,0 +1,64 @@
+; read a sector from the disk into memory.
+;  a = sector number
+;  b = memory address
+;  returns: a = result
+
+define disk_port_exec      0x20
+define disk_port_sector    0x21
+define disk_port_address   0x22
+define disk_port_status    0x23
+
+define disk_status_idle    0x00
+define disk_status_busy    0x01
+define disk_status_error   0x02
+
+define disk_command_read   0x00
+define disk_command_write  0x01
+
+; syscalls
+
+sc_mount:
+    mov a, 0x00 ; boot sector
+    mov b, 0x1000 ; where to load
+    call disk_read
+    ret
+
+sc_list:
+sc_open:
+sc_read:
+sc_write:
+sc_seek:
+sc_close:
+sc_stat:
+
+mov a, 0x01
+ret
+
+; disk read
+;  a = sector number
+;  b = memory address
+;  returns: when done
+
+disk_read:
+    outb disk_port_sector, a
+    outb disk_port_address, b
+    
+    mov z, disk_command_read
+    outb disk_port_exec, z
+
+    sti
+    halt
+
+    mov e, 0x1000
+    get e, [e]
+    cmp e, 0x333A ; check for magic
+
+    jz disk_read_success
+    jmp disk_read_error
+
+disk_read_success:
+    mov a, 0x00
+    ret
+disk_read_error:
+    mov a, 0x01
+    ret

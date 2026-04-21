@@ -28,128 +28,71 @@ loop:
 keyboard_interrupt:
     jmp shell__keyboard_interrupt
 
-; read a sector from the disk into memory.
-;  a = sector number
-;  b = memory address
-;  returns: a = result
-
-define disk_port_exec      0x20
-define disk_port_sector    0x21
-define disk_port_address   0x22
-define disk_port_status    0x23
-
-define disk_status_idle    0x00
-define disk_status_busy    0x01
-define disk_status_error   0x02
-
-define disk_command_read   0x00
-define disk_command_write  0x01
-
-
-; disk read
-;  a = sector number
-;  b = memory address
-;  returns: when done
-
-disk_read:
-    outb disk_port_sector, a
-    outb disk_port_address, b
-    
-    mov z, disk_command_read
-    outb disk_port_exec, z
-
-    sti
-    halt
-
-    mov e, 0x1000
-    get e, [e]
-    cmp e, 0x333A ; check for magic
-
-    jz disk_read_success
-    jmp disk_read_error
-
-disk_read_success:
-    mov a, 0x00
-    ret
-disk_read_error:
-    mov a, 0x01
-    ret
-
 disk_interrupt:
     ; all this really does is resume exececution
     ; from wherever we called halt before
     iret
 
 ; system call interface
+; called via interrupt vector 16 (must use iret to return)
 ; a = syscall number (see table below)
 ; arguments in b, c, d, e
 ; returns: a = result (zero if success, nonzero if error)
 
 syscall:
-
-    ; decode syscall function from the function table
+    ; we have a number in a, which should map to an entry in the function table
+    ; move to the start of the function table
     mov z, sc_function_table
 
 syscall_search_loop:
+
+    ; repeatedly search for our entry in the table
     get y, [z]
+    cmp y, a             ; did we find a match?
+    jz syscall_found     ; yes!
 
-    cmp y, a
-    ; we found a handler!
-    jz syscall_found
-
-    cmp y, 0
-    ; end of table, no handler found
-    jz syscall_not_found
+    cmp y, 0             ; end of table?
+    jz syscall_not_found ; yes, exit with error
 
     ; move to the next entry
     add z, 2
     jmp syscall_search_loop
-    
 
 syscall_not_found:
-    mov a, 0x01 ; return with error
-    ret
+    mov a, 0x01
+    ; return with error via iret
+    iret
 
 syscall_found:
     inc z ; move to the function pointer
     get y, [z]
     call y ; execute handler
-    iret ; return!
+    iret ; return! we trust that the handler has set a value in a for us
 
+; unimplemented syscalls
 
-sc_mount:
-    mov a, 0x00 ; boot sector
-    mov b, 0x1000 ; where to load
-    call disk_read
-    ret
+sc_exit:
+sc_exec:
+sc_write_string:
+sc_write_char:
+sc_clear_screen:
+sc_set_cursor:
+sc_get_cursor:
+sc_put_char_at:
+sc_set_color:
+sc_read_char:
+sc_read_line:
+sc_get_ticks:
+sc_get_time:
 
-sc_disk_info:
-    mov a, 0x00
-    ret
+; all these labels above simply point to this code here,
+; that returns with an error code
+mov a, 0x01
+ret
 
-sc_exit: ret
-sc_exec: ret
-sc_write_string: ret
-sc_write_char: ret
-sc_clear_screen: ret
-sc_set_cursor: ret
-sc_get_cursor: ret
-sc_put_char_at: ret
-sc_set_color: ret
-sc_read_char: ret
-sc_read_line: ret
-sc_fs_mount: ret
-sc_fs_list: ret
-sc_fs_open: ret
-sc_fs_read: ret
-sc_fs_write: ret
-sc_fs_seek: ret
-sc_fs_close: ret
-sc_fs_stat: ret
-sc_get_ticks: ret
-sc_get_time: ret
-sc_shutdown: ret
-sc_reset: ret
+import "os/syscalls/fs.jasm"
+import "os/syscalls/system.jasm"
+
 
 sc_function_table:
 
@@ -168,19 +111,19 @@ sc_function_table:
     data 0x20, sc_read_char
     data 0x21, sc_read_line
     ; filesystem
-    data 0x30, sc_fs_mount
-    data 0x31, sc_fs_list
-    data 0x32, sc_fs_open
-    data 0x33, sc_fs_read
-    data 0x34, sc_fs_write
-    data 0x35, sc_fs_seek
-    data 0x36, sc_fs_close
-    data 0x37, sc_fs_stat
+    data 0x30, fs__sc_mount
+    data 0x31, fs__sc_list
+    data 0x32, fs__sc_open
+    data 0x33, fs__sc_read
+    data 0x34, fs__sc_write
+    data 0x35, fs__sc_seek
+    data 0x36, fs__sc_close
+    data 0x37, fs__sc_stat
     ; system
     data 0x40, sc_get_ticks
     data 0x41, sc_get_time
-    data 0x42, sc_shutdown
-    data 0x43, sc_reset
+    data 0x42, system__sc_shutdown
+    data 0x43, system__sc_reset
     data 0,    0  ; end of table
 
 s_ready:  data "ready.", 0

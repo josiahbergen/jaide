@@ -1,0 +1,12 @@
+
+sc_shutdown:
+    mov a, 0x03
+    outb 0xFF, a
+    halt
+    jmp sc_shutdown
+
+sc_reset:
+    mov a, 0x01
+    outb 0xFF, a
+    halt
+    jmp sc_reset
