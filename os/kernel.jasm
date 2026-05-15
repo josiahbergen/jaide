@@ -46,12 +46,15 @@ syscall:
 
 syscall_search_loop:
 
+    ; TODO: once a good abi gets defined, just use an
+    ;       actual jump table to avoid the loop here
+
     ; repeatedly search for our entry in the table
     get y, [z]
     cmp y, a             ; did we find a match?
     jz syscall_found     ; yes!
 
-    cmp y, 0             ; end of table?
+    cmp y, 0xFFFF        ; end of table?
     jz syscall_not_found ; yes, exit with error
 
     ; move to the next entry
@@ -124,10 +127,10 @@ sc_function_table:
     data 0x41, sc_get_time
     data 0x42, system__sc_shutdown
     data 0x43, system__sc_reset
-    data 0,    0  ; end of table
+    data 0xFFFF  ; end of table
 
 s_ready:  data "ready.", 0
-s_shell_version:  data "jadeos shell v0.0.1 alpha", 0
+s_shell_version:  data "jaideos shell v0.0.1 alpha", 0
 s_shell_help:  data "type 'help' for a list of commands.", 0
 
 ; all the shell interface code lives here.

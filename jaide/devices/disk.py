@@ -26,10 +26,17 @@ class Disk(Device):
         self.sector_number = 0
         self.memory_address = 0
 
+        if not disk_file:
+            logger.fatal("no image file provided!", scope="disk.py:Disk.__init__()")
+
         # hold the disk image in memory
         # fine, i guess. NOTE: optimize?
         self.disk_file = disk_file
-        self.disk = bytearray(open(self.disk_file, "rb").read())
+
+        try:
+            self.disk = bytearray(open(self.disk_file, "rb").read())
+        except FileNotFoundError:
+            logger.fatal(f"image file {self.disk_file} not found!", scope="disk.py:Disk.__init__()")
 
         # which word we are currently reading/writing to
         # simulates "slow" (non-instant) data transfer.
@@ -42,6 +49,9 @@ class Disk(Device):
         self.read_dispatch[0x23] = lambda: self.status
 
         self._log_ready()
+
+    def _log_ready(self) -> None:
+        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_port_list()} (using {self.disk_file})")
 
     def execute_command(self, value: int) -> None:
         if self.status in [STATUS_READING, STATUS_WRITING]:

@@ -40,7 +40,7 @@ def mask16(x: int) -> int:
 
 
 class Emulator:
-    def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}):
+    def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = ""):
 
         logger.set_level(verbosity)
 
@@ -78,7 +78,7 @@ class Emulator:
 
         # disk device
         if enabled_devices.get("disk", False):
-            self.devices.append(Disk(self.raise_interrupt, "disk.img", self.read16, self.write16))
+            self.devices.append(Disk(self.raise_interrupt, image_file, self.read16, self.write16))
 
         # interrupt handling
         self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled
@@ -210,6 +210,7 @@ class Emulator:
             print(chr(value), end="", flush=True)
 
         if port == 0xFF:  # system interface port
+            logger.debug(f"system interface port write: 0x{value:04X}")
             match value:
                 case 0x01:  # reset
                     self.reset()
@@ -221,7 +222,7 @@ class Emulator:
                     pass  # undefined behavior, so we'll just do nothing
 
         # TODO: refactor to not be a dumb ahh loop
-        logger.debug(f"writing 0x{value:04X} to port 0x{port:02X}")
+        # logger.debug(f"writing 0x{value:04X} to port 0x{port:02X}")
         for device in self.devices:
             if port in device.write_dispatch:
                 device.port_write(port, value)
@@ -235,7 +236,6 @@ class Emulator:
         if vector < 0 or vector > 0xFF:
             raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
 
-        logger.debug(f"raising interrupt vector {vector}...")
         self.pending_interrupts.append(vector)
 
 
@@ -320,8 +320,9 @@ class Emulator:
 
         if self.interrupts_pending():
             # interrupt called!
-            logger.debug(f"interrupt called! {self.pending_interrupts}")
             interrupt_id = self.pending_interrupts.pop()
+
+            logger.debug(f"interrupt 0x{interrupt_id:02X} called! {"(remaining: " + ", ".join([str(i) for i in self.pending_interrupts]) + ")" if self.pending_interrupts else ""}")
             self._execute_interrupt(interrupt_id)
 
             # reset to normal execution state,

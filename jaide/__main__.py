@@ -21,6 +21,7 @@ class EmulatorArgumentParser(Tap):
     rtc: bool = False
     graphics: bool = False
     disk: bool = False
+    image: str = ""
 
     def configure(self):
         # configure short flags
@@ -54,7 +55,7 @@ def main():
         "disk": args.disk,
     }
 
-    emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices)
+    emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices, image_file=args.image)
 
     # load binary file if provided
     if args.binary:

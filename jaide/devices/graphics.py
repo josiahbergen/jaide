@@ -64,6 +64,7 @@ class Graphics(Device):
         self._framebuf: bytearray   = bytearray(GRAPHICS_WIDTH * GRAPHICS_HEIGHT * 3)
         self._blink_timer: int      = 0
         self._last_hash: int | None = None
+        self._inactive_drawn: bool = False
 
         pygame.init()
         self.screen: pygame.Surface = pygame.display.set_mode((SCALED_WIDTH, SCALED_HEIGHT))
@@ -76,6 +77,8 @@ class Graphics(Device):
 
     def _set_control(self, value: int) -> None:
         self.enabled = bool(value & 0x01)
+        logger.debug(f"graphics controller {'enabled' if self.enabled else 'disabled'}")
+        self._inactive_drawn = False
 
     def tick(self) -> None:
 
@@ -158,11 +161,16 @@ class Graphics(Device):
         self.screen.blit(scaled_surface, (0, 0))
 
     def _render_inactive(self) -> None:
-        # draw a red bar and little message to indicate that graphics are disabled
+        if self._inactive_drawn:
+            return
+        
+        # blank the screen then draw a red bar and little message to indicate that graphics are disabled
         # ugly ahh code though
         pygame.draw.rect(self.screen, COLORS[2], (0, 0, SCALED_WIDTH, GRAPHICS_CHAR_H * SCALE))
+        pygame.draw.rect(self.screen, COLORS[0], (0, GRAPHICS_CHAR_H * SCALE, SCALED_WIDTH, SCALED_HEIGHT - GRAPHICS_CHAR_H * SCALE))
         font = pygame.font.SysFont(None, (GRAPHICS_CHAR_H + 1) * SCALE)
-        self.screen.blit(font.render("graphics disabled", True, COLORS[0], COLORS[2]), (4 * SCALE, 0))
+        self.screen.blit(font.render("video disabled", True, COLORS[0], COLORS[2]), (4 * SCALE, 2 * SCALE))
+        self._inactive_drawn = True
 
     def __str__(self) -> str:
         return f"graphics: enabled={self.enabled}"

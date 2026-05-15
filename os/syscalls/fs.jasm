@@ -46,6 +46,7 @@ disk_read:
     mov z, disk_command_read
     outb disk_port_exec, z
 
+    ; block until the disk is done
     sti
     halt
 
@@ -53,10 +54,7 @@ disk_read:
     get e, [e]
     cmp e, 0x333A ; check for magic
 
-    jz disk_read_success
-    jmp disk_read_error
-
-disk_read_success:
+    jnz disk_read_error
     mov a, 0x00
     ret
 disk_read_error:
