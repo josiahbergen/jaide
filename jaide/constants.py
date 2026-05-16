@@ -6,8 +6,15 @@
 from common.isa import OPCODE_FORMATS
 
 MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
-BANK_SIZE   = 0x4200 * 2   # bytes needed for the 0xBC00–0xFDFF window (0x4200 word addresses)
+BANK_SIZE   = 0x4100 * 2   # bytes for the 0xBC00–0xFCFF banked window (0x4100 word addresses)
 NUM_BANKS   = 31           # 32 banks total, bank 0 is built-in RAM
+
+BANK_WINDOW_START = 0xBC00
+BANK_WINDOW_END   = 0xFCFF
+
+MMIO_BASE = 0xFE00
+MMIO_END  = 0xFEFF
+MMIO_SYSTEM = 0xFEFF
 
 # Register names in index order (matches REGISTERS enum in common.isa)
 REGISTERS = ["A", "B", "C", "D", "E", "X", "Y", "Z", "F", "MB", "SP", "PC"]

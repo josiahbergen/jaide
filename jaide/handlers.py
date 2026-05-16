@@ -2,7 +2,7 @@ from typing import Callable
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
 
-from .constants import FLAG_C, FLAG_I, FLAG_N, FLAG_O, FLAG_Z
+from .constants import BANK_WINDOW_END, BANK_WINDOW_START, FLAG_C, FLAG_I, FLAG_N, FLAG_O, FLAG_Z
 from .emulator import Emulator, mask16
 from .exceptions import EmulatorException
 from .util.logger import logger
@@ -283,29 +283,6 @@ def handle_swp(emu, decoded: tuple[int, ...]) -> None:
     emu.reg_set(reg_b, a)
 
 
-def handle_inb(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # dest = reg_b (dddd), port = reg_a (ssss) or imm
-    if modes == (MODES.REG, MODES.REG):
-        result = emu.port_get(emu.reg_get(reg_a))
-    else:
-        result = emu.port_get(imm16)
-    emu.reg_set(reg_b, result)
-    emu.flag_set(FLAG_Z, result == 0)
-
-
-def handle_outb(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # src = reg_a (ssss), port = reg_b (dddd) or imm
-    if modes == (MODES.REG, MODES.REG):
-        emu.port_set(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        # OUTB imm, reg: port = imm, src = reg_a
-        emu.port_set(imm16, emu.reg_get(reg_a))
-
-
 def handle_cmp(emu, decoded: tuple[int, ...]) -> None:
     opcode, reg_a, reg_b, imm16 = decoded
     modes = OPCODE_FORMATS[opcode].modes
@@ -443,10 +420,10 @@ def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
     count = imm16
 
     bank = emu.mb.value % 32
-    if bank != 0 and 0xBC00 <= src <= 0xFDFF and 0xBC00 <= dst <= 0xFDFF:
+    if bank != 0 and BANK_WINDOW_START <= src <= BANK_WINDOW_END and BANK_WINDOW_START <= dst <= BANK_WINDOW_END:
         mem = emu.banks[bank - 1]
-        s = (src - 0xBC00) * 2
-        d = (dst - 0xBC00) * 2
+        s = (src - BANK_WINDOW_START) * 2
+        d = (dst - BANK_WINDOW_START) * 2
     elif bank == 0:
         mem = emu.memory
         s = src * 2
@@ -489,8 +466,6 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.CLI  : handle_cli,
     INSTRUCTIONS.STC  : handle_stc,
     INSTRUCTIONS.CLC  : handle_clc,
-    INSTRUCTIONS.INB  : handle_inb,
-    INSTRUCTIONS.OUTB : handle_outb,
     INSTRUCTIONS.CMP  : handle_cmp,
     INSTRUCTIONS.JMP  : handle_jmp,
     INSTRUCTIONS.JZ   : handle_jz,

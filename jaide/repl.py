@@ -96,7 +96,7 @@ class REPL:
             (self.c_disasm, ["disasm", "d"], [("addr", Arg.Type.I16)], "disassemble instruction at address (pc if no address provided)"),
             (self.c_disasm_pc, ["disasm_pc", "dp"], [], "disassemble instruction at pc"),
             (self.c_vram, ["vram"], [], "display the vram"),
-            (self.c_ports, ["ports"], [], "display non-zero port values"),
+            (self.c_mmio, ["mmio"], [], "list MMIO device registers"),
             (self.c_reset, ["reset"], [], "reset the emulator"),
             (self.c_clear, ["clear"], [], "clear the screen"),
             (self.c_help, ["help"], [], "display help"),
@@ -224,13 +224,12 @@ class REPL:
                 word_offset = i // 2  # convert byte offset to word offset
                 logger.info(f"0x{word_offset:04X} | {' '.join([f'{w:04X}' for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
 
-    def c_ports(self):
-        non_zero = [i for i in range(len(self.emulator.ports)) if self.emulator.ports[i] != 0]
-        if len(non_zero) == 0:
-            logger.info("no non-zero ports found.")
+    def c_mmio(self):
+        if not self.emulator.devices:
+            logger.info("no devices registered.")
             return
-        for i in non_zero:
-            logger.info(f"port {i}: 0x{self.emulator.ports[i]:02X}")
+        for device in self.emulator.devices:
+            logger.info(str(device))
 
     def c_clear(self):
         os.system("cls" if os.name == "nt" else "clear")

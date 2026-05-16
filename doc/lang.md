@@ -213,3 +213,14 @@ mov x, 0
 mov y, 10
 xy_to_vram z, x, y ; puts some memory address in z
 ```
+
+### MMIO helpers
+
+`os/util.jasm` defines assembler macros (not CPU instructions) for memory-mapped device access:
+
+```jasm
+mmio_in A, mmio_keyboard_data   ; read MMIO register into A (trashes E)
+mmio_out mmio_system, A         ; write A to MMIO register (trashes E, Z)
+```
+
+see [spec.md](spec.md) for the register map and `MMIO_BASE` (`0xFE00`).

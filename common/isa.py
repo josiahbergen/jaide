@@ -47,8 +47,6 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     CLI  = auto()
     STC  = auto()
     CLC  = auto()
-    INB  = auto()
-    OUTB = auto()
     CMP  = auto()
     JMP  = auto()
     JZ   = auto()
@@ -137,8 +135,6 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.CLI:  [ () ],
     INSTRUCTIONS.STC:  [ () ],
     INSTRUCTIONS.CLC:  [ () ],
-    INSTRUCTIONS.INB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.OUTB: [ (MODES.REG, MODES.REG), (MODES.IMM, MODES.REG) ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.JMP:  [ (MODES.REG, ), (MODES.IMM, ) ],
     # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
@@ -272,16 +268,6 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.CLI, ()):                                (None, None, None),
     (INSTRUCTIONS.STC, ()):                                (None, None, None),
     (INSTRUCTIONS.CLC, ()):                                (None, None, None),
-
-    # I/O
-    # INB dest, port_src: ssss=port_reg(op1)  dddd=dest(op0)
-    (INSTRUCTIONS.INB, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.INB, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    # OUTB port_dest, src: ssss=src(op1)  dddd=port_reg(op0)
-    # OUTB imm, src:       ssss=src(op1)  imm=port_num(op0)
-    (INSTRUCTIONS.OUTB, (MODES.REG, MODES.REG)):           (1,    0,    None),
-    (INSTRUCTIONS.OUTB, (MODES.IMM, MODES.REG)):           (1,    None, 0   ),
 
     # CMP dest, src: ssss=src(op1)  dddd=dest(op0)
     # CMP dest, imm: ssss=dest(op0) (same anomaly as MOV)

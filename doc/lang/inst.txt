@@ -83,14 +83,6 @@ XOR dest, src       bitwise xor (updates Z)
 reg  reg            oooooooo ssss dddd -------- --------  dest <- dest ^ reg
 reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- src ^ imm16
 
-INB dest, src       get word from I/O port
-reg  reg            oooooooo ssss dddd -------- --------  dest <- port(src)
-reg  imm16          oooooooo ---- dddd xxxxxxxx xxxxxxxx  dest <- port(imm16)
-
-OUTB dest, src      put word on I/O port
-reg    reg          oooooooo ssss dddd -------- --------  port(dest) <- src
-imm16  reg          oooooooo ssss ---- xxxxxxxx xxxxxxxx  port(imm16) <- src
-
 CMP dest, src       non-destructive compare (updates Z, C, O, N)
 reg  reg            oooooooo ssss dddd -------- --------  flags <- dest - src
 reg  imm16          oooooooo ssss ---- xxxxxxxx xxxxxxxx  flags <- dest - imm16

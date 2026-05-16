@@ -73,8 +73,8 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | #      | Name        | Args | Returns                      | Notes                                                          |
 | ------ | ----------- | ---- | ---------------------------- | -------------------------------------------------------------- |
 | `0x40` | `get_ticks` |      | A = low word, B = high word  | 32-bit kernel tick counter, incremented by PIT ISR (vector 5). |
-| `0x41` | `get_date`  |      | A = year, B = month, C = day | Read RTC (ports `0x30–0x33`).                                  |
-| `0x41` | `get_time`  |      | A = hours, B = minutes,      | Read RTC (ports `0x30–0x33`).                                  |
+| `0x41` | `get_date`  |      | A = year, B = month, C = day | Read RTC (MMIO `0xFE30–0xFE33`).                               |
+| `0x41` | `get_time`  |      | A = hours, B = minutes,      | Read RTC (MMIO `0xFE30–0xFE33`).                               |
 
 ### system
 

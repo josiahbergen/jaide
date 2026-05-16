@@ -15,50 +15,52 @@ class Device:
         # by default, no read or write handlers are defined
         self.read_dispatch: dict[int, Callable[..., int]] = {}
         self.write_dispatch: dict[int, Callable[[int], None]] = {}
-        
 
-    def port_read(self, port: int) -> int:
+    def mmio_read(self, addr: int) -> int:
         """Dispatch a request to read from a device."""
 
-        read_handler = self.read_dispatch.get(port)
+        read_handler = self.read_dispatch.get(addr)
         if read_handler is None:
-            raise EmulatorException(f"{self.__class__.__name__} has no read handler for port {port}.")
+            raise EmulatorException(f"{self.__class__.__name__} has no read handler for MMIO 0x{addr:04X}.")
 
-        logger.debug(f"{self.__class__.__name__}: READ on port 0x{port:02X}...")
+        logger.debug(f"{self.__class__.__name__}: READ at MMIO 0x{addr:04X}...")
         return read_handler()
 
-    def port_write(self, port: int, value: int):
+    def mmio_write(self, addr: int, value: int):
         """Dispatch a request to write to a device."""
 
-        write_handler = self.write_dispatch.get(port)
+        write_handler = self.write_dispatch.get(addr)
         if write_handler is None:
-            raise EmulatorException(f"{self.__class__.__name__} has no write handler for port {port}.")
+            raise EmulatorException(f"{self.__class__.__name__} has no write handler for MMIO 0x{addr:04X}.")
 
-        logger.debug(f"{self.__class__.__name__}: WRITE to port 0x{port:02X} with 0x{value:04X}...")
+        logger.debug(f"{self.__class__.__name__}: WRITE to MMIO 0x{addr:04X} with 0x{value:04X}...")
         write_handler(value)
 
-    def _get_port_list(self) -> str:
-        """ return a string of format "port1 (r/w), port2 (r), ..."
+    def _get_mmio_list(self) -> str:
+        """ return a string of format "0xFE01 (r/w), 0xFE02 (r), ..."
         """
         # [0] = read, [1] = write
-        open_ports: dict[int, list[bool]] = {}
+        open_addrs: dict[int, list[bool]] = {}
 
-        for port, _ in self.read_dispatch.items():
-            if port not in open_ports:
-                open_ports[port] = [False, False]
-            open_ports[port][0] = True
-        for port, _ in self.write_dispatch.items():
-            if port not in open_ports:
-                open_ports[port] = [False, False]
-            open_ports[port][1] = True
-        return ", ".join([f"0x{port:02X} ({'r/w' if open_ports[port][0] and open_ports[port][1] else 'r' if open_ports[port][0] else 'w'})" for port in open_ports])
+        for addr, _ in self.read_dispatch.items():
+            if addr not in open_addrs:
+                open_addrs[addr] = [False, False]
+            open_addrs[addr][0] = True
+        for addr, _ in self.write_dispatch.items():
+            if addr not in open_addrs:
+                open_addrs[addr] = [False, False]
+            open_addrs[addr][1] = True
+        return ", ".join([
+            f"0x{addr:04X} ({'r/w' if open_addrs[addr][0] and open_addrs[addr][1] else 'r' if open_addrs[addr][0] else 'w'})"
+            for addr in open_addrs
+        ])
 
     def tick(self) -> None:
         """Tick the device. Runs once per CPU cycle."""
         pass
 
     def _log_ready(self) -> None:
-        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_port_list()}")
+        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()}")
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__.lower()}: {self._get_port_list()}"
+        return f"{self.__class__.__name__.lower()}: {self._get_mmio_list()}"

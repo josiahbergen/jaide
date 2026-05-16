@@ -13,6 +13,8 @@ from common.isa import INSTRUCTIONS, OPCODE_FORMATS
 
 from .constants import (
     BANK_SIZE,
+    BANK_WINDOW_END,
+    BANK_WINDOW_START,
     FLAG_C,
     FLAG_I,
     FLAG_N,
@@ -20,6 +22,9 @@ from .constants import (
     FLAG_STRINGS,
     FLAG_Z,
     MEMORY_SIZE,
+    MMIO_BASE,
+    MMIO_END,
+    MMIO_SYSTEM,
     NUM_BANKS,
     REGISTERS,
 )
@@ -53,14 +58,13 @@ class Emulator:
         self.f: Register = self.reg["F"]    # flags
         self.mb: Register = self.reg["MB"]  # memory bank
 
-        # set stack pointer to 0xFEFF as recommended by the spec
-        self.sp.set(0xFEFF)
+        # set stack pointer to 0xFDFF as recommended by the spec
+        self.sp.set(0xFDFF)
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
 
-        self.ports: list[int] = [0] * 256
         self.devices: list[Device] = []
 
         # simple read/write devices
@@ -117,12 +121,16 @@ class Emulator:
 
     def read16(self, addr: int) -> int:
         # fetch a 16-bit little-endian value from memory using word addressing
+        addr = mask16(addr)
+        if MMIO_BASE <= addr <= MMIO_END:
+            return self.mmio_read(addr)
+
         bank = self.mb.value % 32
-        # banked view (MB != 0): window 0xBC00–0xFDFF maps to the start of banks[MB-1].
+        # banked view (MB != 0): window 0xBC00–0xFCFF maps to the start of banks[MB-1].
         # flat memory (MB == 0): use absolute word addresses.
-        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
+        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
             memory = self.banks[bank - 1]
-            addr = addr - 0xBC00
+            addr = addr - BANK_WINDOW_START
         else:
             memory = self.memory
 
@@ -133,24 +141,32 @@ class Emulator:
 
     def write16(self, addr: int, value: int):
         # write a 16-bit little-endian value to memory using word addressing
+        addr = mask16(addr)
+        if MMIO_BASE <= addr <= MMIO_END:
+            self.mmio_write(addr, value)
+            return
 
         if addr < 0x0200:  # writing to ROM (0x0000–0x01FF)
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
 
         bank = self.mb.value % 32
-        if bank != 0 and 0xBC00 <= addr <= 0xFDFF:
+        phys_addr = addr
+        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
             memory = self.banks[bank - 1]
-            addr = addr - 0xBC00
+            addr = addr - BANK_WINDOW_START
         else:
             memory = self.memory
 
         if addr * 2 >= len(memory):
-            logger.warning(f"attempted to write to out of bounds memory (0x{addr:04X} in bank {bank}).")
+            logger.warning(f"attempted to write to out of bounds memory (0x{phys_addr:04X} in bank {bank}).")
             self.raise_interrupt(0)
             return
 
-        logger.verbose(f"writing 0x{value:04X} to 0x{addr:04X}{' in bank ' + str(bank) if 0xBC00 <= addr <= 0xFDFF else ''}...")
+        logger.verbose(
+            f"writing 0x{value:04X} to 0x{phys_addr:04X}"
+            f"{' (bank ' + str(bank) + ')' if bank != 0 and BANK_WINDOW_START <= phys_addr <= BANK_WINDOW_END else ''}..."
+        )
 
         value = mask16(value)
         memory[addr * 2] = value & 0xFF
@@ -191,26 +207,21 @@ class Emulator:
         self.flag_set(FLAG_N, bool(n))
         self.flag_set(FLAG_O, bool(o))
 
-    # port helpers
+    # MMIO helpers (0xFE00–0xFEFF, bank-independent)
 
-    def port_get(self, port: int) -> int:
-
+    def mmio_read(self, addr: int) -> int:
         for device in self.devices:
-            if port in device.read_dispatch:
-                return device.port_read(port)
-      
-        logger.warning(f"no device found on port {port}, return value is undefined behavior.")
+            if addr in device.read_dispatch:
+                return device.mmio_read(addr)
+
+        logger.warning(f"no device at MMIO 0x{addr:04X}, read is undefined.")
         return 0
 
-
-    def port_set(self, port: int, value: int) -> None:
+    def mmio_write(self, addr: int, value: int) -> None:
         value = mask16(value)
-        
-        if port == 0:  # port 0 is special and will print the value to the console
-            print(chr(value), end="", flush=True)
 
-        if port == 0xFF:  # system interface port
-            logger.debug(f"system interface port write: 0x{value:04X}")
+        if addr == MMIO_SYSTEM:
+            logger.debug(f"system MMIO write: 0x{value:04X} -> 0x{addr:04X}")
             match value:
                 case 0x01:  # reset
                     self.reset()
@@ -219,13 +230,11 @@ class Emulator:
                 case 0x03:  # power off
                     self.shutdown()
                 case _:
-                    pass  # undefined behavior, so we'll just do nothing
+                    pass
 
-        # TODO: refactor to not be a dumb ahh loop
-        # logger.debug(f"writing 0x{value:04X} to port 0x{port:02X}")
         for device in self.devices:
-            if port in device.write_dispatch:
-                device.port_write(port, value)
+            if addr in device.write_dispatch:
+                device.mmio_write(addr, value)
                 break
 
     # interrupt helpers
@@ -316,7 +325,7 @@ class Emulator:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
         # if logger.level == logger.log_level.VERBOSE:
-            # time.sleep(0.001)
+        # time.sleep(0.001)
 
         if self.interrupts_pending():
             # interrupt called!

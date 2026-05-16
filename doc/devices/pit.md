@@ -8,16 +8,16 @@ the pit is disabled by default. it must be enabled by passing 0x01 to the flags 
 
 when on, the pit continuously counts down from its `reset` value, and when this counter reaches zero, it fires interrupt `0x05` and resets its counter.
 
-## open ports
+## MMIO registers
 
-the pit supports read/write communication on two ports:
+the pit supports read/write communication on two registers:
 
-| operation | port   | action          |
-| --------- | ------ | --------------- |
-| read      | `0x10` | get reset value |
-| read      | `0x11` | get flags       |
-| write     | `0x10` | set reset value |
-| write     | `0x11` | set flags       |
+| operation | address  | action          |
+| --------- | -------- | --------------- |
+| read      | `0xFE10` | get reset value |
+| read      | `0xFE11` | get flags       |
+| write     | `0xFE10` | set reset value |
+| write     | `0xFE11` | set flags       |
 
 ## flags
 

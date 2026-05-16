@@ -22,8 +22,8 @@ class Keyboard(Device):
         self._pending: int  = 0      # scancode waiting to be read
         self._has_key: bool = False  # whether a key is ready
 
-        self.read_dispatch[0x01] = self._read_key
-        self.read_dispatch[0x02] = lambda: 0x01 if self._has_key else 0x00
+        self.read_dispatch[0xFE01] = self._read_key
+        self.read_dispatch[0xFE02] = lambda: 0x01 if self._has_key else 0x00
 
         self._log_ready()
 

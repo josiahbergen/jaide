@@ -43,15 +43,15 @@ class Disk(Device):
         # counts words.
         self._cursor = 0
 
-        self.write_dispatch[0x20] = self.execute_command
-        self.write_dispatch[0x21] = lambda value: setattr(self, "sector_number", value)
-        self.write_dispatch[0x22] = lambda value: setattr(self, "memory_address", value)
-        self.read_dispatch[0x23] = lambda: self.status
+        self.write_dispatch[0xFE20] = self.execute_command
+        self.write_dispatch[0xFE21] = lambda value: setattr(self, "sector_number", value)
+        self.write_dispatch[0xFE22] = lambda value: setattr(self, "memory_address", value)
+        self.read_dispatch[0xFE23] = lambda: self.status
 
         self._log_ready()
 
     def _log_ready(self) -> None:
-        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_port_list()} (using {self.disk_file})")
+        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()} (using {self.disk_file})")
 
     def execute_command(self, value: int) -> None:
         if self.status in [STATUS_READING, STATUS_WRITING]:

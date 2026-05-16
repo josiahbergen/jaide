@@ -1,15 +1,3 @@
-
-; serial_out
-; print a character to the serial port.
-;   char_reg = character to print (register/immediate)
-;   trashes e
-define serial_port 0x00
-macro serial_out %char
-    mov e, %char
-    outb serial_port, e
-end macro
-
-
 ; dereference_into
 ; dereference a pointer into a register.
 ;   dest = destination register for the dereferenced value

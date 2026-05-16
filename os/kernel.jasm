@@ -46,7 +46,7 @@ syscall:
 
 syscall_search_loop:
 
-    ; TODO: once a good abi gets defined, just use an
+    ; TODO: once a stable abi gets defined, just use an
     ;       actual jump table to avoid the loop here
 
     ; repeatedly search for our entry in the table

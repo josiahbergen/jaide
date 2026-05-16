@@ -32,13 +32,13 @@ on reset, the content of all registers is `0x0000`. the contents of RAM are unde
 
 thus, the jaide will simply start execution at `0x0000`
 
-*it is recommended that SP be set to 0xFEFF on reset.*
+_it is recommended that SP be set to 0xFDFF on reset._
 
 ## registers
 
 the jaide architecture supports up to 16 registers. all registers contain 16 bits.
 
-*currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support.*
+_currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
 
 ### general purpose registers
 
@@ -46,13 +46,13 @@ the jaide architecture supports up to 16 registers. all registers contain 16 bit
 
 ### special registers
 
-`PC` program counter *(read-only)*
+`PC` program counter _(read-only)_
 
 `SP` stack pointer
 
 `MB` memory bank
 
-`F` flags *(zero, carry, negative, overflow, interrupts enabled)*
+`F` flags _(zero, carry, negative, overflow, interrupts enabled)_
 
 the format of the flags register is `C Z N O I - - - - - - - - - - -`.
 
@@ -72,7 +72,7 @@ a single 16-bit instruction word is defined as follows:
 
 `EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset.
 
-*all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate.*
+_all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
 ### instruction set
 
@@ -85,14 +85,15 @@ jaide supports up to 128 Kib of memory.
 | Range             | Size      | Purpose                      |
 | ----------------- | --------- | ---------------------------- |
 | `0xFF00...0xFFFF` | 512 bytes | interrupt vector table       |
-| `0xFE00...0xFEFF` | 512 bytes | stack (recommended)          |
-| `0xBC00...0xFDFF` | 32 KiB    | general purpose RAM (banked) |
+| `0xFE00...0xFEFF` | 512 bytes | memory-mapped I/O            |
+| `0xFD00...0xFDFF` | 512 bytes | stack (recommended)          |
+| `0xBC00...0xFCFF` | 31.75 KiB | general purpose RAM (banked) |
 | `0x0200...0xBBFF` | 94 Kib    | general purpose RAM          |
 | `0x0000...0x01FF` | 1 KiB     | BIOS ROM                     |
 
-*the stack grows downwards. it is recommended that SP be set to 0xFEFF.*
+_the stack grows downwards. it is recommended that SP be set to 0xFDFF._
 
-*banked memory can be swapped using the MB register.*
+_banked memory can be swapped using the MB register._
 
 ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM; but you have bigger problems if SP points to ROM!)
 
@@ -134,7 +135,7 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 
 ### a note on HALT
 
-calling `HALT` puts the cpu in a *non-permanent*, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
+calling `HALT` puts the cpu in a _non-permanent_, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
 
 ### using INT and IRET
 
@@ -160,17 +161,35 @@ normal execution can be restored by calling `IRET`. more specifically, when `IRE
 | `F <- [SP++]`  | flags are popped (unmasks interrupts if applicable) |
 | `PC <- [SP++]` | program counter is popped                           |
 
-## ports
+## memory-mapped I/O
 
-ports can be used to interact with external i/o devices. The `INB` and `OUTB` instructions exist to facilitate this. jaide supports up to 255 custom i/o devices.
+device registers live in the 256-word region from `0xFE00` to `0xFEFF`. access them with `GET` and `PUT`.
 
-all ports have 16-bit data widths. it is recommended that a programmer makes use of the interrupt system, and then uses the i/o instructions to communicate data
+the JASM helpers `mmio_in` and `mmio_out` in `os/util.jasm` wrap `GET`/`PUT` for fixed addresses.
+
+### register map
+
+| number | address  | device   | access | role                       |
+| ------ | -------- | -------- | ------ | -------------------------- |
+| `0x01` | `0xFE01` | keyboard | R      | scancode                   |
+| `0x02` | `0xFE02` | keyboard | R      | status (`1` = key ready)   |
+| `0x10` | `0xFE10` | PIT      | R/W    | reload value               |
+| `0x11` | `0xFE11` | PIT      | R/W    | flags                      |
+| `0x20` | `0xFE20` | disk     | W      | command                    |
+| `0x21` | `0xFE21` | disk     | W      | sector number              |
+| `0x22` | `0xFE22` | disk     | W      | memory address             |
+| `0x23` | `0xFE23` | disk     | R      | status                     |
+| `0x30` | `0xFE30` | RTC      | R      | second                     |
+| `0x30` | `0xFE30` | RTC      | R      | minute                     |
+| `0x30` | `0xFE30` | RTC      | R      | hour                       |
+| `0x30` | `0xFE30` | RTC      | R      | day of year                |
+| `0xFF` | `0xFEFF` | system   | W      | system control (see below) |
+
+see the [device documentation](devices/) for per-device details.
 
 ### system interface
 
-port `0xFF` is a special port that can be used to control the physical hardware.
-
-the system interface port supports these commands:
+MMIO address `0xFEFF` controls the physical hardware.
 
 | value | command     | emulator behavior          | hardware behavior  |
 | ----- | ----------- | -------------------------- | ------------------ |
@@ -178,4 +197,4 @@ the system interface port supports these commands:
 | 0x01  | reset       | clear ram/regs, set pc = 0 | pull reset pin low |
 | 0x02  | halt        | set halted = true          | stop the clock     |
 | 0x03  | shutdown    | shut down emulator process | disconnect power   |
-| other | *undefined* | *undefined*                | *undefined*        |
+| other | _undefined_ | _undefined_                | _undefined_        |
