@@ -12,6 +12,7 @@ the disk controller utilizes dma-style data transfer to and from a hard disk. on
 
 the disk controller supports communication over five ports:
 
+
 | operation | port   | action              |
 | --------- | ------ | ------------------- |
 | write     | `0x20` | command             |
@@ -20,30 +21,36 @@ the disk controller supports communication over five ports:
 | write     | `0x23` | memory address low  |
 | read      | `0x24` | status              |
 
+
 ### commands
 
 there are two supported commands:
+
 
 | value  | command      | action                                   |
 | ------ | ------------ | ---------------------------------------- |
 | `0x01` | read sector  | copies data from a sector into memory    |
 | `0x02` | write sector | writes data from memory to a disk sector |
 
+
 ### status flags
 
 reading from the status port returns a value from this table:
 
-| value | flag     | meaning                           |
-| ----- | -------- | --------------------------------- |
-| 0     | idle     | device is idle                    |
-| 1     | busy     | device is executing data transfer |
-| 2     | error    | device error                      |
+
+| value | flag  | meaning                           |
+| ----- | ----- | --------------------------------- |
+| 0     | idle  | device is idle                    |
+| 1     | busy  | device is executing data transfer |
+| 2     | error | device error                      |
+
 
 ## jfs (jaide file system)
 
 jfs is a fat-style filesystem. it uses a block size of 256 words.
 
 the general structure of the filesystem is as follows:
+
 
 | name             | size (blocks) |
 | ---------------- | ------------- |
@@ -52,9 +59,11 @@ the general structure of the filesystem is as follows:
 | root blocks      | m             |
 | data blocks      | ...           |
 
+
 ### boot section
 
 the boot section is exactly one block in length. it contains 7 values, each one word in size. all indices are word indices.
+
 
 | word index | name         | description                                   |
 | ---------- | ------------ | --------------------------------------------- |
@@ -67,6 +76,7 @@ the boot section is exactly one block in length. it contains 7 values, each one 
 | 6          | data start   | block index of the first data block           |
 | 7          | padding      | 249 words                                     |
 
+
 ### allocation table
 
 each entry in the allocation table is one word (16 bits) in size.
@@ -75,10 +85,12 @@ with a few exceptions, the value of the entry is simply the index of the next bl
 
 special values:
 
+
 | value    | meaning      |
 | -------- | ------------ |
 | `0x0000` | unallocated  |
 | `0xffff` | end of chain |
+
 
 indexing: table entry indexing uses absolute block numbers.
 
@@ -88,12 +100,14 @@ the root directory table is 2 blocks in size. each entry is 8 words long. all in
 
 the root directory can contain up to 64 files.
 
-| word index | size (words) | name        | description                                              |
-| ---------- | ------------ | ----------- | -------------------------------------------------------- |
-| 0          | 4            | filename    | 8-character name, null-padded (2 chars per word)         |
-| 4          | 2            | extension   | 4-character extension, null-padded                       |
-| 6          | 1            | start block | first block index of the file                            |
-| 7          | 1            | size        | size of the file in words                                |
+
+| word index | size (words) | name        | description                                      |     |
+| ---------- | ------------ | ----------- | ------------------------------------------------ | --- |
+| 0          | 4            | filename    | 8-character name, null-padded (2 chars per word) |     |
+| 4          | 2            | extension   | 4-character extension, null-padded               |     |
+| 6          | 1            | start block | first block index of the file                    |     |
+| 7          | 1            | size        | size of the file in words                        |     |
+
 
 #### future plan: ebnlf (executable-but-not-linkable format)
 

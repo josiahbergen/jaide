@@ -94,7 +94,7 @@ jaide supports up to 128 Kib of memory.
 
 *banked memory can be swapped using the MB register.*
 
-ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM -- but you have bigger problems if SP points to ROM...)
+ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM; but you have bigger problems if SP points to ROM!)
 
 ### memory banking
 
