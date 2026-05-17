@@ -321,6 +321,17 @@ handler_list:
     ret
 
 handler_disk:
+
+    dereference_into a, kernel_var_fs_mounted
+    cmp a, 0x00
+    jnz handler_disk_mounted
+
+    mov a, s_disk_info_error
+    call echo
+    ret
+
+handler_disk_mounted:
+
     ; header
     mov a, s_disk_info
     call echo
@@ -448,6 +459,7 @@ s_disk_info_table:  data "       allocation table start", 0
 s_disk_info_root:   data "       root start", 0
 s_disk_info_data:   data "       data start", 0
 s_disk_info:        data "jfs file system:", 0
+s_disk_info_error:  data "error: no disk mounted.", 0
 
 s_cmd_exec:         data "exec",  0
 s_cmd_list:         data "list",  0
