@@ -1,13 +1,13 @@
-import "os/util.jasm"
-
-sc_shutdown:
-    mov a, 0x03
-    mmio_out mmio_system, a
-    halt
-    jmp sc_shutdown
-
-sc_reset:
-    mov a, 0x01
-    mmio_out mmio_system, a
-    halt
-    jmp sc_reset
+
+sc_shutdown:
+    mov a, 0x03
+    mmio_out mmio_system, a
+    halt
+    jmp sc_shutdown
+
+sc_reset:
+    mov a, 0x01
+    mmio_out mmio_system, a
+    halt
+    jmp sc_reset
+

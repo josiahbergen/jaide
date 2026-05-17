@@ -55,7 +55,7 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | `0x21` | `poll_key`  | -                     | A = char or 0                      | **Non-blocking.** Returns next key from buffer, or 0 if empty. |
 | `0x22` | `read_line` | B = buff, C = max len | A = len (includes null terminator) | Collect input with echo and backspace until ENTER.             |
 
-### tilesystem
+### filesystem
 
 | #      | Name       | Args                               | Returns                               | Notes                                                                 |
 | ------ | ---------- | ---------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
@@ -82,3 +82,26 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | ------ | ---------- | ---- | ------- | --------------- |
 | `0x50` | `reset`    | -    | -       | Reset system    |
 | `0x51` | `shutdown` | -    | -       | Shutdown system |
+
+## memory layout
+
+| Range             | Purpose                                      |
+| ----------------- | -------------------------------------------- |
+| `0x0000`–`0x00FF` | BIOS ROM                                     |
+| `0x0100`–`0x3FFF` | Kernel code                                  |
+| `0x4000`–`0x4FFF` | VRAM (terminal display)                      |
+| `0x5000`–`0x5FFF` | Kernel data (vars, FD table, disk scratch)   |
+| `0x6000`–`0x6FFF` | Filesystem block cache                       |
+| `0x7000`–`0xAFFF` | User program space (banked; see below)       |
+| `0xB000`–`0xFCFF` | Reserved                                     |
+| `0xFD00`–`0xFDFF` | Stack                                        |
+| `0xFE00`–`0xFEFF` | MMIO                                         |
+| `0xFF00`–`0xFFFF` | Interrupt vector table                       |
+
+### user programs
+
+programs loaded by `exec` are placed at **`0x7000`** in their assigned memory bank (`MB = 1`–`31`). the entry point is **`0x7000`**. each bank provides 16,384 words (32 KiB, exactly 2¹⁴) for code and data.
+
+## notes
+
+the kernel owns flat memory from `0x0100` through `0x6FFF` (code, VRAM, kernel data, and FS cache). user code runs in the banked region at `0x7000`–`0xAFFF`.

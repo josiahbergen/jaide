@@ -1,4 +1,4 @@
-define vram_start 0xBC00
+define vram_start 0x4000
 
 macro xy_to_vram %dest, %x, %y
     mov %dest, vram_start ; start of vram

@@ -1,4 +1,4 @@
-; this code lives at 0x200, and will eventually be in a separate file,
+; this code lives at 0x100, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 
 main:
@@ -93,6 +93,8 @@ sc_get_time:
 mov a, 0x01
 ret
 
+import "os/util.jasm"
+import "os/syscalls/process.jasm"
 import "os/syscalls/fs.jasm"
 import "os/syscalls/system.jasm"
 
@@ -124,6 +126,7 @@ sc_function_table:
     data 0x37, fs__sc_stat
     ; system
     data 0x40, sc_get_ticks
+    data 0x41, sc_get_time
     data 0x41, sc_get_time
     data 0x42, system__sc_shutdown
     data 0x43, system__sc_reset

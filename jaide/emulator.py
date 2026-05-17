@@ -27,6 +27,9 @@ from .constants import (
     MMIO_SYSTEM,
     NUM_BANKS,
     REGISTERS,
+    VRAM_END,
+    VRAM_SIZE,
+    VRAM_START,
 )
 from .devices.device import Device
 from .devices.disk import Disk
@@ -63,6 +66,7 @@ class Emulator:
 
         # memory and i/o
         self.memory: bytearray = bytearray(MEMORY_SIZE)
+        self.vram: bytearray = bytearray(VRAM_SIZE)
         self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
 
         self.devices: list[Device] = []
@@ -77,7 +81,7 @@ class Emulator:
             # we need this because the keyboard and graphics controllers need to both pull data from the pygame window,
             # and this is the simplest way to do that.
             _key_queue = deque()
-            self.devices.append(Graphics(self.raise_interrupt, _key_queue, self.banks[0], self.shutdown))
+            self.devices.append(Graphics(self.raise_interrupt, _key_queue, self.vram, self.shutdown))
             self.devices.append(Keyboard(self.raise_interrupt, _key_queue))
 
         # disk device
@@ -99,6 +103,17 @@ class Emulator:
         self.handlers: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = handler_map
 
     # memory
+
+    def _resolve_memory(self, addr: int) -> tuple[bytearray, int]:
+        """Map a word address to (backing store, word offset within that store)."""
+        if VRAM_START <= addr <= VRAM_END:
+            return self.vram, addr - VRAM_START
+
+        bank = self.mb.value % 32
+        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
+            return self.banks[bank - 1], addr - BANK_WINDOW_START
+
+        return self.memory, addr
 
     def load_binary(self, file: str, addr: int = 0):
 
@@ -125,14 +140,7 @@ class Emulator:
         if MMIO_BASE <= addr <= MMIO_END:
             return self.mmio_read(addr)
 
-        bank = self.mb.value % 32
-        # banked view (MB != 0): window 0xBC00–0xFCFF maps to the start of banks[MB-1].
-        # flat memory (MB == 0): use absolute word addresses.
-        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
-            memory = self.banks[bank - 1]
-            addr = addr - BANK_WINDOW_START
-        else:
-            memory = self.memory
+        memory, addr = self._resolve_memory(addr)
 
         lo = memory[addr * 2]
         hi = memory[addr * 2 + 1]
@@ -146,26 +154,25 @@ class Emulator:
             self.mmio_write(addr, value)
             return
 
-        if addr < 0x0200:  # writing to ROM (0x0000–0x01FF)
+        if addr < 0x0100:  # writing to ROM (0x0000–0x00FF)
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
 
-        bank = self.mb.value % 32
         phys_addr = addr
-        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
-            memory = self.banks[bank - 1]
-            addr = addr - BANK_WINDOW_START
-        else:
-            memory = self.memory
+        memory, addr = self._resolve_memory(addr)
 
         if addr * 2 >= len(memory):
-            logger.warning(f"attempted to write to out of bounds memory (0x{phys_addr:04X} in bank {bank}).")
+            logger.warning(f"attempted to write to out of bounds memory (0x{phys_addr:04X}).")
             self.raise_interrupt(0)
             return
 
+        bank = self.mb.value % 32
+        in_bank = bank != 0 and BANK_WINDOW_START <= phys_addr <= BANK_WINDOW_END
+        in_vram = VRAM_START <= phys_addr <= VRAM_END
         logger.verbose(
             f"writing 0x{value:04X} to 0x{phys_addr:04X}"
-            f"{' (bank ' + str(bank) + ')' if bank != 0 and BANK_WINDOW_START <= phys_addr <= BANK_WINDOW_END else ''}..."
+            f"{' (bank ' + str(bank) + ')' if in_bank else ''}"
+            f"{' (vram)' if in_vram else ''}..."
         )
 
         value = mask16(value)
@@ -325,7 +332,7 @@ class Emulator:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
         # if logger.level == logger.log_level.VERBOSE:
-        # time.sleep(0.001)
+        time.sleep(0.001)
 
         if self.interrupts_pending():
             # interrupt called!

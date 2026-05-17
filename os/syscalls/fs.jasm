@@ -1,9 +1,58 @@
-; read a sector from the disk into memory.
-;  a = sector number
-;  b = memory address
-;  returns: a = result
 
-import "os/util.jasm"
+;    filesystem syscalls for the jaideos kernel.
+;    josiah bergen, may 2026
+;
+;    this file contains implentations for the following syscalls:
+;
+;    | name     | args                               | Returns                               | Notes                                                                 |
+;    | -------- | ---------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
+;    | fs_mount | -                                  | a = status                            | read boot sector, validate magic, cache header values.                |
+;    | fs_list  | b = buff, c = max entries          | a = count                             | copy root directory entries into buffer.                              |
+;    | fs_open  | b = filename                       | a = fd                                | walk root dir, return index into kernel FD table. Error if not found. |
+;    | fs_read  | b = fd, c = dest addr, D = n_words | a = words read                        | read words from current file position, following FaT chain.           |
+;    | fs_write | b = fd, c = src addr, D = n_words  | a = status                            | write words at current file position. allocates new blocks as needed. |
+;    | fs_seek  | b = fd, c = word offset            | a = status                            | move read/write position within file.                                 |
+;    | fs_close | b = fd                             | -                                     | release FD table slot. Flush any pending writes.                      |
+;    | fs_stat  | b = filename                       | a = status, b = start block, c = size | query file metadata without opening.                                  |
+;
+;    the filesystem syscalls share the kernel data region from 0x5000 to 0x5FFF.
+;    the kernel data layout is as follows:
+;
+;    | range           | size (words) | purpose                  |
+;    | --------------- | ------------ | ------------------------ |
+;    | 0x5200...0x5FFF | 0xE00        | reserved/scratch         |
+;    | 0x51C0...0x51FF | 0x40         | shell variables          |
+;    | 0x5180...0x51BF | 0x40         | filesystem cache indices |
+;    | 0x5140...0x517F | 0x40         | file descriptor table*   |
+;    | 0x5100...0x513F | 0x40         | kernel variables**       |
+;    | 0x5000...0x50FF | 0x100        | disk scratch buffer      |
+;
+;    *the file descriptor table is a 64-word array of eight 8-word file descriptor structs:
+;
+;    | word index | name           |
+;    | ---------- | -------------- |
+;    | 0          | open           |
+;    | 1          | start block    |
+;    | 2          | current block  |
+;    | 3          | current offset |
+;    | 4          | size           |
+;    | 5-7        | padding        |
+;
+;    ** the kernel variable section is defined as:
+;
+;    | address    | name         | description                                   |
+;    | ---------- | ------------ | --------------------------------------------- |
+;    | 0x5100     | pit low      | low word of 32-bit kernel PIT counter         |
+;    | 0x5101     | pit high     | high word of 32-bit kernel PIT counter        |
+;    | 0x5102     | fs mounted   | 0x01 if filesystem mounted, 0x00 otherwise    |
+;    | 0x5103     | blocks       | total number of blocks on the disk            |
+;    | 0x5104     | table start  | block index of the first element in the table |
+;    | 0x5105     | table blocks | number of blocks in the allocation table      |
+;    | 0x5106     | root start   | block index of the first root block           |
+;    | 0x5107     | root blocks  | number of blocks in the root directory        |
+;    | 0x5108     | data start   | block index of the first data block           |
+;    | 0x5109     | padding      | 54 words                                      |
+;
 
 define disk_status_idle    0x00
 define disk_status_busy    0x01
@@ -12,12 +61,64 @@ define disk_status_error   0x02
 define disk_command_read   0x00
 define disk_command_write  0x01
 
-; syscalls
+define disk_scratch_buffer 0x5000
+define disk_scratch_buffer_size 0x100
+
+define kernel_var_pit_low      0x5100
+define kernel_var_pit_high     0x5101
+define kernel_var_fs_mounted   0x5102
+define kernel_var_blocks       0x5103
+define kernel_var_table_start  0x5104
+define kernel_var_table_blocks 0x5105
+define kernel_var_root_start   0x5106
+define kernel_var_root_blocks  0x5107
+define kernel_var_data_start   0x5108
 
 sc_mount:
-    mov a, 0x00 ; boot sector
-    mov b, 0x1000 ; where to load
-    call disk_read
+    mov a, 0x00                ; load the boot sector...
+    mov b, disk_scratch_buffer ; ...into the scratch buffer
+    call disk_read_sector
+
+    ; pointer to the boot sector, now in memory
+    mov y, disk_scratch_buffer
+
+    ; check for magic
+    get z, [y]
+    cmp z, 0x333a 
+    jnz sc_mount_error
+
+    ; get and cache header values
+    inc y
+    get z, [y]
+    save_to kernel_var_blocks, z
+    inc y
+    get z, [y]
+    save_to kernel_var_table_start, z
+    inc y
+    get z, [y]
+    save_to kernel_var_table_blocks, z
+    inc y
+    get z, [y]
+    save_to kernel_var_root_start, z
+    inc y
+    get z, [y]
+    save_to kernel_var_root_blocks, z
+    inc y
+    get z, [y]
+    save_to kernel_var_data_start, z
+
+    ; set fs mounted to 1
+    save_to kernel_var_fs_mounted, 0x01
+
+    ; return success!
+    mov a, 0x00
+    ret
+
+sc_mount_error:
+    ; set fs mounted to 0
+    save_to kernel_var_fs_mounted, 0x00
+    ; return error
+    mov a, 0x01
     ret
 
 sc_list:
@@ -36,7 +137,7 @@ ret
 ;  b = memory address
 ;  returns: when done
 
-disk_read:
+disk_read_sector:
     mmio_out mmio_disk_sector, a
     mmio_out mmio_disk_address, b
     
@@ -47,13 +148,6 @@ disk_read:
     sti
     halt
 
-    mov e, 0x1000
-    get e, [e]
-    cmp e, 0x333A ; check for magic
-
-    jnz disk_read_error
+    ; disk done, return success
     mov a, 0x00
-    ret
-disk_read_error:
-    mov a, 0x01
     ret

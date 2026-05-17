@@ -216,7 +216,7 @@ class REPL:
         logger.info(self.disasm_at(self.emulator.pc.value))
 
     def c_vram(self):
-        chunk = self.emulator.banks[1][:32]
+        chunk = self.emulator.vram[:32]
         for i in range(0, len(chunk), 32):
             for i in range(0, len(chunk), 32):
                 row = chunk[i : i + 32]

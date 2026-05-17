@@ -47,9 +47,9 @@ COLORS: list[tuple[int, int, int]] = [
 
 class Graphics(Device):
     def __init__(self, irq: Callable[[int], None], key_queue: deque, vram: bytearray, shutdown: Callable[[], None]):
-        """Graphics controller. Renders VRAM (bank 1) to a pygame window.
+        """Graphics controller. Renders VRAM to a pygame window.
 
-        vram      -- reference to emulator.banks[0] (VRAM bank)
+        vram      -- reference to emulator.vram (mapped at 0x4000–0x4FFF)
         key_queue -- shared deque; key events are appended here for KeyboardDevice
         """
         super().__init__(irq)
@@ -168,7 +168,7 @@ class Graphics(Device):
         # ugly ahh code though
         pygame.draw.rect(self.screen, COLORS[2], (0, 0, SCALED_WIDTH, GRAPHICS_CHAR_H * SCALE))
         pygame.draw.rect(self.screen, COLORS[0], (0, GRAPHICS_CHAR_H * SCALE, SCALED_WIDTH, SCALED_HEIGHT - GRAPHICS_CHAR_H * SCALE))
-        font = pygame.font.SysFont(None, (GRAPHICS_CHAR_H + 1) * SCALE)
+        font = pygame.font.SysFont(None, int((GRAPHICS_CHAR_H + 1) * SCALE))
         self.screen.blit(font.render("video disabled", True, COLORS[0], COLORS[2]), (4 * SCALE, 2 * SCALE))
         self._inactive_drawn = True
 
@@ -188,7 +188,7 @@ def _load_glyphs() -> list[bytes]:
 
 def _translate_key(event: pygame.event.Event) -> int:
     """Translate a pygame KEYDOWN event to a Jaide scancode (ASCII for now)."""
-    if event.unicode and ord(event.unicode) < 0x100:
+    if event.unicode and ord(event.unicode) < 0x80:
         return ord(event.unicode)
     # TODO: map non-printable keys (arrows, F-keys, etc.) to extended scancodes
     return 0

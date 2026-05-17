@@ -2,7 +2,7 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define indicator_position 0xBC00
+define indicator_position 0x4000
 
 define MMIO_BASE 0xFE00
 
@@ -37,7 +37,6 @@ start:
     ; booloader entry point. lives at 0x0000.
 
     ; setup our registers
-    mov mb, 0x01 ; set memory bank to vram
     mov sp, 0xfdff ; set the stack pointer to recommended location
 
     mov x, indicator_position ; start of message location
@@ -86,7 +85,7 @@ generic_fault_hander:
     halt ; if that didn't work, hang cpu permanently
     jmp generic_fault_hander
 
-align 0x200 ; fill entire rom
+align 0x100 ; fill entire rom
 
-; kernel, "loaded" at 0x200
+; kernel, "loaded" at 0x100
 import "os/kernel.jasm"

@@ -2,7 +2,7 @@ from typing import Callable
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
 
-from .constants import BANK_WINDOW_END, BANK_WINDOW_START, FLAG_C, FLAG_I, FLAG_N, FLAG_O, FLAG_Z
+from .constants import FLAG_C, FLAG_I, FLAG_N, FLAG_O, FLAG_Z
 from .emulator import Emulator, mask16
 from .exceptions import EmulatorException
 from .util.logger import logger
@@ -419,23 +419,19 @@ def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
     src = emu.reg_get(reg_a)   # ssss = src address
     count = imm16
 
-    bank = emu.mb.value % 32
-    if bank != 0 and BANK_WINDOW_START <= src <= BANK_WINDOW_END and BANK_WINDOW_START <= dst <= BANK_WINDOW_END:
-        mem = emu.banks[bank - 1]
-        s = (src - BANK_WINDOW_START) * 2
-        d = (dst - BANK_WINDOW_START) * 2
-    elif bank == 0:
-        mem = emu.memory
-        s = src * 2
-        d = dst * 2
-    else:
-        # cross-boundary copy: fall back to word-by-word
+    src_mem, src_off = emu._resolve_memory(src)
+    dst_mem, dst_off = emu._resolve_memory(dst)
+
+    if src_mem is not dst_mem:
+        # cross-region copy: fall back to word-by-word
         for i in range(count):
             emu.write16(dst + i, emu.read16(src + i))
         return
 
+    s = src_off * 2
+    d = dst_off * 2
     n = count * 2
-    mem[d:d + n] = mem[s:s + n]
+    src_mem[d:d + n] = src_mem[s:s + n]
 
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {

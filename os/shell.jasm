@@ -1,6 +1,6 @@
 
 define command_buffer_length 20
-define vram_start 0xBC00
+define vram_start 0x4000
 define vram_row_length 0xA0
 define vram_length 0x0FA0
 
@@ -321,10 +321,67 @@ handler_list:
     ret
 
 handler_disk:
-    ; TODO: syscall to show disk information
-    mov a, s_not_implemented
+    ; header
+    mov a, s_disk_info
     call echo
+
+    dereference_into a, kernel_var_blocks
+    mov b, handler_disk_buffer
+
+    ; put string of number of blocks into buffer
+    call util__num_to_string
+
+    mov a, s_disk_info_blocks
+    call print
+
+    mov a, handler_disk_buffer
+    call print
+    call scroll
+
+    dereference_into a, kernel_var_table_start
+    mov b, handler_disk_buffer
+
+    ; put string of number of blocks into buffer
+    call util__num_to_string
+
+    mov a, s_disk_info_table
+    call print
+
+    mov a, handler_disk_buffer
+    call print
+    call scroll
+
+    dereference_into a, kernel_var_root_start
+    mov b, handler_disk_buffer
+
+    ; put string of number of blocks into buffer
+    call util__num_to_string
+
+    mov a, s_disk_info_root
+    call print
+
+    mov a, handler_disk_buffer
+    call print
+    call scroll
+
+    dereference_into a, kernel_var_data_start
+    mov b, handler_disk_buffer
+
+    ; put string of number of blocks into buffer
+    call util__num_to_string
+
+    mov a, s_disk_info_data
+    call print
+
+    mov a, handler_disk_buffer
+    call print
+    call scroll
+    call draw_prompt
     ret
+
+handler_disk_buffer:
+times 16, 0x00 ; 16 words
+data 0xA       ; newline
 
 handler_mount:
 
@@ -386,6 +443,11 @@ s_error:            data "command returned with error status.", 0
 s_marko_message:    data "hi marko! you are looking at at this text through a custom shell written in my", 0xA
                     data "custom assembly language, completely powered by my custom cpu architecture.", 0xA
                     data "i think it's pretty cool!", 0
+s_disk_info_blocks: data "       total blocks", 0
+s_disk_info_table:  data "       allocation table start", 0
+s_disk_info_root:   data "       root start", 0
+s_disk_info_data:   data "       data start", 0
+s_disk_info:        data "jfs file system:", 0
 
 s_cmd_exec:         data "exec",  0
 s_cmd_list:         data "list",  0

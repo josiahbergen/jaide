@@ -64,3 +64,58 @@ string_compare_end:
     pop b
     pop a
     ret
+
+
+; num_to_string
+; convert a number to a string.
+;   a = number to convert
+;   b = destination buffer
+;   trashes e
+num_to_string:
+    push a
+    push b
+    push c
+
+    ; digit count
+    mov c, 0 
+
+    cmp a, 0
+    jnz num_to_string_loop
+
+    ; zero case, construct "0" and return
+    put [b], 0x30 ; '0'
+    inc b
+    jmp num_to_string_end
+
+num_to_string_loop:
+    mov e, a
+    mod e, 10
+    add e, 0x30 ; convert remainder to ASCII
+    push e
+    
+    ; increment digit count
+    inc c
+
+    div a, 10
+    cmp a, 0
+    jnz num_to_string_loop
+
+    ; b is the start of the buffer     
+    ; c is the digit count
+num_to_string_reverse_loop:
+    pop e
+    put [b], e
+    inc b
+
+    dec c
+    cmp c, 0
+    jnz num_to_string_reverse_loop
+
+num_to_string_end:
+    ; add null terminator
+    put [b], 0
+    ; restore values and return
+    pop c
+    pop b
+    pop a
+    ret

@@ -1,0 +1,47 @@
+
+;    process syscalls for the jaideos kernel.
+;    josiah bergen, may 2026
+;
+;    this file contains implentations for the following syscalls:
+;
+;    | name   | args          | returns                                      | notes                                                |
+;    | ------ | ------------- | -------------------------------------------- | ---------------------------------------------------- |
+;    | `exit` | b = exit code | a = exit code                                | return to shell. no-op if called from shell context. |
+;    | `exec` | b = string    | a = error (return not guaranteed on success) | load and execute file from disk.                     |
+
+define stack_top 0xfdff
+
+sc_exit:
+    ; this subroutine purges the entire call stack,
+    ; re-enables interrupts, and transfers control back
+    ; to the kernel's main loop (i.e. the shell).
+
+    pop z 
+    cmp sp, stack_top
+    ; since we can be anywhere in the call stack when this
+    ; syscall executes, we need to keep popping until we get
+    ; to the very top.
+    jnz sc_exit
+
+    ; save requested exit code
+    push b 
+
+    ; clear the screen + redraw shell prompt. 
+    ; mimics handler_clear subroutine
+    call shell__clear_screen
+    call shell__draw_prompt_no_scroll
+
+    ; re-enable interrupts
+    sti 
+
+    ; recover exit code into a and transfer control back
+    ; to the kernel's main loop
+    pop a
+    jmp kernel__loop
+
+
+sc_exec:
+    ; TODO: depends on fs_* syscalls to work
+    ; for now, return an error
+    mov a, 0x01
+    ret

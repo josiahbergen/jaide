@@ -82,24 +82,30 @@ see the [instruction set](inst.txt) and for a comprehensive list of instructions
 
 jaide supports up to 128 Kib of memory.
 
-| Range             | Size      | Purpose                      |
-| ----------------- | --------- | ---------------------------- |
-| `0xFF00...0xFFFF` | 512 bytes | interrupt vector table       |
-| `0xFE00...0xFEFF` | 512 bytes | memory-mapped I/O            |
-| `0xFD00...0xFDFF` | 512 bytes | stack (recommended)          |
-| `0xBC00...0xFCFF` | 31.75 KiB | general purpose RAM (banked) |
-| `0x0200...0xBBFF` | 94 Kib    | general purpose RAM          |
-| `0x0000...0x01FF` | 1 KiB     | BIOS ROM                     |
+| Range             | Size      | Purpose                                      |
+| ----------------- | --------- | -------------------------------------------- |
+| `0xFF00...0xFFFF` | 512 bytes | interrupt vector table                       |
+| `0xFE00...0xFEFF` | 512 bytes | memory-mapped I/O                            |
+| `0xFD00...0xFDFF` | 512 bytes | stack (recommended)                          |
+| `0xB000...0xFCFF` | ~39 KiB   | reserved (future kernel heap / expansion)    |
+| `0x7000...0xAFFF` | 32 KiB    | user processes RAM (banked)                  |
+| `0x6000...0x6FFF` | 8 KiB     | filesystem block cache                       |
+| `0x5000...0x5FFF` | 8 KiB     | kernel data (vars, FD table, disk scratch)   |
+| `0x4000...0x4FFF` | 8 KiB     | video memory                                 |
+| `0x0100...0x3FFF` | ~16 KiB   | kernel code                                  |
+| `0x0000...0x00FF` | 512 bytes | BIOS ROM                                     |
 
 _the stack grows downwards. it is recommended that SP be set to 0xFDFF._
 
 _banked memory can be swapped using the MB register._
 
-ROM is protected from writes (`PUT 0x0100, A` will simply `NOP`, as will `PUSH` if SP points to ROM; but you have bigger problems if SP points to ROM!)
+ROM is protected from writes (`PUT 0x0080, A` will simply `NOP`, as will `PUSH` if SP points to ROM; but you have bigger problems if SP points to ROM!)
 
 ### memory banking
 
-there are up to 32 possible memory banks. `MB = 0` indicates that the built-in RAM is in use. it is recommended that MB = 1 point to built-in VRAM.
+there are up to 31 banked memory regions (`MB = 1` through `MB = 31`). each maps the window `0x7000`–`0xAFFF` to a separate 16,384-word (2¹⁴) bank. `MB = 0` uses flat (unbanked) addressing for all regions except the bank window.
+
+VRAM lives at `0x4000`–`0x4FFF` in flat memory and is not banked. user programs are loaded at `0x7000` in their assigned bank; the entry point is `0x7000`.
 
 ### the stack
 
@@ -169,7 +175,7 @@ the JASM helpers `mmio_in` and `mmio_out` in `os/util.jasm` wrap `GET`/`PUT` for
 
 ### register map
 
-| number | address  | device   | access | role                       |
+| index  | address  | device   | access | role                       |
 | ------ | -------- | -------- | ------ | -------------------------- |
 | `0x01` | `0xFE01` | keyboard | R      | scancode                   |
 | `0x02` | `0xFE02` | keyboard | R      | status (`1` = key ready)   |

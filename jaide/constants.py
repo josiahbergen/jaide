@@ -6,11 +6,15 @@
 from common.isa import OPCODE_FORMATS
 
 MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
-BANK_SIZE   = 0x4100 * 2   # bytes for the 0xBC00–0xFCFF banked window (0x4100 word addresses)
-NUM_BANKS   = 31           # 32 banks total, bank 0 is built-in RAM
+BANK_SIZE   = 0x4000 * 2   # bytes per bank (0x4000 = 16384 words, 2¹⁴)
+NUM_BANKS   = 31           # MB=1..31 map to banks[0..30] for user processes
 
-BANK_WINDOW_START = 0xBC00
-BANK_WINDOW_END   = 0xFCFF
+BANK_WINDOW_START = 0x7000
+BANK_WINDOW_END   = 0xAFFF
+
+VRAM_START = 0x4000
+VRAM_END   = 0x4FFF
+VRAM_SIZE  = 0x1000 * 2  # 4096 words (8 KiB)
 
 MMIO_BASE = 0xFE00
 MMIO_END  = 0xFEFF
