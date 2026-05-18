@@ -1,8 +1,10 @@
-# jaideos kernel abi (syscall interface)
+# jaideos kernel
 
-the jaideos kernel supports a low-level interface of syscalls, mostly for system + driver functionality.
+the jaideos kernel is pretty cool. read all about it below!
 
-## interface
+## syscall interface
+
+the kernel supports a low-level interface of syscalls, mostly for system + driver functionality.
 
 syscalls can be invoked via a software interrupt with `int 0x10`.
 
@@ -68,7 +70,7 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | `0x36` | `fs_close` | B = fd                             | -                                     | Release FD table slot. Flush any pending writes.                      |
 | `0x37` | `fs_stat`  | B = filename                       | A = status, B = start block, C = size | Query file metadata without opening.                                  |
 
-### other devices
+### time
 
 | #      | Name        | Args | Returns                      | Notes                                                          |
 | ------ | ----------- | ---- | ---------------------------- | -------------------------------------------------------------- |
@@ -85,23 +87,62 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 
 ## memory layout
 
-| Range             | Purpose                                      |
+the jaide kernel requires a specific memory layout:
+
+| range             | purpose                                      |
 | ----------------- | -------------------------------------------- |
-| `0x0000`–`0x00FF` | BIOS ROM                                     |
-| `0x0100`–`0x3FFF` | Kernel code                                  |
-| `0x4000`–`0x4FFF` | VRAM (terminal display)                      |
-| `0x5000`–`0x5FFF` | Kernel data (vars, FD table, disk scratch)   |
-| `0x6000`–`0x6FFF` | Filesystem block cache                       |
-| `0x7000`–`0xAFFF` | User program space (banked; see below)       |
-| `0xB000`–`0xFCFF` | Reserved                                     |
-| `0xFD00`–`0xFDFF` | Stack                                        |
-| `0xFE00`–`0xFEFF` | MMIO                                         |
-| `0xFF00`–`0xFFFF` | Interrupt vector table                       |
+| `0x0000`–`0x00FF` | bios rom                                     |
+| `0x0100`–`0x3FFF` | kernel code                                  |
+| `0x4000`–`0x4FFF` | video memory                                 |
+| `0x5000`–`0x5FFF` | kernel data                                  |
+| `0x6000`–`0x6FFF` | filesystem block cache                       |
+| `0x7000`–`0xAFFF` | user program space (banked)                  |
+| `0xB000`–`0xFCFF` | reserved                                     |
+| `0xFD00`–`0xFDFF` | stack                                        |
+| `0xFE00`–`0xFEFF` | mmio                                         |
+| `0xFF00`–`0xFFFF` | interrupt vector table                       |
+
+### kernel data layout
+
+| range             | size (words) | purpose                  |
+| ----------------- | ------------ | ------------------------ |
+| `0x5200...0x5FFF` | 0xE00        | reserved/scratch         |
+| `0x51C0...0x51FF` | 0x40         | shell variables          |
+| `0x5180...0x51BF` | 0x40         | filesystem cache indices |
+| `0x5140...0x517F` | 0x40         | file descriptor table*   |
+| `0x5100...0x513F` | 0x40         | kernel variables**       |
+| `0x5000...0x50FF` | 0x100        | disk scratch buffer      |
+
+#### file descriptor table
+
+the file descriptor table is a 64-word array of eight 8-word file descriptor structs:
+
+| word index | name           |
+| ---------- | -------------- |
+| 0          | open           |
+| 1          | start block    |
+| 2          | current block  |
+| 3          | current offset |
+| 4          | size           |
+| 5-7        | padding        |
+
+#### kernel variables
+
+the kernel variable section contains these defined values:
+
+| address    | name         | description                                   |
+| ---------- | ------------ | --------------------------------------------- |
+| 0x5100     | pit low      | low word of 32-bit kernel PIT counter         |
+| 0x5101     | pit high     | high word of 32-bit kernel PIT counter        |
+| 0x5102     | fs mounted   | 0x01 if filesystem mounted, 0x00 otherwise    |
+| 0x5103     | blocks       | total number of blocks on the disk            |
+| 0x5104     | table start  | block index of the first element in the table |
+| 0x5105     | table blocks | number of blocks in the allocation table      |
+| 0x5106     | root start   | block index of the first root block           |
+| 0x5107     | root blocks  | number of blocks in the root directory        |
+| 0x5108     | data start   | block index of the first data block           |
+| 0x5109     | padding      | 54 words                                      |
 
 ### user programs
 
-programs loaded by `exec` are placed at **`0x7000`** in their assigned memory bank (`MB = 1`–`31`). the entry point is **`0x7000`**. each bank provides 16,384 words (32 KiB, exactly 2¹⁴) for code and data.
-
-## notes
-
-the kernel owns flat memory from `0x0100` through `0x6FFF` (code, VRAM, kernel data, and FS cache). user code runs in the banked region at `0x7000`–`0xAFFF`.
+programs loaded by `exec` are placed at **`0x7000`** in their assigned memory bank (`MB = 1`–`31`). the entry point is **`0x7000`**. each bank provides 16,384 words (32 KiB) for code and data.

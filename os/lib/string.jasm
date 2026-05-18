@@ -1,34 +1,3 @@
-; dereference_into
-; dereference a pointer into a register.
-;   dest = destination register for the dereferenced value
-;   ptr = pointer to dereference
-;   trashes e
-macro dereference_into %dest_reg, %ptr_label
-    mov e, %ptr_label
-    get %dest_reg, [e]
-end macro
-
-; save_to
-; save a word value to a memory location at a label.
-;   src = source register for the value
-;   dest = destination label for the value
-;   trashes e
-macro save_to %dest_label, %src_reg
-    mov e, %dest_label
-    put [e], %src_reg
-end macro
-
-
-; put_value_at
-; put a value at a pointer.
-;   ptr_label = pointer to the value
-;   value = value to put
-;   trashes e
-macro put_value_at %ptr_label, %value
-    mov e, %ptr_label
-    put [e], %value
-end macro
-
 ; compare two strings at addresses a and b.
 ; result in c. 0 if equal, nonzero if not.
 string_compare:
@@ -55,7 +24,6 @@ string_compare_loop:
     inc b
     jmp string_compare_loop
 
-
 string_compare_not_equal:
     mov c, 1
     jmp string_compare_end
@@ -71,6 +39,7 @@ string_compare_end:
 ;   a = number to convert
 ;   b = destination buffer
 ;   trashes e
+
 num_to_string:
     push a
     push b
@@ -100,9 +69,9 @@ num_to_string_loop:
     cmp a, 0
     jnz num_to_string_loop
 
+num_to_string_reverse_loop:
     ; b is the start of the buffer     
     ; c is the digit count
-num_to_string_reverse_loop:
     pop e
     put [b], e
     inc b

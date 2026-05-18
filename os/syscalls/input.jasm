@@ -1,0 +1,23 @@
+
+;    terminal input interface for the jaideos kernel.
+;    josiah bergen, may 2026
+;
+;    this file contains implentations for the following system calls:
+;
+;    | id     | name        | args                  | returns                            | notes                                                          |
+;    | ------ | ----------- | --------------------- | ---------------------------------- | -------------------------------------------------------------- |
+;    | 0x20   | read_char   | -                     | a = char                           | blocking. returns raw key code.                                |
+;    | 0x21   | poll_key    | -                     | a = char or 0                      | non-blocking. returns next key from buffer, or 0 if empty.     |
+;    | 0x22   | read_line   | b = buff, c = max len | a = len (includes null terminator) | collect input with echo and backspace until enter pressed.     |
+
+sc_read_char:
+    mov a, 0x01
+    ret
+
+sc_poll_key:
+    mov a, 0x01
+    ret
+
+sc_read_line:
+    mov a, 0x01
+    ret

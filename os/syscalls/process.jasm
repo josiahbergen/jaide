@@ -1,15 +1,13 @@
 
-;    process syscalls for the jaideos kernel.
+;    process interface for the jaideos kernel.
 ;    josiah bergen, may 2026
 ;
-;    this file contains implentations for the following syscalls:
+;    this file contains implentations for the following system calls:
 ;
-;    | name   | args          | returns                                      | notes                                                |
-;    | ------ | ------------- | -------------------------------------------- | ---------------------------------------------------- |
-;    | `exit` | b = exit code | a = exit code                                | return to shell. no-op if called from shell context. |
-;    | `exec` | b = string    | a = error (return not guaranteed on success) | load and execute file from disk.                     |
-
-define stack_top 0xfdff
+;    | name   | args          | returns                                      | notes                                  |
+;    | ------ | ------------- | -------------------------------------------- | -------------------------------------- |
+;    | `exit` | b = exit code | a = exit code                                | exit the current process to the shell. |
+;    | `exec` | b = string    | a = error (return not guaranteed on success) | load and execute file from disk.       |
 
 sc_exit:
     ; this subroutine purges the entire call stack,
@@ -41,7 +39,10 @@ sc_exit:
 
 
 sc_exec:
-    ; TODO: depends on fs_* syscalls to work
+    ; TODO: depends on fs_* syscalls to work.
+    ; this syscall will call fs_open -> fs_read -> fs_close,
+    ; then jump to 0x7000.
+
     ; for now, return an error
     mov a, 0x01
     ret

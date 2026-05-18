@@ -466,7 +466,7 @@ class TestMod:
 class TestGetVariants:
 
     def test_get_reg_pointer(self, assemble_and_load):
-        # GET A, [B] — register-indirect load
+        # GET A, [B]. register-indirect load
         # layout: mov(0-1) get(2) jmp(3-4) mydata(5) done/nop(6)
         src = (
             "mov B, 0x0005\n"   # B points to mydata (word 5)
@@ -597,7 +597,7 @@ class TestJmpVariants:
 
 
 # ---------------------------------------------------------------------------
-# Conditional jumps — each tested taken and not-taken
+# Conditional jumps. each tested taken and not-taken
 # ---------------------------------------------------------------------------
 
 def _cond_jump_src(cmp_a, cmp_b, jump_mnemonic):

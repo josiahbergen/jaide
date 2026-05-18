@@ -282,8 +282,8 @@ class Emulator:
         regs, instr = word & 0xFF, (word >> 8) & 0xFF
 
         opcode = instr  # flat 8-bit opcode
-        reg_a = (regs >> 4) & 0xF  # ssss — high nibble
-        reg_b = regs & 0xF  # dddd — low nibble
+        reg_a = (regs >> 4) & 0xF  # ssss/high nibble
+        reg_b = regs & 0xF  # dddd/low nibble
 
         if opcode not in OPCODE_FORMATS:
             logger.warning(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. requesting interrupt 1.")
@@ -312,7 +312,6 @@ class Emulator:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
             logger.error(f"emulator stopped: {e.message}")
-            # breakpoints are a deliberate stop — leave halted clear so step/run can continue
         except KeyboardInterrupt:
             # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
@@ -332,7 +331,7 @@ class Emulator:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
         # if logger.level == logger.log_level.VERBOSE:
-        time.sleep(0.001)
+        # time.sleep(0.001)
 
         if self.interrupts_pending():
             # interrupt called!

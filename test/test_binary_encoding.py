@@ -2,7 +2,7 @@
 
 Driven entirely by OPCODE_FORMATS from common/isa.py. When the ISA changes
 (opcodes added, removed, or re-encoded), the test suite adapts automatically
-without any manual updates — just run pytest.
+without any manual updates. just run pytest!
 """
 
 import os
@@ -95,7 +95,7 @@ def _assemble_source(source: str) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Parametrized test — one case per opcode in the ISA
+# Parametrized test. one case per opcode in the ISA
 # ---------------------------------------------------------------------------
 
 _params = list(OPCODE_FORMATS.items())

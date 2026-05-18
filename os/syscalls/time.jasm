@@ -1,1 +1,29 @@
+;    time interface for the jaideos kernel.
+;    josiah bergen, may 2026
 ;
+;    this file contains implentations for the following system calls:
+;
+;    | id     | name        | args | returns                      | notes                                                      |
+;    | ------ | ----------- | ---- | ---------------------------- | ---------------------------------------------------------- |
+;    | 0x40   | get_ticks   | -    | a = low word, b = high word  | 32-bit kernel tick counter, incremented by the pit device. |
+;    | 0x41   | get_date    | -    | a = day of year              | read rtc device                                            |
+;    | 0x41   | get_time    | -    | a = hours, b = minutes       | read rtc device                                            |
+
+sc_get_ticks:
+    ; use saved kernel variables
+    dereference_into a, kernel_var_pit_low
+    dereference_into b, kernel_var_pit_high
+    ret
+
+sc_get_date:
+    ; ping device for day of year
+    ; TODO: return year?/month/day combo instead
+    mmio_in a, mmio_rtc_yday
+    ret
+
+sc_get_time:
+    ; ping device for second and minute
+    ; TODO: return hour/minute/second combo instead
+    mmio_in a, mmio_rtc_second
+    mmio_in b, mmio_rtc_minute
+    ret

@@ -1,0 +1,65 @@
+
+;    macros.jasm
+;    jaideos kernel macros
+;    josiah bergen, may 2026
+;
+;    all assembler macros for the kernel and shell.
+;    import defs.jasm before this file.
+
+; ── mmio ──────────────────────────────────────────────────────────────────────
+
+macro mmio_in %dest, %addr
+    mov e, %addr
+    get %dest, [e]
+end macro
+
+macro mmio_out %addr, %src
+    mov e, %addr
+    put [e], %src
+end macro
+
+macro dereference_into %dest_reg, %ptr_label
+    mov e, %ptr_label
+    get %dest_reg, [e]
+end macro
+
+macro save_to %dest_label, %src_reg
+    mov e, %dest_label
+    put [e], %src_reg
+end macro
+
+macro put_value_at %ptr_label, %value
+    mov e, %ptr_label
+    put [e], %value
+end macro
+
+macro xy_to_vram %dest, %reg_x, %reg_y
+    mov %dest, vram_start
+    push %reg_y
+    mul %reg_y, 160
+    add %dest, %reg_y
+    add %dest, %reg_x
+    add %dest, %reg_x   ; each cell is 2 words
+    pop %reg_y
+end macro
+
+macro imm_xy_to_vram %dest, %ximm, %yimm
+    mov %dest, vram_start
+    mov e, %yimm
+    mul e, 160
+    add %dest, e
+    add %dest, %ximm
+    add %dest, %ximm
+end macro
+
+macro blink_at %ximm, %yimm
+    mov z, vram_start
+    mov e, %yimm
+    mul e, 160
+    add z, e
+    add z, %ximm
+    add z, %ximm
+    put [z], 0x20       ; space character
+    inc z
+    put [z], 0x8001     ; attrs: white on black, blink
+end macro

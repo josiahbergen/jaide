@@ -159,7 +159,6 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.IRET: [ () ],
     INSTRUCTIONS.NOP:  [ () ],
 
-    # BCP dst, src, count — block copy count words from src to dst
     INSTRUCTIONS.BCP: [ (MODES.REG, MODES.REG, MODES.IMM) ],
 }
 

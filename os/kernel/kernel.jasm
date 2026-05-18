@@ -1,6 +1,20 @@
 ; this code lives at 0x100, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 
+jmp main
+
+import "os/kernel/defs.jasm" 
+import "os/kernel/macros.jasm"
+
+import "os/syscalls/process.jasm"
+import "os/syscalls/output.jasm"
+import "os/syscalls/input.jasm"
+import "os/syscalls/fs.jasm"
+import "os/syscalls/time.jasm"
+import "os/syscalls/system.jasm"
+
+import "os/lib/string.jasm"
+
 main:
     ; print some strings, save the new cursor row,
     ; and draw the prompt. then, the shell is ready to take over!
@@ -72,49 +86,23 @@ syscall_found:
     call y ; execute handler
     iret ; return! we trust that the handler has set a value in a for us
 
-; unimplemented syscalls
-
-sc_exit:
-sc_exec:
-sc_write_string:
-sc_write_char:
-sc_clear_screen:
-sc_set_cursor:
-sc_get_cursor:
-sc_put_char_at:
-sc_set_color:
-sc_read_char:
-sc_read_line:
-sc_get_ticks:
-sc_get_time:
-
-; all these labels above simply point to this code here,
-; that returns with an error code
-mov a, 0x01
-ret
-
-import "os/util.jasm"
-import "os/syscalls/process.jasm"
-import "os/syscalls/fs.jasm"
-import "os/syscalls/system.jasm"
-
 
 sc_function_table:
 
     ; process
-    data 0x00, sc_exit
-    data 0x01, sc_exec
+    data 0x00, process__sc_exit
+    data 0x01, process__sc_exec
     ; tty output
-    data 0x10, sc_write_string
-    data 0x11, sc_write_char
-    data 0x12, sc_clear_screen
-    data 0x13, sc_set_cursor
-    data 0x14, sc_get_cursor
-    data 0x15, sc_put_char_at
-    data 0x16, sc_set_color
+    data 0x10, output__sc_write_str
+    data 0x11, output__sc_write_char
+    data 0x12, output__sc_clear
+    data 0x13, output__sc_set_cursor
+    data 0x14, output__sc_get_cursor
+    data 0x15, output__sc_put_char_at
+    data 0x16, output__sc_set_col
     ; tty input (blocking)
-    data 0x20, sc_read_char
-    data 0x21, sc_read_line
+    data 0x20, input__sc_read_char
+    data 0x21, input__sc_read_line
     ; filesystem
     data 0x30, fs__sc_mount
     data 0x31, fs__sc_list
@@ -124,12 +112,13 @@ sc_function_table:
     data 0x35, fs__sc_seek
     data 0x36, fs__sc_close
     data 0x37, fs__sc_stat
+    ; time
+    data 0x40, time__sc_get_ticks
+    data 0x41, time__sc_get_date
+    data 0x41, time__sc_get_time
     ; system
-    data 0x40, sc_get_ticks
-    data 0x41, sc_get_time
-    data 0x41, sc_get_time
-    data 0x42, system__sc_shutdown
-    data 0x43, system__sc_reset
+    data 0x50, system__sc_shutdown
+    data 0x51, system__sc_reset
     data 0xFFFF  ; end of table
 
 s_ready:  data "ready.", 0
@@ -137,4 +126,4 @@ s_shell_version:  data "jaideos shell v0.0.1 alpha", 0
 s_shell_help:  data "type 'help' for a list of commands.", 0
 
 ; all the shell interface code lives here.
-import "os/shell.jasm"
+import "os/kernel/shell.jasm"

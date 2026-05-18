@@ -1,0 +1,75 @@
+
+;    defs.jasm
+;    jaideos kernel definitions
+;
+;    josiah bergen, may 2026
+
+; video memory
+
+define vram_start                   0x4000
+define vram_end                     0x4fff
+define vram_row_length              0xa0     ; words per row (160: 80 cols x 2 words/char)
+define vram_length                  0xfa0    ; total vram words (25 rows x 160)
+
+; kernel data
+
+define disk_scratch_buffer          0x5000
+
+define kernel_var_pit_low           0x5100
+define kernel_var_pit_high          0x5101
+define kernel_var_fs_mounted        0x5102
+define kernel_var_blocks            0x5103
+define kernel_var_table_start       0x5104
+define kernel_var_table_blocks      0x5105
+define kernel_var_root_start        0x5106
+define kernel_var_root_blocks       0x5107
+define kernel_var_data_start        0x5108
+
+define fdt_base                     0x5140
+define fdt_entry_size               0x8
+define fdt_open                     0x0
+define fdt_start_block              0x1
+define fdt_current_block            0x2
+define fdt_current_offset           0x3
+define fdt_size                     0x4
+
+define fs_cache_index               0x5180   ; 16 words long, one sector number per cache slot
+define fs_cache_empty               0xffff
+
+define fs_cache_base                0x6000   ; filesystem block cache (16 sectors)
+define bank_window_start            0x7000   ; 
+define bank_window_end              0xafff
+define stack_top                    0xfdff
+
+; mmio locations
+
+define mmio_base                    0xfe00
+
+define mmio_keyboard_data           0xfe01
+define mmio_keyboard_status         0xfe02
+
+define mmio_pit_reload              0xfe10
+define mmio_pit_flags               0xfe11
+
+define mmio_disk_command            0xfe20
+define mmio_disk_sector             0xfe21
+define mmio_disk_address            0xfe22
+define mmio_disk_status             0xfe23
+
+define mmio_rtc_second              0xfe30
+define mmio_rtc_minute              0xfe31
+define mmio_rtc_hour                0xfe32
+define mmio_rtc_yday                0xfe33
+
+define mmio_system                  0xfeff
+
+; disk/filesystem constants 
+
+define disk_status_idle             0x0
+define disk_status_busy             0x1
+define disk_status_error            0x2
+
+define disk_command_read            0x0
+define disk_command_write           0x1
+
+define fs_magic                     0x333a   ; expected magic word in boot sector

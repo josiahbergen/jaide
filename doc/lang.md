@@ -103,7 +103,7 @@ jmp my_label        ; jumps to the absolute address of my_label
 put [d], my_label   ; stores the absolute address of my_label into memory at [d]
 ```
 
-conditional branch instructions (`jz`, `jnz`, `jc`, etc.) use a pc-relative offset internally, but you write them the same way — the assembler computes the offset for you.
+conditional branch instructions (`jz`, `jnz`, `jc`, etc.) use a pc-relative offset internally, but you write them the same way. the assembler computes the offset for you.
 
 _note: PIC (position-independent) addressing modes (`[label]`, `[label + reg]`) are reserved for a future linker design and are currently undefined behaviour. exciting!_
 

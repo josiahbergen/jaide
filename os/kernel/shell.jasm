@@ -1,15 +1,9 @@
 
-define command_buffer_length 20
-define vram_start 0x4000
-define vram_row_length 0xA0
-define vram_length 0x0FA0
-
-import "os/graphics.jasm"
-import "os/util.jasm"
-
 var_cursor_row: data 0 ; cursor starts at top of screen
 var_command_len: data 0
 var_command_buffer: times 85, 0
+
+command_buffer_length: data 20
 
 keyboard_interrupt:
     mmio_in a, mmio_keyboard_data
@@ -155,7 +149,7 @@ dispatch_command__loop:
     jz dispatch_command__not_found ; end of list, no match found
 
     push x
-    call util__string_compare ; result in c (0 = equal); clobbers x, y
+    call string__string_compare ; result in c (0 = equal); clobbers x, y
     cmp c, 0
     jz dispatch_command__found
 
@@ -340,7 +334,7 @@ handler_disk_mounted:
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
-    call util__num_to_string
+    call string__num_to_string
 
     mov a, s_disk_info_blocks
     call print
@@ -353,7 +347,7 @@ handler_disk_mounted:
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
-    call util__num_to_string
+    call string__num_to_string
 
     mov a, s_disk_info_table
     call print
@@ -366,7 +360,7 @@ handler_disk_mounted:
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
-    call util__num_to_string
+    call string__num_to_string
 
     mov a, s_disk_info_root
     call print
@@ -379,7 +373,7 @@ handler_disk_mounted:
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
-    call util__num_to_string
+    call string__num_to_string
 
     mov a, s_disk_info_data
     call print

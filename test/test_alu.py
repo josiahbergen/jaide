@@ -41,7 +41,7 @@ class TestAddCore:
         assert emu.flag_get(FLAG_C)
 
     def test_overflow_positive(self, emu):
-        # 0x0040 + 0x0060 = 0x00A0 — both operands have bit 7 clear,
+        # 0x0040 + 0x0060 = 0x00A0. both operands have bit 7 clear,
         # result has bit 7 set → overflow
         result = emu._add_core(0x0040, 0x0060)
         assert result == 0x00A0

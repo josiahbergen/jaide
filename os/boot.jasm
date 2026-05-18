@@ -4,35 +4,6 @@
 org 0x0000
 define indicator_position 0x4000
 
-define MMIO_BASE 0xFE00
-
-define mmio_keyboard_data   0xFE01
-define mmio_keyboard_status 0xFE02
-define mmio_pit_reload      0xFE10
-define mmio_pit_flags       0xFE11
-define mmio_disk_command    0xFE20
-define mmio_disk_sector     0xFE21
-define mmio_disk_address    0xFE22
-define mmio_disk_status     0xFE23
-define mmio_rtc_second      0xFE30
-define mmio_rtc_minute      0xFE31
-define mmio_rtc_hour        0xFE32
-define mmio_rtc_yday        0xFE33
-define mmio_system          0xFEFF
-
-; mmio_in dest, addr — read MMIO word at addr into dest; trashes E
-macro mmio_in %dest, %addr
-    mov e, %addr
-    get %dest, [e]
-end macro
-
-; mmio_out addr, src — write src to MMIO word at addr; trashes E
-macro mmio_out %addr, %src
-    mov e, %addr
-    put [e], %src
-end macro
-
-
 start:
     ; booloader entry point. lives at 0x0000.
 
@@ -88,4 +59,4 @@ generic_fault_hander:
 align 0x100 ; fill entire rom
 
 ; kernel, "loaded" at 0x100
-import "os/kernel.jasm"
+import "os/kernel/kernel.jasm"

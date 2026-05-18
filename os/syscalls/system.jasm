@@ -1,13 +1,22 @@
 
-sc_shutdown:
-    mov a, 0x03
-    mmio_out mmio_system, a
-    halt
-    jmp sc_shutdown
+;    system interface for the jaideos kernel.
+;    josiah bergen, may 2026
+;
+;    this file contains implentations for the following system calls:
+;
+;    | id     | name       | args | returns | notes           |
+;    | ------ | ---------- | ---- | ------- | --------------- |
+;    | 0x50   | reset      | -    | -       | restart system  |
+;    | 0x51   | shutdown   | -    | -       | shutdown system |
+;
+;    notes: see the mmio system interface documentation for more details.
 
 sc_reset:
-    mov a, 0x01
-    mmio_out mmio_system, a
+    mmio_out mmio_system, 0x01
     halt
     jmp sc_reset
 
+sc_shutdown:
+    mmio_out mmio_system, 0x03
+    halt
+    jmp sc_shutdown

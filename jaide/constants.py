@@ -2,7 +2,6 @@
 # emulator-specific constants for the jaide project.
 # josiah bergen, january 2026
 
-# ISA definitions are in common/isa.py — import from there, not here.
 from common.isa import OPCODE_FORMATS
 
 MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
