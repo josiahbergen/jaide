@@ -4,6 +4,7 @@ version = "0.0.5"
 description = "custom cpu architecture"
 readme = "README.md"
 requires-python = ">=3.12"
+
 dependencies = [
     "colorama==0.4.6",
     "lark==1.3.1",

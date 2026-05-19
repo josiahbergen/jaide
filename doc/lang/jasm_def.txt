@@ -1,0 +1,5 @@
+JASM
+    filter remove_matches ^\s*;
+    filter remove_inline ;.*$
+    extension jasm
+    3rd_gen_scale 1.00
