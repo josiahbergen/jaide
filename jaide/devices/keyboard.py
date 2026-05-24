@@ -7,9 +7,6 @@ from typing import Callable
 
 from .device import Device
 
-KEYBOARD_INTERRUPT_VECTOR = 4
-
-
 class Keyboard(Device):
     def __init__(self, irq: Callable[[int], None], key_queue: deque):
         """Keyboard controller. Reads translated scancodes from the shared queue populated by the graphics controller.
@@ -38,9 +35,8 @@ class Keyboard(Device):
         if self._has_key or not self._key_queue:
             return
 
-        self._pending  = self._key_queue.popleft()
-        self._has_key  = True
-        self.irq(KEYBOARD_INTERRUPT_VECTOR)
+        self._pending = self._key_queue.popleft()
+        self._has_key = True
 
     def __str__(self) -> str:
         return f"keyboard: pending=0x{self._pending:02X}, has_key={self._has_key}"

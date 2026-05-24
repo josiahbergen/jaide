@@ -22,15 +22,12 @@ sc_exit:
     jnz sc_exit
 
     ; save requested exit code
-    push b 
+    push b
 
-    ; clear the screen + redraw shell prompt. 
-    ; mimics handler_clear subroutine
+    ; clear the screen + redraw shell prompt.
+    ; mimics handler_clear subroutine. hack until output syscalls are done.
     call shell__clear_screen
     call shell__draw_prompt_no_scroll
-
-    ; re-enable interrupts
-    sti 
 
     ; recover exit code into a and transfer control back
     ; to the kernel's main loop

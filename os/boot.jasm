@@ -2,59 +2,14 @@
 ; josiah bergen, march 2026
 
 org 0x0000
-define indicator_position 0x4000
 
 start:
-    ; booloader entry point. lives at 0x0000.
-
-    ; setup our registers
-    mov sp, 0xfdff ; set the stack pointer to recommended location
-
-    mov x, indicator_position ; start of message location
-    put [x], 0x20   ; word 0: space
-    inc x
-    put [x], 0x8001 ; word 1: attrs (fg=1 white, bg=0 black, blink)
-
-    ; populate hardware fault interrupt handlers
-    mov d, 0xffff ; start of ivt
-
-    ; unhandled fault (div by zero, etc.)
-    put [d], generic_fault_hander
-    dec d
-
-    ; invalid instruction
-    put [d], generic_fault_hander
-    dec d
+    ; bootloader entry point. lives at 0x0000.
+    mov sp, 0xfdff
     
-    ; protection fault (future)
-    put [d], generic_fault_hander
-    dec d
+    ; todo: load kernel into ram with manual mmio writes.
 
-    ; vector 3 is reserved
-    dec d 
-
-    ; keyboard interrupt
-    put [d], kernel__keyboard_interrupt
-    dec d
-    dec d
-
-    ; disk interrupt (vector 6)
-    put [d], kernel__disk_interrupt
-
-    ; syscall at vector 16 (0x10)
-    mov d, 0xffff
-    sub d, 0x10
-    put [d], kernel__syscall
-
-    jmp kernel__main ; jump to end of rom (i.e. where the loaded kernel is loaded)
-
-generic_fault_hander:
-    and f, 0x00 ; clear flags (disables interrupts)
-    ; attempt to halt cpu via system MMIO
-    mov a, 0x02 ; halt command
-    mmio_out mmio_system, a
-    halt ; if that didn't work, hang cpu permanently
-    jmp generic_fault_hander
+    jmp kernel__main
 
 align 0x100 ; fill entire rom
 

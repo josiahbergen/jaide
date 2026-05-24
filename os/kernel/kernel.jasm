@@ -35,23 +35,17 @@ main:
     call shell__draw_prompt
 
 loop:
-    halt ; wait around for interrupts to come in...
-    jmp loop ; we did something! loop back around.
-
-; keyboard input. caught by the kernel and dispatched to the shell.
-keyboard_interrupt:
-    jmp shell__keyboard_interrupt
-
-disk_interrupt:
-    ; all this really does is resume exececution
-    ; from wherever we called halt before
-    iret
+    ; poll keyboard and dispatch keystrokes to the shell
+    mmio_in a, mmio_keyboard_status
+    cmp a, 0
+    jz loop
+    mmio_in a, mmio_keyboard_data
+    call shell__keyboard_interrupt
+    jmp loop
 
 ; system call interface
-; called via interrupt vector 16 (must use iret to return)
-; a = syscall number (see table below)
-; arguments in b, c, d, e
-; returns: a = result (zero if success, nonzero if error)
+; called via:  call kernel__syscall  (a = syscall number, args in b, c, d, e)
+; returns:     a = result (zero if success, nonzero if error)
 
 syscall:
     ; we have a number in a, which should map to an entry in the function table
@@ -77,14 +71,13 @@ syscall_search_loop:
 
 syscall_not_found:
     mov a, 0x01
-    ; return with error via iret
-    iret
+    ret
 
 syscall_found:
     inc z ; move to the function pointer
     get y, [z]
     call y ; execute handler
-    iret ; return! we trust that the handler has set a value in a for us
+    ret ; we trust that the handler has set a value in a for us
 
 
 sc_function_table:

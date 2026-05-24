@@ -11,7 +11,6 @@ from colorama import Fore as f
 from common.isa import OPCODE_FORMATS
 from jaide.constants import (
     FLAG_C,
-    FLAG_I,
     FLAG_N,
     FLAG_O,
     FLAG_Z,
@@ -184,7 +183,7 @@ class REPL:
         logger.info(f"{line_1}\n{line_2}")  # all addresses displayed as word addresses
 
     def c_flags(self):
-        line_1 = f"C: {self.emulator.flag_get(FLAG_C)}  Z: {self.emulator.flag_get(FLAG_Z)}  N: {self.emulator.flag_get(FLAG_N)}  O: {self.emulator.flag_get(FLAG_O)}  I: {self.emulator.flag_get(FLAG_I)}"
+        line_1 = f"C: {self.emulator.flag_get(FLAG_C)}  Z: {self.emulator.flag_get(FLAG_Z)}  N: {self.emulator.flag_get(FLAG_N)}  O: {self.emulator.flag_get(FLAG_O)}"
         logger.info(line_1)
 
     def c_devices(self):

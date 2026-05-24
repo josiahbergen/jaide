@@ -43,8 +43,6 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     NOT  = auto()
     XOR  = auto()
     SWP  = auto()
-    STI  = auto()
-    CLI  = auto()
     STC  = auto()
     CLC  = auto()
     CMP  = auto()
@@ -63,8 +61,6 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     JLE  = auto()
     CALL = auto()
     RET  = auto()
-    INT  = auto()
-    IRET = auto()
     BCP = auto()
 
 
@@ -131,8 +127,6 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
     INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
     INSTRUCTIONS.SWP:  [ (MODES.REG, MODES.REG) ],
-    INSTRUCTIONS.STI:  [ () ],
-    INSTRUCTIONS.CLI:  [ () ],
     INSTRUCTIONS.STC:  [ () ],
     INSTRUCTIONS.CLC:  [ () ],
     INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
@@ -155,8 +149,6 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
 
     INSTRUCTIONS.RET:  [ () ],
-    INSTRUCTIONS.INT:  [ (MODES.REG, ), (MODES.IMM, ) ],
-    INSTRUCTIONS.IRET: [ () ],
     INSTRUCTIONS.NOP:  [ () ],
 
     INSTRUCTIONS.BCP: [ (MODES.REG, MODES.REG, MODES.IMM) ],
@@ -263,8 +255,6 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.XOR, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.XOR, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
 
-    (INSTRUCTIONS.STI, ()):                                (None, None, None),
-    (INSTRUCTIONS.CLI, ()):                                (None, None, None),
     (INSTRUCTIONS.STC, ()):                                (None, None, None),
     (INSTRUCTIONS.CLC, ()):                                (None, None, None),
 
@@ -300,12 +290,6 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     # (INSTRUCTIONS.CALL, (MODES.OFF_POINTER,)):           (0,    None, 0   ),
 
     (INSTRUCTIONS.RET,  ()):                               (None, None, None),
-
-    # INT
-    (INSTRUCTIONS.INT, (MODES.REG,)):                      (0,    None, None),
-    (INSTRUCTIONS.INT, (MODES.IMM,)):                      (None, None, 0   ),
-
-    (INSTRUCTIONS.IRET, ()):                               (None, None, None),
     (INSTRUCTIONS.NOP,  ()):                               (None, None, None),
 
     # SWP: ssss=op0, dddd=op1

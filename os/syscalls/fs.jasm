@@ -85,11 +85,17 @@ disk_read_sector:
     mov z, disk_command_read
     mmio_out mmio_disk_command, z
 
-    ; block until the disk is done 
-    ; (disk fires an interrupt)
-    sti
-    halt
+disk_read_sector__poll:
+    mmio_in z, mmio_disk_status
+    cmp z, disk_status_busy
+    jz disk_read_sector__poll
 
-    ; disk done, return success
+    cmp z, disk_status_error
+    jz disk_read_sector__error
+
     mov a, 0x00
+    ret
+
+disk_read_sector__error:
+    mov a, 0x01
     ret

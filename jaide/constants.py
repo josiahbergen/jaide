@@ -26,14 +26,12 @@ FLAG_C = 0  # carry
 FLAG_Z = 1  # zero
 FLAG_N = 2  # negative
 FLAG_O = 3  # overflow
-FLAG_I = 4  # interrupts enabled
 
 FLAG_STRINGS: dict[int, str] = {
     FLAG_C: "C",
     FLAG_Z: "Z",
     FLAG_N: "N",
     FLAG_O: "O",
-    FLAG_I: "I",
 }
 
 # Human-readable mnemonic strings (for logging / disassembly)

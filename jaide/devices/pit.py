@@ -7,8 +7,6 @@ from typing import Callable
 from ..util.logger import logger
 from .device import Device
 
-PIT_INTERRUPT_VECTOR = 5
-
 class PIT(Device):
     def __init__(self, irq: Callable[[int], None]):
         """Programmable interval timer."""
@@ -49,7 +47,7 @@ class PIT(Device):
             else:
                 self.counter = self.reload  # run it back baby
 
-            self.irq(PIT_INTERRUPT_VECTOR)  # raise interrupt vector 5
+            pass  # no IRQ; tick counter incremented here in future
 
     def __str__(self) -> str:
         return f"pit: enabled={self.enabled}, one-shot={self.one_shot}, counter={self.counter}, reload={self.reload}"

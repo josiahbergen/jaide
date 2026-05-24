@@ -6,7 +6,7 @@ var_command_buffer: times 85, 0
 command_buffer_length: data 20
 
 keyboard_interrupt:
-    mmio_in a, mmio_keyboard_data
+    ; a = key code, passed in by the kernel polling loop
 
     cmp a, 0x7F
     ja keyboard_interrupt__end
@@ -134,7 +134,7 @@ keyboard_interrupt__enter__buffer_loop:
     put [e], 0
 
 keyboard_interrupt__end:
-    iret
+    ret
 
 
 dispatch_command:
@@ -390,9 +390,8 @@ data 0xA       ; newline
 
 handler_mount:
 
-    sti ; enable interrupts so we can syscall
     mov a, 0x30 ; mount
-    int 0x10
+    call kernel__syscall
 
     cmp a, 0x00
     jz handler_mount_success

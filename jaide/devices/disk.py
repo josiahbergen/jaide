@@ -8,8 +8,6 @@ from typing import Callable
 from ..util.logger import logger
 from .device import Device
 
-PIT_INTERRUPT_VECTOR = 5
-
 STATUS_IDLE = 0
 STATUS_READING = 1
 STATUS_WRITING = 2
@@ -91,12 +89,10 @@ class Disk(Device):
             self._cursor += 1
         
     def _reset_if_done(self) -> None:
-        if self._cursor < 256:  
-            return 
-         
-        # raise interrupt vector 6 on transfer complete
-        logger.debug(f"transfer complete! raising interrupt...")
-        self.irq(6)
+        if self._cursor < 256:
+            return
+
+        logger.debug(f"transfer complete!")
 
         # save modified disk image to the real file
         if self.status == STATUS_WRITING:

@@ -4,7 +4,6 @@
 
 import os
 import sys
-import time
 import traceback
 from collections import deque
 from typing import Callable
@@ -16,7 +15,6 @@ from .constants import (
     BANK_WINDOW_END,
     BANK_WINDOW_START,
     FLAG_C,
-    FLAG_I,
     FLAG_N,
     FLAG_O,
     FLAG_STRINGS,
@@ -71,27 +69,21 @@ class Emulator:
 
         self.devices: list[Device] = []
 
+        _no_irq = lambda _: None  # no interrupt controller; devices call this as a no-op
+
         # simple read/write devices
-        if enabled_devices.get("pit", False): self.devices.append(PIT(self.raise_interrupt))
-        if enabled_devices.get("rtc", False): self.devices.append(RTC(self.raise_interrupt))
+        if enabled_devices.get("pit", False): self.devices.append(PIT(_no_irq))
+        if enabled_devices.get("rtc", False): self.devices.append(RTC(_no_irq))
 
         # graphics and keyboard devices
         if enabled_devices.get("graphics", False):
-            # shared queue for keyboard and graphics
-            # we need this because the keyboard and graphics controllers need to both pull data from the pygame window,
-            # and this is the simplest way to do that.
             _key_queue = deque()
-            self.devices.append(Graphics(self.raise_interrupt, _key_queue, self.vram, self.shutdown))
-            self.devices.append(Keyboard(self.raise_interrupt, _key_queue))
+            self.devices.append(Graphics(_no_irq, _key_queue, self.vram, self.shutdown))
+            self.devices.append(Keyboard(_no_irq, _key_queue))
 
         # disk device
         if enabled_devices.get("disk", False):
-            self.devices.append(Disk(self.raise_interrupt, image_file, self.read16, self.write16))
-
-        # interrupt handling
-        self.pending_interrupts: list[int] = []  # queue of vectors waiting to be handled
-        self.waiting_for_interrupt: bool = False
-        self.flag_set(FLAG_I, True)
+            self.devices.append(Disk(_no_irq, image_file, self.read16, self.write16))
 
         # debugger etc.
         self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
@@ -162,7 +154,6 @@ class Emulator:
 
         if addr * 2 >= len(memory):
             logger.warning(f"attempted to write to out of bounds memory (0x{phys_addr:04X}).")
-            self.raise_interrupt(0)
             return
 
         bank = self.mb.value % 32
@@ -243,21 +234,6 @@ class Emulator:
                 device.mmio_write(addr, value)
                 break
 
-    # interrupt helpers
-
-    def raise_interrupt(self, vector: int) -> None:
-        if self.halted:
-            return
-        if vector < 0 or vector > 0xFF:
-            raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
-
-        self.pending_interrupts.append(vector)
-
-
-    def interrupts_pending(self) -> bool:
-        return len(self.pending_interrupts) > 0 and self.flag_get(FLAG_I)
-
-
     def reset(self) -> None:
         self.__init__()
         logger.info("emulator reset")
@@ -285,9 +261,7 @@ class Emulator:
         reg_b = regs & 0xF  # dddd/low nibble
 
         if opcode not in OPCODE_FORMATS:
-            logger.warning(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}. requesting interrupt 1.")
-            self.raise_interrupt(1)  # invalid instruction interrupt
-            return (0, 0, 0, 0)
+            raise EmulatorException(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}.")
 
         fmt = OPCODE_FORMATS[opcode]
         imm16 = self.fetch() if fmt.imm_operand is not None else 0
@@ -297,11 +271,6 @@ class Emulator:
     # main run loop
 
     def run(self) -> None:
-
-        # we can restart while waiting for an interrupt
-        # so we communicate that, because communication is key
-        if self.waiting_for_interrupt:
-            logger.debug("waiting for interrupt...")
 
         try:
             while True:
@@ -329,25 +298,9 @@ class Emulator:
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
-        if self.interrupts_pending():
-            # interrupt called!
-            interrupt_id = self.pending_interrupts.pop()
-
-            logger.debug(f"interrupt 0x{interrupt_id:02X} called! {"(remaining: " + ", ".join([str(i) for i in self.pending_interrupts]) + ")" if self.pending_interrupts else ""}")
-            self._execute_interrupt(interrupt_id)
-
-            # reset to normal execution state,
-            # and skip to next instruction
-            self.waiting_for_interrupt = False
-            return 
-
-         # tick all devices
+        # tick all devices
         for device in self.devices:
             device.tick()
-
-        if self.waiting_for_interrupt:
-            time.sleep(0.001) # reduce load on the cpu while waiting
-            return
 
         # normal fetch/decode/execute
         decoded = self.decode()
@@ -427,26 +380,3 @@ class Emulator:
         return value
 
 
-    def _execute_interrupt(self, vector: int) -> None:
-        if vector < 0 or vector > 0xFF:
-            raise EmulatorException(f"invalid interrupt vector {vector}. valid vectors are 0-255.")
-
-        # interrupt flag gotta be enabled
-        if not self.flag_get(FLAG_I):
-            logger.debug(f"interrupt {vector} ignored, mask is {self.flag_get(FLAG_I)}")
-            return
-
-        # push return address and flags onto the stack
-        self._push_core(self.pc.value)
-        self._push_core(self.f.value)
-
-        # clear interrupt mask
-        self.flag_set(FLAG_I, False)
-
-        # get vector (interrupt table is at word addresses 0xFEFF-0xFFFF)
-        # Interrupt vector is at word address 0xFFFF - vector
-        vector_word = 0xFFFF - vector
-        dest = self.read16(vector_word)
-        # set program counter to address at vector and unhalt
-
-        self.pc.set(dest)

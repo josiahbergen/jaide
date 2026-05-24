@@ -300,17 +300,12 @@ class TestNop:
 
 class TestHalt:
 
-    def test_halt_sets_waiting(self, assemble_and_load):
+    def test_halt_raises(self, assemble_and_load):
+        import pytest
+        from jaide.exceptions import EmulatorException
         emu = assemble_and_load("halt\nmov A, 0x00FF")
-        emu.step()
-        assert emu.waiting_for_interrupt  # HALT waits for interrupt
-
-    def test_halt_does_not_execute_next(self, assemble_and_load):
-        emu = assemble_and_load("halt\nmov A, 0x00FF")
-        emu.step()  # halt
-        # interrupt never arrives, so next step sleeps and returns without decoding
-        emu.step()
-        assert emu.reg["A"].value == 0  # mov A never ran
+        with pytest.raises(EmulatorException):
+            emu.step()  # halt freezes the CPU
 
 
 class TestMovLabel:
@@ -455,12 +450,13 @@ class TestMod:
         assert emu.reg["A"].value == 0
         assert emu.flag_get(FLAG_Z)
 
-    def test_mod_by_zero_queues_interrupt(self, assemble_and_load):
+    def test_mod_by_zero_raises(self, assemble_and_load):
+        import pytest
+        from jaide.exceptions import EmulatorException
         emu = assemble_and_load("mov A, 0x0005\nmod A, 0x0000")
         emu.step()
-        emu.step()  # mod by zero → queues interrupt vector 0
-        assert 0 in emu.pending_interrupts
-        assert emu.reg["A"].value == 5  # dest unchanged
+        with pytest.raises(EmulatorException):
+            emu.step()  # mod by zero halts the CPU
 
 
 class TestGetVariants:
@@ -758,72 +754,10 @@ class TestMmio:
 
     def test_mmio_read_unmapped_returns_zero(self, assemble_and_load):
         emu = assemble_and_load("mov B, 0xFE05\nget A, [B]")
-        emu.step()
-        emu.step()
-        emu.step()
+        emu.step()  # mov B, 0xFE05
+        emu.step()  # get A, [B]
         assert emu.reg["A"].value == 0
 
-
-class TestIntIret:
-
-    def test_int_imm_jumps_to_handler(self, assemble_and_load):
-        # Layout (assembled at word 0):
-        #   word 0-1: int 200
-        #   word 2-3: mov B, 0x00FF  (reached after iret)
-        #   word 4:   halt
-        #   word 5-6: mov A, 0x0042  (handler)
-        #   word 7:   iret
-        src = (
-            "int 200\n"
-            "mov B, 0x00FF\n"
-            "halt\n"
-            "handler:\n"
-            "mov A, 0x0042\n"
-            "iret\n"
-        )
-        emu = assemble_and_load(src)
-        emu.write16(0xFFFF - 200, 5)   # vector 200 → handler at word 5
-        emu.step()  # int 200 → jumps to 5, pushes PC=2 and flags
-        emu.step()  # mov A, 0x0042
-        emu.step()  # iret → restores flags and PC=2
         emu.step()  # mov B, 0x00FF
         assert emu.reg["A"].value == 0x0042
         assert emu.reg["B"].value == 0x00FF
-
-    def test_int_reg(self, assemble_and_load):
-        # Same as above but using INT A (register mode)
-        src = (
-            "mov A, 200\n"
-            "int A\n"
-            "mov B, 0x00FF\n"
-            "halt\n"
-            "handler:\n"
-            "mov A, 0x0042\n"
-            "iret\n"
-        )
-        emu = assemble_and_load(src)
-        # Layout: mov(0-1) int(2) mov_B(3-4) halt(5) handler: mov_A(6-7) iret(8)
-        emu.write16(0xFFFF - 200, 6)   # vector 200 → handler at word 6
-        emu.step()  # mov A, 200
-        emu.step()  # int A → jumps to 6, pushes PC=3
-        emu.step()  # mov A, 0x0042
-        emu.step()  # iret → PC=3
-        emu.step()  # mov B, 0x00FF
-        assert emu.reg["A"].value == 0x0042
-        assert emu.reg["B"].value == 0x00FF
-
-    def test_iret_restores_flags(self, assemble_and_load):
-        # After IRET, the flags register should be exactly what it was before INT
-        src = (
-            "int 200\n"
-            "halt\n"
-            "handler:\n"
-            "iret\n"
-        )
-        emu = assemble_and_load(src)
-        # Layout: int(0-1) halt(2) handler: iret(3)
-        emu.write16(0xFFFF - 200, 3)
-        flags_before = emu.f.value
-        emu.step()  # int 200
-        emu.step()  # iret
-        assert emu.f.value == flags_before

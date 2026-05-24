@@ -2,7 +2,7 @@ from typing import Callable
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
 
-from .constants import FLAG_C, FLAG_I, FLAG_N, FLAG_O, FLAG_Z
+from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z
 from .emulator import Emulator, mask16
 from .exceptions import EmulatorException
 from .util.logger import logger
@@ -24,8 +24,8 @@ def _jump_target(emu: Emulator, imm16: int) -> int:
 # see OPCODE_FORMATS for which operand each field represents per opcode.
 
 
-def handle_halt(emu, _decoded: tuple[int, ...]) -> None:
-    emu.waiting_for_interrupt = True
+def handle_halt(_emu, _decoded: tuple[int, ...]) -> None:
+    raise EmulatorException("halted")
 
 
 def handle_get(emu, decoded: tuple[int, ...]) -> None:
@@ -163,10 +163,7 @@ def handle_mod(emu, decoded: tuple[int, ...]) -> None:
     dest = emu.reg_get(reg_b)
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
     if src == 0:
-        # division by zero, request hardware fault interrupt
-        logger.warning(f"division by zero at 0x{emu.pc.value:04x}.")
-        emu.raise_interrupt(0)
-        return
+        raise EmulatorException(f"division by zero at 0x{emu.pc.value:04x}.")
     result = mask16(dest % src)
     emu.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
     emu.reg_set(reg_b, result)
@@ -179,10 +176,7 @@ def handle_div(emu, decoded: tuple[int, ...]) -> None:
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
 
     if src == 0:
-        logger.warning(f"division by zero at 0x{emu.pc.value:04x}.")
-        emu.raise_interrupt(0)
-        return
-
+        raise EmulatorException(f"division by zero at 0x{emu.pc.value:04x}.")
     result = mask16(dest // src)
     remainder = dest % src
 
@@ -375,33 +369,8 @@ def handle_ret(emu, _decoded: tuple[int, ...]) -> None:
     emu.pc.set(emu._pop_core())
 
 
-def handle_int(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    vector = emu.reg_get(reg_a) if modes == (MODES.REG,) else imm16
-
-    if not emu.flag_get(FLAG_I):
-        logger.debug(f"interrupt {vector} ignored, mask is {emu.flag_get(FLAG_I)}.")
-        return
-
-    emu._execute_interrupt(vector)
-
-
-def handle_iret(emu, _decoded: tuple[int, ...]) -> None:
-    emu.f.set(emu._pop_core())
-    emu.pc.set(emu._pop_core())
-
-
 def handle_nop(_emu, _decoded: tuple[int, ...]) -> None:
     pass
-
-
-def handle_sti(emu, _decoded: tuple[int, ...]) -> None:
-    emu.flag_set(FLAG_I, True)
-
-
-def handle_cli(emu, _decoded: tuple[int, ...]) -> None:
-    emu.flag_set(FLAG_I, False)
 
 
 def handle_stc(emu, _decoded: tuple[int, ...]) -> None:
@@ -458,8 +427,6 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.NOT  : handle_not,
     INSTRUCTIONS.XOR  : handle_xor,
     INSTRUCTIONS.SWP  : handle_swp,
-    INSTRUCTIONS.STI  : handle_sti,
-    INSTRUCTIONS.CLI  : handle_cli,
     INSTRUCTIONS.STC  : handle_stc,
     INSTRUCTIONS.CLC  : handle_clc,
     INSTRUCTIONS.CMP  : handle_cmp,
@@ -478,8 +445,6 @@ handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.JLE  : handle_jle,
     INSTRUCTIONS.CALL : handle_call,
     INSTRUCTIONS.RET  : handle_ret,
-    INSTRUCTIONS.INT  : handle_int,
-    INSTRUCTIONS.IRET : handle_iret,
     INSTRUCTIONS.NOP  : handle_nop,
     INSTRUCTIONS.BCP : handle_bcp,
 }
