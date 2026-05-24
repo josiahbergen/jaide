@@ -96,7 +96,6 @@ class Emulator:
         # debugger etc.
         self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
         self.halted: bool = False  # hardware halt
-        self._halted_step_count: int = 0
 
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
         from .handlers import handler_map
@@ -330,9 +329,6 @@ class Emulator:
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
-        # if logger.level == logger.log_level.VERBOSE:
-        # time.sleep(0.001)
-
         if self.interrupts_pending():
             # interrupt called!
             interrupt_id = self.pending_interrupts.pop()
@@ -350,11 +346,7 @@ class Emulator:
             device.tick()
 
         if self.waiting_for_interrupt:
-            # halt was called, we are simply waiting for an interrupt
-            # self._halted_step_count = (self._halted_step_count + 1) % 10000000
-            # if self._halted_step_count == 0:
-            #     logger.verbose("waiting for interrupt...")
-            # time.sleep(0.001)
+            time.sleep(0.001) # reduce load on the cpu while waiting
             return
 
         # normal fetch/decode/execute

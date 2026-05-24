@@ -85,7 +85,8 @@ disk_read_sector:
     mov z, disk_command_read
     mmio_out mmio_disk_command, z
 
-    ; block until the disk is done
+    ; block until the disk is done 
+    ; (disk fires an interrupt)
     sti
     halt
 
