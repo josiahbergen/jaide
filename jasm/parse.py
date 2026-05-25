@@ -148,7 +148,7 @@ def update_context_from_file(context: AssemblyContext, ir: dict[str, list[IRNode
 def parse_text(text: str, filename: str) -> list[IRNode]:
     """Parse JASM source from a string (no file I/O). Used by assemble_string()."""
     try:
-        tree = _parser.parse(text)
+        tree = parser.parse(text)
     except Exception as e:
         logger.fatal(f"parser error: {e}", "parse.py:parse_text()")
     return IRTransformer(source_file=filename).transform(tree)
