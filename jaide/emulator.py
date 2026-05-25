@@ -4,6 +4,7 @@
 
 import os
 import sys
+import time
 import traceback
 from collections import deque
 from typing import Callable
@@ -69,21 +70,15 @@ class Emulator:
 
         self.devices: list[Device] = []
 
-        _no_irq = lambda _: None  # no interrupt controller; devices call this as a no-op
+        if enabled_devices.get("pit", False): self.devices.append(PIT())
+        if enabled_devices.get("rtc", False): self.devices.append(RTC())
+        if enabled_devices.get("disk", False): self.devices.append(Disk(image_file, self.read16, self.write16))
 
-        # simple read/write devices
-        if enabled_devices.get("pit", False): self.devices.append(PIT(_no_irq))
-        if enabled_devices.get("rtc", False): self.devices.append(RTC(_no_irq))
-
-        # graphics and keyboard devices
+        # graphics and keyboard device (two-in-one implementation)
         if enabled_devices.get("graphics", False):
             _key_queue = deque()
-            self.devices.append(Graphics(_no_irq, _key_queue, self.vram, self.shutdown))
-            self.devices.append(Keyboard(_no_irq, _key_queue))
-
-        # disk device
-        if enabled_devices.get("disk", False):
-            self.devices.append(Disk(_no_irq, image_file, self.read16, self.write16))
+            self.devices.append(Graphics(_key_queue, self.vram, self.shutdown))
+            self.devices.append(Keyboard(_key_queue))
 
         # debugger etc.
         self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
@@ -236,7 +231,7 @@ class Emulator:
 
     def reset(self) -> None:
         self.__init__()
-        logger.info("emulator reset")
+        logger.info("emulator reset!")
 
 
     def shutdown(self) -> None:
@@ -275,15 +270,16 @@ class Emulator:
         try:
             while True:
                 # normal execution
+                time.sleep(0.001)
                 self.step()
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
-            logger.error(f"emulator stopped: {e.message}")
+            logger.error(f"emulator stopped: {e.message} (at 0x{self.pc.value:04X}).")
         except KeyboardInterrupt:
             # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
-            print("! execution stopped (user interrupt).")
+            logger.info("execution stopped (user interrupt).")
         except Exception as e:
             # general exception. this is an emulator code error, 
             # not an assembly error. allow the repl to persist.

@@ -2,9 +2,10 @@
 # macros resolution functions.
 # josiah bergen, december 2025
 
+from .language.context import AssemblyContext
 from .language.ir.base import IRNode, MacroCallNode, MacroDefinitionNode
 from .util.logger import logger
-from .language.context import AssemblyContext
+
 
 def expand_macros(context: AssemblyContext) -> None:
     """ Parse and expand macros in the IR. """

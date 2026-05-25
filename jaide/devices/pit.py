@@ -2,15 +2,14 @@
 # device base class for the jaide emulator.
 # josiah bergen, march 2026
 
-from typing import Callable
-
 from ..util.logger import logger
 from .device import Device
 
+
 class PIT(Device):
-    def __init__(self, irq: Callable[[int], None]):
+    def __init__(self):
         """Programmable interval timer."""
-        super().__init__(irq)
+        super().__init__()
 
         self.enabled: bool = False
         self.one_shot: bool = False

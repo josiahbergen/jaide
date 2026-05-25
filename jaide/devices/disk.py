@@ -2,7 +2,6 @@
 # device base class for the jaide emulator.
 # josiah bergen, march 2026
 
-from ast import Return
 from typing import Callable
 
 from ..util.logger import logger
@@ -14,9 +13,10 @@ STATUS_WRITING = 2
 STATUS_ERROR = 2
 
 class Disk(Device):
-    def __init__(self, irq: Callable[[int], None], disk_file: str, read16: Callable[[int], int], write16: Callable[[int, int], None]):
+    def __init__(self, disk_file: str, read16: Callable[[int], int], write16: Callable[[int, int], None]):
         """Disk controller."""
-        super().__init__(irq)
+        super().__init__()
+
         self.read16 = read16
         self.write16 = write16
 

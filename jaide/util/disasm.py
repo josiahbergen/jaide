@@ -1,6 +1,7 @@
 from common.isa import OPCODE_FORMATS
 from jaide.constants import REGISTERS
 
+
 def disassemble(decoded: tuple[int, ...]) -> str:
 
     opcode, reg_a, reg_b, imm16 = decoded

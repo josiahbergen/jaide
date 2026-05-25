@@ -4,7 +4,7 @@
 
 from enum import IntEnum, auto
 
-from common.isa import ZeroIndexedIntEnum
+from common.isa import ZeroIndexedEnum
 
 MAGIC      = 0x333A  # ":3" (little-endian)
 BLOCK_SIZE = 256     # words
@@ -17,7 +17,7 @@ ROOT_ENTRIES    = 64 # maximum number of entries in the root directory table
 UNALLOCATED = 0x0000
 EOF = 0xFFFF
 
-class BOOT_INDICES(ZeroIndexedIntEnum):
+class BOOT_INDICES(ZeroIndexedEnum):
 
     MAGIC        = auto()  # 0x3A33
     BLOCKS       = auto()  # total number of blocks on the disk  

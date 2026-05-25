@@ -3,16 +3,14 @@
 # josiah bergen, march 2026
 
 import time
-from re import T
-from typing import Callable
 
 from .device import Device
 
 
 class RTC(Device):
-    def __init__(self, irq: Callable[[int], None]):
+    def __init__(self):
         """Real-time clock."""
-        super().__init__(irq)
+        super().__init__()
 
         self.read_dispatch[0xFE30] = lambda: time.localtime().tm_sec
         self.read_dispatch[0xFE31] = lambda: time.localtime().tm_min

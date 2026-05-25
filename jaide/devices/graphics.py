@@ -46,13 +46,13 @@ COLORS: list[tuple[int, int, int]] = [
 
 
 class Graphics(Device):
-    def __init__(self, irq: Callable[[int], None], key_queue: deque, vram: bytearray, shutdown: Callable[[], None]):
+    def __init__(self, key_queue: deque, vram: bytearray, shutdown: Callable[[], None]):
         """Graphics controller. Renders VRAM to a pygame window.
 
         vram      -- reference to emulator.vram (mapped at 0x4000–0x4FFF)
         key_queue -- shared deque; key events are appended here for KeyboardDevice
         """
-        super().__init__(irq)
+        super().__init__()
 
         self.vram: bytearray     = vram
         self.enabled: bool       = True

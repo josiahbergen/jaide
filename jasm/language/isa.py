@@ -4,20 +4,21 @@
 
 # Re-export everything from the canonical common ISA so jasm and jaide
 # always share exactly one definition.
+# RTYPE is only needed by the assembler for operand-direction annotation.
+from enum import IntEnum
+
 from common.isa import (
-    INSTRUCTIONS,
-    REGISTERS,
-    MODES,
     INSTRUCTION_MODES,
-    OPCODE_MAP_KEYS,
-    OPCODE_MAP,
-    InstructionFormat,
+    INSTRUCTIONS,
+    MODES,
     OPCODE_FORMATS,
+    OPCODE_MAP,
+    OPCODE_MAP_KEYS,
+    REGISTERS,
+    InstructionFormat,
     generate_opcode_string,
 )
 
-# RTYPE is only needed by the assembler for operand-direction annotation.
-from enum import IntEnum
 
 class RTYPE(IntEnum):
     SRC  = 0

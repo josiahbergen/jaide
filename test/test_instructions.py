@@ -305,6 +305,7 @@ class TestHalt:
 
     def test_halt_raises(self, assemble_and_load):
         import pytest
+
         from jaide.exceptions import EmulatorException
         emu = assemble_and_load("halt\nmov A, 0x00FF")
         with pytest.raises(EmulatorException):
@@ -455,6 +456,7 @@ class TestMod:
 
     def test_mod_by_zero_raises(self, assemble_and_load):
         import pytest
+
         from jaide.exceptions import EmulatorException
         emu = assemble_and_load("mov A, 0x0005\nmod A, 0x0000")
         emu.step()

@@ -8,16 +8,16 @@ from lark import Lark
 
 from .language.context import AssemblyContext
 from .language.grammar import GRAMMAR
-from .language.transformer import IRTransformer
 from .language.ir.base import (
-    ImportDirectiveNode,
-    IRNode,
-    MacroDefinitionNode,
-    MacroCallNode,
-    InstructionNode,
     DefineDirectiveNode,
+    ImportDirectiveNode,
+    InstructionNode,
+    IRNode,
+    MacroCallNode,
+    MacroDefinitionNode,
     OrgDirectiveNode,
 )
+from .language.transformer import IRTransformer
 from .util.logger import logger
 
 # build the parser once at import time

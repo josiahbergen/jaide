@@ -73,7 +73,7 @@ class Cmd:
 class REPL:
     def __init__(self, emulator: Emulator):
 
-        logger.info("jaide emulator shell version 0.0.3")
+        logger.info("jaide shell version 0.0.3")
         logger.info("welcome to the emulator! type 'help' for a list of commands.")
 
         self.emulator: Emulator = emulator
@@ -103,6 +103,7 @@ class REPL:
 
         for func, names, args, description in command_defs:
             self.commands.append(Cmd(func, names, [Arg(*a) for a in args], description))
+
 
         while True:
             try:

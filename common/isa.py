@@ -4,19 +4,18 @@
 
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from tkinter import OUTSIDE
 
 from tap import Tap
 
 
-class ZeroIndexedIntEnum(IntEnum):
+class ZeroIndexedEnum(IntEnum):
     """zero-indexed int enum."""
 
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return count # ensure 0-indexing
 
-class INSTRUCTIONS(ZeroIndexedIntEnum):
+class INSTRUCTIONS(ZeroIndexedEnum):
     """all supported instructions"""
 
     NOP  = auto()
@@ -64,7 +63,7 @@ class INSTRUCTIONS(ZeroIndexedIntEnum):
     BCP = auto()
 
 
-class REGISTERS(ZeroIndexedIntEnum):
+class REGISTERS(ZeroIndexedEnum):
     """all the registers"""
 
     A  = auto()
@@ -81,8 +80,7 @@ class REGISTERS(ZeroIndexedIntEnum):
     PC = auto()
 
 
-class MODES(ZeroIndexedIntEnum):
-
+class MODES(ZeroIndexedEnum):
     """addressing modes for instructions"""
 
                           # syntax       parsed         where does the value come from?
@@ -92,8 +90,8 @@ class MODES(ZeroIndexedIntEnum):
     REG_POINTER = auto()  # [a]          [reg]          memory at register
     OFF_POINTER = auto()  # [label + a]  [imm16 + reg]  memory at immediate + register
     REL_POINTER = auto()  # [label]      [pc + imm16]   memory at pc + imm16
-
     NULL        = auto()  # placeholder, used during parsing
+
 
 
 INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
@@ -182,35 +180,25 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
 
     (INSTRUCTIONS.HALT, ()):                                (None, None, None),
 
-    # GET dest, src
-    # reg: ssss=src ptr reg  dddd=dest reg                 src    dest  imm
     (INSTRUCTIONS.GET, (MODES.REG, MODES.REG_POINTER)):    (1,    0,    None),
     # (INSTRUCTIONS.GET, (MODES.REG, MODES.REL_POINTER)):  (None, 0,    1   ),
     # (INSTRUCTIONS.GET, (MODES.REG, MODES.OFF_POINTER)):  (1,    0,    1   ),
 
-    # PUT dest, src
-    # reg: ssss=src reg  dddd=dest ptr reg
     (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.REG)):    (1,    0,    None),
     # imm: dddd=dest ptr reg  imm=value to store
     (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.IMM)):    (None, 0,    1   ),
     # (INSTRUCTIONS.PUT, (MODES.OFF_POINTER, MODES.REG)):  (1,    0,    0   ),
     # (INSTRUCTIONS.PUT, (MODES.REL_POINTER, MODES.REG)):  (1,    None, 0   ),
 
-    # MOV dest, src
-    # reg+reg: ssss=src  dddd=dest
-    # reg+imm: ssss=dest (anomaly: dest register goes in source slot when src is an immediate)
     (INSTRUCTIONS.MOV, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.MOV, (MODES.REG, MODES.IMM)):            (0,    None, 1   ),
     # (INSTRUCTIONS.MOV, (MODES.REG, MODES.RELATIVE)):     (0,    None, 1   ),
 
-    # PUSH src
     (INSTRUCTIONS.PUSH, (MODES.REG,)):                     (0,    None, None),
     (INSTRUCTIONS.PUSH, (MODES.IMM,)):                     (None, None, 0   ),
 
-    # POP dest
     (INSTRUCTIONS.POP, (MODES.REG,)):                      (None, 0,    None),
 
-    # ALU binary ops: ssss=src(op1)  dddd=dest(op0)
     (INSTRUCTIONS.ADD, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.ADD, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
 
@@ -232,7 +220,6 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.DIV, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.DIV, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
 
-    # ALU unary ops: dddd=dest
     (INSTRUCTIONS.INC, (MODES.REG,)):                      (None, 0,    None),
     (INSTRUCTIONS.DEC, (MODES.REG,)):                      (None, 0,    None),
     (INSTRUCTIONS.NOT, (MODES.REG,)):                      (None, 0,    None),
@@ -258,18 +245,14 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.STC, ()):                                (None, None, None),
     (INSTRUCTIONS.CLC, ()):                                (None, None, None),
 
-    # CMP dest, src: ssss=src(op1)  dddd=dest(op0)
-    # CMP dest, imm: ssss=dest(op0) (same anomaly as MOV)
     (INSTRUCTIONS.CMP, (MODES.REG, MODES.REG)):            (1,    0,    None),
     (INSTRUCTIONS.CMP, (MODES.REG, MODES.IMM)):            (0,    None, 1   ),
 
-    # JMP
     (INSTRUCTIONS.JMP, (MODES.REG,)):                      (0,    None, None),
     (INSTRUCTIONS.JMP, (MODES.IMM,)):                      (None, None, 0   ),
     # (INSTRUCTIONS.JMP, (MODES.RELATIVE,)):               (None, None, 0   ),
     # (INSTRUCTIONS.JMP, (MODES.OFF_POINTER,)):            (0,    None, 0   ),
 
-    # Conditional jumps (all RELATIVE)
     (INSTRUCTIONS.JZ,  (MODES.RELATIVE,)):                 (None, None, 0   ),
     (INSTRUCTIONS.JNZ, (MODES.RELATIVE,)):                 (None, None, 0   ),
     (INSTRUCTIONS.JC,  (MODES.RELATIVE,)):                 (None, None, 0   ),
@@ -283,7 +266,6 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.JL,  (MODES.RELATIVE,)):                 (None, None, 0   ),
     (INSTRUCTIONS.JLE, (MODES.RELATIVE,)):                 (None, None, 0   ),
 
-    # CALL
     (INSTRUCTIONS.CALL, (MODES.REG,)):                     (0,    None, None),
     (INSTRUCTIONS.CALL, (MODES.IMM,)):                     (None, None, 0   ),
     # (INSTRUCTIONS.CALL, (MODES.RELATIVE,)):              (None, None, 0   ),
@@ -292,10 +274,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.RET,  ()):                               (None, None, None),
     (INSTRUCTIONS.NOP,  ()):                               (None, None, None),
 
-    # SWP: ssss=op0, dddd=op1
     (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
 
-    # BCP dst, src, count : ssss=src  dddd=dst  imm=count
     (INSTRUCTIONS.BCP, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
 }
 
@@ -304,9 +284,9 @@ OPCODE_FORMATS: dict[int, InstructionFormat] = {
     opcode: InstructionFormat(
         mnemonic       = instr,
         modes          = modes,
-        src_operand    = _FORMAT_DATA[(instr, modes)][0], # will be 0, 1, or None
-        dest_operand   = _FORMAT_DATA[(instr, modes)][1], # will be 0, 1, or None
-        imm_operand    = _FORMAT_DATA[(instr, modes)][2], # will be 0, 1, or None
+        src_operand    = _FORMAT_DATA[(instr, modes)][0],
+        dest_operand   = _FORMAT_DATA[(instr, modes)][1],
+        imm_operand    = _FORMAT_DATA[(instr, modes)][2],
     )
     for (instr, modes), opcode in OPCODE_MAP.items()
 }

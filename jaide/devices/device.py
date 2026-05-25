@@ -9,9 +9,7 @@ from ..util.logger import logger
 
 
 class Device:
-    def __init__(self, irq: Callable[[int], None]):
-        self.irq: Callable[[int], None] = irq
-
+    def __init__(self):
         # by default, no read or write handlers are defined
         self.read_dispatch: dict[int, Callable[..., int]] = {}
         self.write_dispatch: dict[int, Callable[[int], None]] = {}
@@ -37,23 +35,12 @@ class Device:
         write_handler(value)
 
     def _get_mmio_list(self) -> str:
-        """ return a string of format "0xFE01 (r/w), 0xFE02 (r), ..."
-        """
-        # [0] = read, [1] = write
-        open_addrs: dict[int, list[bool]] = {}
-
-        for addr, _ in self.read_dispatch.items():
-            if addr not in open_addrs:
-                open_addrs[addr] = [False, False]
-            open_addrs[addr][0] = True
-        for addr, _ in self.write_dispatch.items():
-            if addr not in open_addrs:
-                open_addrs[addr] = [False, False]
-            open_addrs[addr][1] = True
-        return ", ".join([
-            f"0x{addr:04X} ({'r/w' if open_addrs[addr][0] and open_addrs[addr][1] else 'r' if open_addrs[addr][0] else 'w'})"
-            for addr in open_addrs
-        ])
+        """ return a string of format "0xFE01 (r/w), 0xFE02 (r), ..."""
+        return ", ".join(
+            f"0x{addr:04X} ({'r/w' if r and w else 'r' if r else 'w'})"
+            for addr in sorted(set(self.read_dispatch) | set(self.write_dispatch))
+            for r, w in [(addr in self.read_dispatch, addr in self.write_dispatch)]
+        )
 
     def tick(self) -> None:
         """Tick the device. Runs once per CPU cycle."""

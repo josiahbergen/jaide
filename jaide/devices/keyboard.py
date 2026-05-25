@@ -3,17 +3,17 @@
 # josiah bergen, april 2026
 
 from collections import deque
-from typing import Callable
 
 from .device import Device
 
+
 class Keyboard(Device):
-    def __init__(self, irq: Callable[[int], None], key_queue: deque):
+    def __init__(self, key_queue: deque):
         """Keyboard controller. Reads translated scancodes from the shared queue populated by the graphics controller.
 
         key_queue -- shared deque[int] of scancodes pushed by Graphics
         """
-        super().__init__(irq)
+        super().__init__()
 
         self._key_queue = key_queue
         self._pending: int  = 0      # scancode waiting to be read

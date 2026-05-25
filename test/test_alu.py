@@ -1,6 +1,6 @@
 """Unit tests for the ALU core operations: _add_core, _sub_core, _lsh_core, _rsh_core."""
 
-from jaide.constants import FLAG_C, FLAG_Z, FLAG_N, FLAG_O
+from jaide.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z
 
 
 class TestAddCore:

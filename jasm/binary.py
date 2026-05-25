@@ -3,7 +3,7 @@
 # josiah bergen, december 2025
 
 from .language.context import AssemblyContext
-from .language.ir.base import DataDirectiveNode, InstructionNode, Operand, TimesDirectiveNode, AlignDirectiveNode
+from .language.ir.base import AlignDirectiveNode, DataDirectiveNode, InstructionNode, Operand, TimesDirectiveNode
 from .language.ir.operands import (
     ImmediateOperand,
     LabelOperand,

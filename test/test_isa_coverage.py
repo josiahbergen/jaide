@@ -1,4 +1,4 @@
-from common.isa import INSTRUCTIONS, INSTRUCTION_MODES, _FORMAT_DATA
+from common.isa import _FORMAT_DATA, INSTRUCTION_MODES, INSTRUCTIONS
 
 
 def test_each_instruction_has_modes_and_format_entries():
