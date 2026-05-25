@@ -15,24 +15,12 @@ import "os/syscalls/system.jasm"
 
 import "os/lib/string.jasm"
 
+data "KERNEL"
+
 main:
-    ; print some strings, save the new cursor row,
-    ; and draw the prompt. then, the shell is ready to take over!
     mov x, 0
     mov y, 0
-    mov a, s_ready
-    call shell__print
-
-    inc y
-    mov a, s_shell_version
-    call shell__print
-    inc y
-    mov a, s_shell_help
-    call shell__print
-
-    inc y
-    save_to shell__var_cursor_row, y
-    call shell__draw_prompt
+    call shell__draw_prompt_no_scroll
 
 loop:
     ; poll keyboard and dispatch keystrokes to the shell
@@ -113,10 +101,6 @@ sc_function_table:
     data 0x50, system__sc_shutdown
     data 0x51, system__sc_reset
     data 0xFFFF  ; end of table
-
-s_ready:  data "ready.", 0
-s_shell_version:  data "jaideos shell v0.0.1 alpha", 0
-s_shell_help:  data "type 'help' for a list of commands.", 0
 
 ; all the shell interface code lives here.
 import "os/kernel/shell.jasm"

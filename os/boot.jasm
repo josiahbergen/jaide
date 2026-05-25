@@ -7,8 +7,7 @@ start:
     ; bootloader entry point. lives at 0x0000.
     mov sp, 0xfdff
     
-    ; todo: load kernel into ram with manual mmio writes.
-
+    ; todo: load kernel into ram with manual mmio writes
     jmp kernel__main
 
 align 0x100 ; fill entire rom

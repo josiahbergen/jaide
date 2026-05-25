@@ -14,9 +14,7 @@
 sc_reset:
     mmio_out mmio_system, 0x01
     halt
-    jmp sc_reset
 
 sc_shutdown:
-    mmio_out mmio_system, 0x03
+    mmio_out mmio_system, 0x02
     halt
-    jmp sc_shutdown

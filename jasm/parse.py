@@ -11,9 +11,7 @@ from .language.grammar import GRAMMAR
 from .language.ir.base import (
     DefineDirectiveNode,
     ImportDirectiveNode,
-    InstructionNode,
     IRNode,
-    MacroCallNode,
     MacroDefinitionNode,
     OrgDirectiveNode,
 )
@@ -21,7 +19,7 @@ from .language.transformer import IRTransformer
 from .util.logger import logger
 
 # build the parser once at import time
-parser = Lark(GRAMMAR, parser="lalr")
+parser = Lark(GRAMMAR, parser="lalr", cache=True)
 
 
 def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:

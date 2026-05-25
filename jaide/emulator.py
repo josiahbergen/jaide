@@ -217,9 +217,7 @@ class Emulator:
             match value:
                 case 0x01:  # reset
                     self.reset()
-                case 0x02:  # halt
-                    self.halted = True
-                case 0x03:  # power off
+                case 0x02:  # power off
                     self.shutdown()
                 case _:
                     pass
@@ -270,7 +268,7 @@ class Emulator:
         try:
             while True:
                 # normal execution
-                time.sleep(0.001)
+                time.sleep(0)
                 self.step()
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,

@@ -6,8 +6,6 @@
 ;    all assembler macros for the kernel and shell.
 ;    import defs.jasm before this file.
 
-; ── mmio ──────────────────────────────────────────────────────────────────────
-
 macro mmio_in %dest, %addr
     mov e, %addr
     get %dest, [e]

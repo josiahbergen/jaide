@@ -1,4 +1,4 @@
-JASM       = uv run -m jasm
+JASM       = uv run -m jasm -v 0
 JASMFLAGS  = --nolink --nowarn
 JAIDE      = uv run -m jaide
 JAIDEFLAGS = --pit --rtc --graphics --disk --image jfs/images/disk.img -r
