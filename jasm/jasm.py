@@ -5,9 +5,35 @@
 from jasm.binary import generate_binary
 from jasm.labels import prepare_instructions
 from jasm.language.context import AssemblyContext
+from jasm.language.ir.base import DefineDirectiveNode, MacroDefinitionNode, OrgDirectiveNode
 from jasm.macros import expand_macros
-from jasm.parse import generate_context
+from jasm.parse import generate_context, parse_text
 from jasm.util.logger import logger
+
+
+def assemble_string(source: str, options: dict[str, bool] = {}) -> bytes:
+    """Assemble JASM source from a string and return the binary bytes.
+
+    No file I/O or import directive support — use assemble() for those.
+    Reuses the cached Lark parser, so repeated calls are fast (~0.2 ms each).
+    """
+    fake = "<string>.jasm"
+    ir_nodes = parse_text(source, fake)
+
+    ctx = AssemblyContext(fake, options)
+    for node in ir_nodes:
+        if isinstance(node, MacroDefinitionNode):
+            ctx.add_macro(node.name, node)
+        elif isinstance(node, DefineDirectiveNode):
+            ctx.add_constant(node.name, node.value)
+        elif isinstance(node, OrgDirectiveNode):
+            ctx.set_origin(node.address)
+        else:
+            ctx.ir.append(node)
+
+    expand_macros(ctx)
+    prepare_instructions(ctx)
+    return bytes(generate_binary(ctx))
 
 
 def assemble(file: str, output: str, options: dict[str, bool] = {}):

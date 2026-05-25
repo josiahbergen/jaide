@@ -1,10 +1,7 @@
-import os
-import tempfile
-
 import pytest
 
 from jaide.emulator import Emulator
-from jasm.jasm import assemble
+from jasm.jasm import assemble_string
 
 
 @pytest.fixture
@@ -16,7 +13,9 @@ def emu():
 
 @pytest.fixture
 def assemble_and_load(emu):
-    """Assemble a JASM source string, load the binary into an emulator instance.
+    """Assemble a JASM source string and load the binary into a fresh emulator.
+
+    Uses the in-memory assembler path (no temp files).
 
     Usage:
         def test_something(assemble_and_load):
@@ -25,13 +24,8 @@ def assemble_and_load(emu):
             assert emu.reg["A"].value == 0x42
     """
     def _helper(source: str) -> Emulator:
-        with tempfile.TemporaryDirectory() as tmp:
-            src_path = os.path.join(tmp, "test.jasm")
-            bin_path = os.path.join(tmp, "test.bin")
-            with open(src_path, "w") as f:
-                f.write(source)
-            assemble(src_path, bin_path)
-            emu.load_binary(bin_path)
+        binary = assemble_string(source)
+        emu.memory[0:len(binary)] = binary
         return emu
     return _helper
 
@@ -47,14 +41,9 @@ def assemble_and_load_ram(emu):
     RAM_WORD = 0x4200
 
     def _helper(source: str) -> Emulator:
-        with tempfile.TemporaryDirectory() as tmp:
-            src_path = os.path.join(tmp, "test.jasm")
-            bin_path = os.path.join(tmp, "test.bin")
-            with open(src_path, "w") as f:
-                f.write(source)
-            assemble(src_path, bin_path)
-            # load_binary addr is a byte offset; word N lives at byte N*2
-            emu.load_binary(bin_path, addr=RAM_WORD * 2)
+        binary = assemble_string(source)
+        addr = RAM_WORD * 2
+        emu.memory[addr:addr + len(binary)] = binary
         emu.pc.set(RAM_WORD)
         return emu
 

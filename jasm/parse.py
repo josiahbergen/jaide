@@ -20,6 +20,9 @@ from .language.ir.base import (
 )
 from .util.logger import logger
 
+# build the parser once at import time
+parser = Lark(GRAMMAR, parser="lalr")
+
 
 def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:
     """Generate the context from the source file."""
@@ -85,7 +88,6 @@ def parse_file(file: str, ir: dict[str, list[IRNode]]) -> None:
 
     # parse the text
     try:
-        parser = Lark(GRAMMAR, parser="lalr")
         tree = parser.parse(text)
     except Exception as e:
         logger.fatal(f"parser error in file {file}: {e}", scope)
@@ -141,3 +143,12 @@ def update_context_from_file(context: AssemblyContext, ir: dict[str, list[IRNode
             # not a directive or macro definition, so add to the big list
             context.ir.append(node)
     return
+
+
+def parse_text(text: str, filename: str) -> list[IRNode]:
+    """Parse JASM source from a string (no file I/O). Used by assemble_string()."""
+    try:
+        tree = _parser.parse(text)
+    except Exception as e:
+        logger.fatal(f"parser error: {e}", "parse.py:parse_text()")
+    return IRTransformer(source_file=filename).transform(tree)

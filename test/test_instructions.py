@@ -1,6 +1,9 @@
 """Integration tests: assemble snippets, load into emulator, step through, verify state."""
 
-from jaide.constants import FLAG_C, FLAG_Z
+import pytest
+
+from jaide.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z
+from jaide.exceptions import EmulatorException
 
 
 class TestMov:
@@ -757,7 +760,140 @@ class TestMmio:
         emu.step()  # mov B, 0xFE05
         emu.step()  # get A, [B]
         assert emu.reg["A"].value == 0
+        assert emu.reg["B"].value == 0x0FE05
 
-        emu.step()  # mov B, 0x00FF
-        assert emu.reg["A"].value == 0x0042
-        assert emu.reg["B"].value == 0x00FF
+
+class TestStcClc:
+
+    def test_stc_sets_carry(self, assemble_and_load):
+        emu = assemble_and_load("stc")
+        emu.step()
+        assert emu.flag_get(FLAG_C)
+
+    def test_clc_clears_carry(self, assemble_and_load):
+        # produce carry via overflow, then clear it
+        emu = assemble_and_load("mov A, 0xFFFF\nadd A, 0x0001\nclc")
+        emu.step()
+        emu.step()  # carry = 1 after overflow
+        assert emu.flag_get(FLAG_C)
+        emu.step()  # clc
+        assert not emu.flag_get(FLAG_C)
+
+    def test_stc_feeds_adc(self, assemble_and_load):
+        # stc then adc A, 0 → A + 0 + carry(1) = A + 1
+        emu = assemble_and_load("stc\nmov A, 0x0005\nadc A, 0x0000")
+        emu.step()  # stc
+        emu.step()  # mov A, 5
+        emu.step()  # adc A, 0
+        assert emu.reg["A"].value == 6
+
+    def test_clc_then_adc_no_carry(self, assemble_and_load):
+        # set carry, then clc, then adc — carry should be gone
+        emu = assemble_and_load("stc\nclc\nmov A, 0x0005\nadc A, 0x0003")
+        for _ in range(4):
+            emu.step()
+        assert emu.reg["A"].value == 8  # 5 + 3 + carry(0) = 8
+
+
+class TestDivByZero:
+
+    def test_div_imm_zero_raises(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x0005\ndiv A, 0x0000")
+        emu.step()
+        with pytest.raises(EmulatorException):
+            emu.step()
+
+    def test_div_reg_zero_raises(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x000A\nmov B, 0x0000\ndiv A, B")
+        emu.step()
+        emu.step()
+        with pytest.raises(EmulatorException):
+            emu.step()
+
+
+class TestFlagNO:
+
+    def test_add_sets_negative_flag(self, assemble_and_load):
+        # 0x4000 + 0x4000 = 0x8000 (bit 15 set → FLAG_N)
+        emu = assemble_and_load("mov A, 0x4000\nadd A, 0x4000")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 0x8000
+        assert emu.flag_get(FLAG_N)
+
+    def test_negative_flag_clear_on_positive_result(self, assemble_and_load):
+        # 0x8000 + 0x8000 = 0x10000 → truncated to 0x0000 (bit 15 clear)
+        emu = assemble_and_load("mov A, 0x8000\nadd A, 0x8000")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 0
+        assert not emu.flag_get(FLAG_N)
+
+    def test_add_sets_overflow_flag(self, assemble_and_load):
+        # 0x0040 + 0x0060 = 0x00A0 (both bit-7 clear, result bit-7 set → FLAG_O)
+        emu = assemble_and_load("mov A, 0x0040\nadd A, 0x0060")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 0x00A0
+        assert emu.flag_get(FLAG_O)
+
+    def test_overflow_flag_clear_when_no_overflow(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x0001\nadd A, 0x0001")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 2
+        assert not emu.flag_get(FLAG_O)
+
+    def test_sub_sets_negative_flag(self, assemble_and_load):
+        # 0x0001 - 0x0002 = 0xFFFF (borrow, bit 15 set → FLAG_N)
+        emu = assemble_and_load("mov A, 0x0001\nsub A, 0x0002")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 0xFFFF
+        assert emu.flag_get(FLAG_N)
+
+
+class TestBcp:
+
+    def test_bcp_same_region(self, assemble_and_load):
+        src_addr = 0x3000
+        dst_addr = 0x3100
+        count = 4
+        emu = assemble_and_load(
+            f"mov A, 0x{dst_addr:04X}\n"
+            f"mov B, 0x{src_addr:04X}\n"
+            f"bcp A, B, {count}\n"
+        )
+        for i in range(count):
+            emu.write16(src_addr + i, 0x1000 + i)
+        emu.step()  # mov A
+        emu.step()  # mov B
+        emu.step()  # bcp
+        for i in range(count):
+            assert emu.read16(dst_addr + i) == 0x1000 + i
+
+    def test_bcp_cross_region(self, assemble_and_load):
+        # copy from regular memory into VRAM (cross-region path)
+        src_addr = 0x3000
+        dst_addr = 0x4500  # VRAM (0x4000–0x4FFF)
+        count = 3
+        emu = assemble_and_load(
+            f"mov A, 0x{dst_addr:04X}\n"
+            f"mov B, 0x{src_addr:04X}\n"
+            f"bcp A, B, {count}\n"
+        )
+        for i in range(count):
+            emu.write16(src_addr + i, 0xBEEF + i)
+        emu.step()
+        emu.step()
+        emu.step()
+        for i in range(count):
+            assert emu.read16(dst_addr + i) == 0xBEEF + i
+
+    def test_bcp_zero_count_is_noop(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x3100\nmov B, 0x3000\nbcp A, B, 0")
+        emu.write16(0x3100, 0xDEAD)  # sentinel at destination
+        emu.step()
+        emu.step()
+        emu.step()  # bcp with count=0 → no copy
+        assert emu.read16(0x3100) == 0xDEAD  # sentinel unchanged

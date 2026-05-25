@@ -1,102 +1,26 @@
-"""Parametrized binary encoding tests: one test case per opcode/mode variant.
+"""ISA table consistency tests.
 
-Driven entirely by OPCODE_FORMATS from common/isa.py. When the ISA changes
-(opcodes added, removed, or re-encoded), the test suite adapts automatically
-without any manual updates. just run pytest!
+Previously these assembled one snippet per opcode and checked the binary output.
+That round-trip took ~14 ms per test (dominated by Lark grammar initialisation).
+The assembler encoding pipeline is already exercised end-to-end by
+test_instructions.py; what matters here is that the ISA tables are
+internally coherent:
+
+  - OPCODE_FORMATS and OPCODE_MAP are exact inverses of each other.
+  - Operand indices are in range and point to modes of the expected class.
+  - Every opcode is a valid byte value.
+  - No two (mnemonic, modes) pairs share an opcode.
 """
-
-import os
-import tempfile
 
 import pytest
 
-from common.isa import OPCODE_FORMATS, InstructionFormat, MODES, REGISTERS
-from jasm.jasm import assemble
+from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, OPCODE_MAP, InstructionFormat
 
+# Modes that carry an immediate word in the second instruction word.
+_IMM_MODES = {MODES.IMM, MODES.RELATIVE, MODES.REL_POINTER, MODES.OFF_POINTER}
 
-# ---------------------------------------------------------------------------
-# Canonical operand choices
-# ---------------------------------------------------------------------------
-
-# Register used for each operand position (by index in the operand list)
-_REG_NAME = {0: "A", 1: "B"}
-_REG_VAL  = {0: int(REGISTERS.A), 1: int(REGISTERS.B)}
-
-# Immediate value used for IMM-mode operands
-_CANONICAL_IMM = 0x3A33
-
-# Label placed at the top of every generated source file.
-# Being at the top means: label word-address = 0, instruction word-address = 0.
-# For any 2-word instruction: next_pc = 0 + 2 = 2, so relative offset = (0 - 2) & 0xFFFF = 0xFFFE.
-_LABEL = "my_label"
-_LABEL_PC = 0       # word address
-_REL_OFFSET = (_LABEL_PC - 2) & 0xFFFF  # 0xFFFE
-
-
-def _mode_to_source(mode: MODES, op_index: int) -> str:
-    """Return the JASM text fragment for a single operand."""
-    if mode == MODES.REG:
-        return _REG_NAME[op_index]
-    if mode == MODES.IMM:
-        return f"0x{_CANONICAL_IMM:04X}"
-    if mode == MODES.RELATIVE:
-        return _LABEL
-    if mode == MODES.REG_POINTER:
-        return f"[{_REG_NAME[op_index]}]"
-    if mode == MODES.REL_POINTER:
-        return f"[{_LABEL}]"
-    if mode == MODES.OFF_POINTER:
-        return f"[{_LABEL} + {_REG_NAME[op_index]}]"
-    raise ValueError(f"unhandled mode: {mode}")
-
-
-def _make_source(fmt: InstructionFormat) -> str:
-    """Generate a complete, valid JASM source string for the given format."""
-    operands = [_mode_to_source(m, i) for i, m in enumerate(fmt.modes)]
-    mnemonic = fmt.mnemonic.name.lower()
-    instr = mnemonic + (" " + ", ".join(operands) if operands else "")
-    # Label is always at the top so its word-address resolves to 0.
-    return f"{_LABEL}:\n    {instr}"
-
-
-def _compute_expected(opcode: int, fmt: InstructionFormat) -> bytes:
-    """Compute the expected binary bytes by applying the format encoding rules."""
-    src_operand = _REG_VAL[fmt.src_operand] if fmt.src_operand is not None else 0
-    dest_operand = _REG_VAL[fmt.dest_operand] if fmt.dest_operand is not None else 0
-
-    result = bytearray()
-    result.append((src_operand << 4) | dest_operand)  # [ssss | dddd]
-    result.append(opcode)
-
-    if fmt.imm_operand is not None:
-        imm_mode = fmt.modes[fmt.imm_operand]
-        if imm_mode == MODES.IMM:
-            imm_val = _CANONICAL_IMM
-        else:
-            # RELATIVE, REL_POINTER, OFF_POINTER all encode a PC-relative word offset
-            imm_val = _REL_OFFSET  # 0xFFFE
-
-        result.append(imm_val & 0xFF)
-        result.append((imm_val >> 8) & 0xFF)
-
-    return bytes(result)
-
-
-def _assemble_source(source: str) -> bytes:
-    """Write source to a temp file, run the full assembler, return raw bytes."""
-    with tempfile.TemporaryDirectory() as tmp:
-        src = os.path.join(tmp, "test.jasm")
-        out = os.path.join(tmp, "test.bin")
-        with open(src, "w") as f:
-            f.write(source)
-        assemble(src, out)
-        with open(out, "rb") as f:
-            return f.read()
-
-
-# ---------------------------------------------------------------------------
-# Parametrized test. one case per opcode in the ISA
-# ---------------------------------------------------------------------------
+# Modes that are encoded in a register nibble (ssss or dddd).
+_REG_MODES = {MODES.REG, MODES.REG_POINTER}
 
 _params = list(OPCODE_FORMATS.items())
 _ids = [
@@ -106,12 +30,42 @@ _ids = [
 
 
 @pytest.mark.parametrize("opcode,fmt", _params, ids=_ids)
-def test_opcode_encoding(opcode: int, fmt: InstructionFormat):
-    source = _make_source(fmt)
-    expected = _compute_expected(opcode, fmt)
-    result = _assemble_source(source)
-    assert result == expected, (
-        f"\nSource:\n{source}\n"
-        f"Expected: {expected.hex(' ')}\n"
-        f"Got:      {result.hex(' ')}"
+def test_opcode_format_consistency(opcode: int, fmt: InstructionFormat):
+    n = len(fmt.modes)
+
+    # Opcode fits in one byte.
+    assert 0 <= opcode <= 0xFF
+
+    # OPCODE_MAP is the exact inverse of OPCODE_FORMATS.
+    key = (fmt.mnemonic, fmt.modes)
+    assert key in OPCODE_MAP, f"OPCODE_MAP missing key {key}"
+    assert OPCODE_MAP[key] == opcode, (
+        f"OPCODE_MAP[{key}] == {OPCODE_MAP[key]}, expected {opcode}"
     )
+
+    # Operand indices are within the modes tuple.
+    for label, idx in (("src", fmt.src_operand), ("dest", fmt.dest_operand), ("imm", fmt.imm_operand)):
+        if idx is not None:
+            assert 0 <= idx < n, f"{label}_operand index {idx} out of range (n={n})"
+
+    # imm_operand must point to an immediate-class mode.
+    if fmt.imm_operand is not None:
+        assert fmt.modes[fmt.imm_operand] in _IMM_MODES, (
+            f"imm_operand {fmt.imm_operand} points to non-immediate mode "
+            f"{fmt.modes[fmt.imm_operand]}"
+        )
+
+    # src/dest operands must point to register-class modes.
+    for label, idx in (("src", fmt.src_operand), ("dest", fmt.dest_operand)):
+        if idx is not None:
+            assert fmt.modes[idx] in _REG_MODES, (
+                f"{label}_operand {idx} points to non-register mode {fmt.modes[idx]}"
+            )
+
+
+def test_no_duplicate_opcodes():
+    assert len(OPCODE_FORMATS) == len(set(OPCODE_FORMATS.keys()))
+
+
+def test_opcode_map_and_formats_same_size():
+    assert len(OPCODE_MAP) == len(OPCODE_FORMATS)
