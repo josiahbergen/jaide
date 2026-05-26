@@ -24,7 +24,8 @@ def _jump_target(emu: Emulator, imm16: int) -> int:
 # see OPCODE_FORMATS for which operand each field represents per opcode.
 
 
-def handle_halt(_emu, _decoded: tuple[int, ...]) -> None:
+def handle_halt(emu, _decoded: tuple[int, ...]) -> None:
+    emu.halted = True
     raise EmulatorException("halted")
 
 

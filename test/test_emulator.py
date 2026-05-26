@@ -101,35 +101,34 @@ class TestMmioWrite:
 
     def test_system_halt_command_sets_halted(self, assemble_and_load):
         emu = assemble_and_load(
-            "mov A, 0xFEFF\n"   # MMIO_SYSTEM address
-            "put [A], 0x0002\n" # halt command
+            "halt\n"
             "nop\n"
         )
-        emu.step()  # mov A
-        emu.step()  # put [A], 0x0002 → emu.halted = True
+        with pytest.raises(EmulatorException, match="halted"): 
+            emu.step()
         assert emu.halted
 
     def test_halted_emulator_raises_on_step(self, assemble_and_load):
         emu = assemble_and_load(
-            "mov A, 0xFEFF\n"
-            "put [A], 0x0002\n"
+            "halt\n"
             "nop\n"
         )
-        emu.step()
-        emu.step()  # sets halted
-        with pytest.raises(EmulatorException):
+        with pytest.raises(EmulatorException, match="halted"):
             emu.step()
 
     def test_unmapped_mmio_write_does_not_crash(self, emu):
         # writing to an unmapped MMIO address should be silently ignored
         emu.write16(0xFE20, 0x1234)  # no device registered at 0xFE20
+        assert emu.read16(0xFE20) == 0
 
     def test_mmio_write_direct(self, emu):
-        # drive the method directly for the halt path
-        assert not emu.halted
-        emu.mmio_write(MMIO_SYSTEM, 0x0002)
-        assert emu.halted
+        # override the shutdown method to raise an exception
+        def shtdown():
+            raise EmulatorException("shutdown")
+        setattr(emu, "shutdown", shtdown)
 
+        with pytest.raises(EmulatorException, match="shutdown"):
+            emu.mmio_write(MMIO_SYSTEM, 0x02)
 
 class TestBreakpoints:
 

@@ -26,7 +26,7 @@ run:
 
 test: clear
 	@echo running test suite...
-	@uv run -m pytest -q
+	@uv run -m pytest
 
 disk:
 	@echo creating disk image...
