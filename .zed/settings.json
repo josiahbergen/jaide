@@ -3,36 +3,31 @@
 // For a full list of overridable settings, and general information on folder-specific settings,
 // see the documentation: https://zed.dev/docs/configuring-zed#settings-files
 {
-  "file_scan_exclusions": [
-    // defaults
-    "**/.git",
-    "**/.svn",
-    "**/.hg",
-    "**/.jj",
-    "**/.repo",
-    "**/CVS",
-    "**/.DS_Store",
-    "**/Thumbs.db",
-    "**/.classpath",
-    "**/.settings",
+    "format_on_save": "off",
 
-    // python artifacts and env things
-    "**/__pycache__/",
-    "**/.pytest_cache/",
-    "**/__init__.py",
-    ".python-version",
-    "pyproject.toml",
-    "uv.lock",
+    "file_scan_exclusions": [
+        "**/.git",
+        "**/.svn",
+        "**/.hg",
+        "**/.jj",
+        "**/CVS",
+        "**/.DS_Store",
+        "**/Thumbs.db",
+        "**/.classpath",
+        "**/.settings",
+        "**/.github",
 
-    // custom stuff
-    ".vscode",
-    ".zed",
-    ".gitignore",
+        "**/.pytest_cache/",
+        "**/__pycache__/",
+        "**/.vscode/",
 
-    // llm tools
-    "CLAUDE.md",
-    ".claude",
-  ],
+        "**/bin/",
+        "**/__init__.py/",
 
-  "format_on_save": "on",
+        ".zed/",
+        ".gitignore",
+        ".python-version",
+        "README.md",
+        "uv.lock"
+    ],
 }

@@ -1,13 +1,9 @@
 
-data "SHELLDATA"
-
 var_cursor_row: data 0 ; cursor starts at top of screen
 var_command_len: data 0
 var_command_buffer: times 20, 0
 
 define command_buffer_length 20
-
-data "SHELLCODE"
 
 keyboard_interrupt:
     ; a = key code, passed in by the kernel polling loop
@@ -401,8 +397,7 @@ handler_mount:
     jmp handler_mount_error
 
 handler_mount_success:
-    mov a, s_success
-    call echo
+    call handler_disk_mounted
     ret
 
 handler_mount_error:
@@ -452,7 +447,7 @@ s_disk_info_blocks: data "       total blocks", 0
 s_disk_info_table:  data "       allocation table start", 0
 s_disk_info_root:   data "       root start", 0
 s_disk_info_data:   data "       data start", 0
-s_disk_info:        data "jfs file system:", 0
+s_disk_info:        data "ok", 0
 s_disk_info_error:  data "error: no disk mounted.", 0
 
 s_cmd_exec:         data "exec",  0
