@@ -1,0 +1,233 @@
+;    kernel terminal implementation.
+;    text-mode vram, cursor state, wrapping, scrolling, and attributes.
+;
+;    public interface:
+;
+;    | name        | args                   | returns      |
+;    | ----------- | ---------------------- | ------------ |
+;    | init        | -                      | -            |
+;    | write       | b = string pointer     | -            |
+;    | putc        | b = character          | -            |
+;    | clear       | -                      | -            |
+;    | set_cursor  | b = column, c = row    | a = status   |
+;    | get_cursor  | -                      | b = col, c = row, a = status |
+;    | put_char_at | b = char, c = x, d = y | a = status   |
+;    | set_attr    | b = attribute          | a = status   |
+
+define tty_width         80
+define tty_height        25
+define tty_last_row      24
+define tty_default_attr  0x0001
+define tty_scroll_words  0x0f00
+
+; Initialise state stored in kernel RAM, whose contents are undefined at reset.
+init:
+    push e
+    save_to kvar_cursor_col, 0
+    save_to kvar_cursor_row, 0
+    save_to kvar_tty_attr, tty_default_attr
+    pop e
+    ret
+
+; Write a null-terminated string at the current cursor position.
+;   b = string pointer
+write:
+    push x
+    mov x, b
+
+write_loop:
+    get b, [x]
+    cmp b, 0
+    jz write_done
+    call putc
+    inc x
+    jmp write_loop
+
+write_done:
+    pop x
+    ret
+
+; Write one character and advance the cursor. Line feed moves to column zero
+; on the next row. Writing beyond the final column wraps in the same way.
+;   b = character
+putc:
+    push e
+    push x
+    push y
+    push z
+
+    cmp b, 0x0a
+    jz putc_newline
+
+    dereference_into x, kvar_cursor_col
+    dereference_into y, kvar_cursor_row
+    xy_to_vram z, x, y
+
+    put [z], b
+    inc z
+    dereference_into x, kvar_tty_attr
+    put [z], x
+
+    dereference_into x, kvar_cursor_col
+    inc x
+    cmp x, tty_width
+    jae putc_newline
+
+    save_to kvar_cursor_col, x
+    jmp putc_done
+
+putc_newline:
+    call newline
+
+putc_done:
+    pop z
+    pop y
+    pop x
+    pop e
+    ret
+
+; Blank the screen and home the cursor. The first blank row is copied over
+; every remaining row to avoid a full-screen store loop.
+clear:
+    push e
+    push x
+    push y
+    push z
+
+    mov x, vram_start
+    mov y, vram_start
+    add y, vram_row_length
+
+clear_first_row:
+    put [x], 0
+    inc x
+    cmp x, y
+    jnz clear_first_row
+
+    mov x, vram_start
+    mov y, vram_start
+    add y, vram_row_length
+    mov z, vram_start
+    add z, vram_length
+
+clear_remaining_rows:
+    bcp y, x, vram_row_length
+    add y, vram_row_length
+    cmp y, z
+    jnz clear_remaining_rows
+
+    save_to kvar_cursor_col, 0
+    save_to kvar_cursor_row, 0
+
+    pop z
+    pop y
+    pop x
+    pop e
+    ret
+
+; Set the cursor if the coordinates are on-screen.
+;   b = column, c = row
+;   a = 0 on success, 1 on invalid coordinates
+set_cursor:
+    cmp b, tty_width
+    jae set_cursor__error
+    cmp c, tty_height
+    jae set_cursor__error
+
+    push e
+    save_to kvar_cursor_col, b
+    save_to kvar_cursor_row, c
+    pop e
+    mov a, 0
+    ret
+
+set_cursor__error:
+    mov a, 1
+    ret
+
+; Read the current cursor coordinates.
+;   returns b = column, c = row, a = 0
+get_cursor:
+    push e
+    dereference_into b, kvar_cursor_col
+    dereference_into c, kvar_cursor_row
+    pop e
+    mov a, 0
+    ret
+
+; Write one character directly without changing the cursor.
+;   b = character, c = column, d = row
+;   a = 0 on success, 1 on invalid coordinates
+put_char_at:
+    cmp c, tty_width
+    jae put_char_at__error
+    cmp d, tty_height
+    jae put_char_at__error
+
+    push e
+    push x
+    push y
+    push z
+
+    mov x, c
+    mov y, d
+    xy_to_vram z, x, y
+    put [z], b
+    inc z
+    dereference_into x, kvar_tty_attr
+    put [z], x
+
+    pop z
+    pop y
+    pop x
+    pop e
+    mov a, 0
+    ret
+
+put_char_at__error:
+    mov a, 1
+    ret
+
+; Set the attribute used by subsequent writes.
+;   b = text-mode attribute
+set_attr:
+    push e
+    save_to kvar_tty_attr, b
+    pop e
+    mov a, 0
+    ret
+
+; Move to column zero on the next row, scrolling at the bottom.
+newline:
+    save_to kvar_cursor_col, 0
+    dereference_into y, kvar_cursor_row
+    cmp y, tty_last_row
+    jz newline_scroll
+
+    inc y
+    save_to kvar_cursor_row, y
+    ret
+
+newline_scroll:
+    call scroll
+    ret
+
+; Copy rows 1-24 over rows 0-23, then blank the final row. The cursor stays
+; on the final row.
+scroll:
+    mov x, vram_start
+    mov y, vram_start
+    add y, vram_row_length
+    bcp x, y, tty_scroll_words
+
+    mov x, vram_start
+    add x, tty_scroll_words
+    mov z, vram_start
+    add z, vram_length
+
+scroll_clear_last_row:
+    put [x], 0
+    inc x
+    cmp x, z
+    jnz scroll_clear_last_row
+    ret

@@ -31,25 +31,25 @@ sc_mount:
     ; get and cache header values
     inc y
     get z, [y]
-    save_to kernel_var_blocks, z
+    save_to kvar_blocks, z
     inc y
     get z, [y]
-    save_to kernel_var_table_start, z
+    save_to kvar_table_start, z
     inc y
     get z, [y]
-    save_to kernel_var_table_blocks, z
+    save_to kvar_table_blocks, z
     inc y
     get z, [y]
-    save_to kernel_var_root_start, z
+    save_to kvar_root_start, z
     inc y
     get z, [y]
-    save_to kernel_var_root_blocks, z
+    save_to kvar_root_blocks, z
     inc y
     get z, [y]
-    save_to kernel_var_data_start, z
+    save_to kvar_data_start, z
 
     ; set fs mounted to 1
-    save_to kernel_var_fs_mounted, 0x01
+    save_to kvar_fs_mounted, 0x01
 
     ; return success!
     mov a, 0x00
@@ -57,12 +57,49 @@ sc_mount:
 
 sc_mount_error:
     ; set fs mounted to 0
-    save_to kernel_var_fs_mounted, 0x00
+    save_to kvar_fs_mounted, 0x00
     ; return error
     mov a, 0x01
     ret
 
 sc_list:
+    dereference_into a, kvar_root_start ; root sector 0
+    mov b, 0 ; index 0, start of scratch
+    call load_to_cache
+
+    inc a ; root sector 2
+    inc b ; index 1
+    call load_to_cache
+
+    ; so now, the root entries are in the cache! yay!
+    ; we can print out the filenames now
+    mov x, fs_cache_base ; index of first file
+    mov d, 0
+    ret
+
+sc_list__loop:
+    get b, [x]
+    mov c, b
+    and b, 0x00FF  ; 2nd char of word
+
+    mov a, 0x11 ; write_char
+    call kernel__syscall
+
+    rsh c, 8  ; 1st char of word
+    mov b, c
+    mov a, 0x11 ; write_char
+    call kernel__syscall
+
+    cmp d, 8
+    jz sc_list__done
+    inc d
+    inc x
+    jmp sc_list__loop
+
+sc_list__done:
+    mov a, 0x00
+    ret
+
 sc_open:
 sc_read:
 sc_write:
@@ -73,11 +110,27 @@ sc_stat:
 mov a, 0x01
 ret
 
+
+; load a sector from disk to a specific index in the fs cache
+; a = sector
+; b = index in the cache (in sectors, 0-31)
+load_to_cache:
+    push a
+    push b
+
+    mul b, 256 ; offset into cache
+    add b, fs_cache_base ; b now holds the address of desired offset into the cache
+
+    call disk_read_sector
+    pop b
+    pop a
+    ret
+
+
 ; disk read
 ;  a = sector number
 ;  b = memory address
 ;  returns: when done
-
 disk_read_sector:
     mmio_out mmio_disk_sector, a
     mmio_out mmio_disk_address, b

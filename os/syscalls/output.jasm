@@ -1,43 +1,45 @@
-
-;    terminal output interface for the jaideos kernel.
-;    josiah bergen, may 2026
+;    terminal output system-call adapters for the jaideos kernel.
 ;
-;    this file contains implentations for the following system calls:
+;    the terminal implementation lives in os/kernel/tty.jasm. these handlers
+;    only translate the public syscall interface into that kernel interface.
 ;
-;    | id      | name       | args                   | returns      | notes                                                                |
-;    | ------ | ----------- | ---------------------- | ------------ | -------------------------------------------------------------------- |
-;    | 0x10   | write_str   | b = string             | -            | print string at cursor. scrolls.                                     |
-;    | 0x11   | write_char  | b = char               | -            | print one character. advances cursor. scrolls at eol.                |
-;    | 0x12   | clear       | -                      | -            | blank vram, reset cursor to (0, 0).                                  |
-;    | 0x13   | set_cursor  | b = x, c = y           | -            | move kernel cursor. x: 0–79, y: 0–24.                                |
-;    | 0x14   | get_cursor  | -                      | b = x, c = y | read current cursor position.                                        |
-;    | 0x15   | put_char_at | b = char, c = x, d = y | -            | write one glyph directly to vram. no cursor update, no scroll.       |
-;    | 0x16   | set_col     | b = attr               | -            | set color attribute for subsequent write_* calls. default is 0x0001. |
+;    | id   | name        | args                   | returns      |
+;    | ---- | ----------- | ---------------------- | ------------ |
+;    | 0x10 | write_str   | b = string pointer     | a = status   |
+;    | 0x11 | write_char  | b = character          | a = status   |
+;    | 0x12 | clear       | -                      | a = status   |
+;    | 0x13 | set_cursor  | b = column, c = row    | a = status   |
+;    | 0x14 | get_cursor  | -                      | b = col, c = row, a = status |
+;    | 0x15 | put_char_at | b = char, c = x, d = y | a = status   |
+;    | 0x16 | set_attr    | b = attribute          | a = status   |
 
 sc_write_str:
-    mov a, 0x01
+    call tty__write
+    mov a, 0
     ret
 
 sc_write_char:
-    mov a, 0x01
+    call tty__putc
+    mov a, 0
     ret
 
 sc_clear:
-    mov a, 0x01
+    call tty__clear
+    mov a, 0
     ret
 
 sc_set_cursor:
-    mov a, 0x01
+    call tty__set_cursor
     ret
 
 sc_get_cursor:
-    mov a, 0x01
+    call tty__get_cursor
     ret
 
 sc_put_char_at:
-    mov a, 0x01
+    call tty__put_char_at
     ret
 
-sc_set_col:
-    mov a, 0x01
+sc_set_attr:
+    call tty__set_attr
     ret

@@ -8,22 +8,25 @@
 
 define vram_start                   0x4000
 define vram_end                     0x4fff
-define vram_row_length              0xa0     ; words per row (160: 80 cols x 2 words/char)
-define vram_length                  0xfa0    ; total vram words (25 rows x 160)
+define vram_row_length              0xa0     ; words per row (160, 80 cols with 2 words/char)
+define vram_length                  0xfa0    ; total vram words (25 rows by 160 words)
 
 ; kernel data
 
 define disk_scratch_buffer          0x5000
 
-define kernel_var_pit_low           0x5100
-define kernel_var_pit_high          0x5101
-define kernel_var_fs_mounted        0x5102
-define kernel_var_blocks            0x5103
-define kernel_var_table_start       0x5104
-define kernel_var_table_blocks      0x5105
-define kernel_var_root_start        0x5106
-define kernel_var_root_blocks       0x5107
-define kernel_var_data_start        0x5108
+define kvar_pit_low           0x5100
+define kvar_pit_high          0x5101
+define kvar_fs_mounted        0x5102
+define kvar_blocks            0x5103
+define kvar_table_start       0x5104
+define kvar_table_blocks      0x5105
+define kvar_root_start        0x5106
+define kvar_root_blocks       0x5107
+define kvar_data_start        0x5108
+define kvar_cursor_row        0x5109   ; tty cursor row, 0-24
+define kvar_cursor_col        0x510a   ; tty cursor column, 0-79
+define kvar_tty_attr          0x510b   ; text attribute used for tty writes
 
 define fdt_base                     0x5140
 define fdt_entry_size               0x8
@@ -37,8 +40,8 @@ define fs_cache_index               0x5180   ; 16 words long, one sector number 
 define fs_cache_empty               0xffff
 
 define fs_cache_base                0x6000   ; filesystem block cache (16 sectors)
-define bank_window_start            0x7000   ; 
-define bank_window_end              0xafff
+define bank_window_start            0x7000   ; userspace start
+define bank_window_end              0xafff   ; userspace end
 define stack_top                    0xfdff
 
 ; mmio locations

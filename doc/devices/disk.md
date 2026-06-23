@@ -8,7 +8,7 @@ the disk controller allows for reading and writing to a hard disk.
 
 the disk controller utilizes dma-style data transfer to and from a hard disk. on a read command, it copies 256 words into memory over 256 ticks (one word per tick). the device raises interrupt vector 6 on transfer complete.
 
-### MMIO registers
+### mmio registers
 
 the disk controller exposes four write registers and one read register:
 

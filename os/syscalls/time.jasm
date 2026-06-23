@@ -11,8 +11,8 @@
 
 sc_get_ticks:
     ; use saved kernel variables
-    dereference_into a, kernel_var_pit_low
-    dereference_into b, kernel_var_pit_high
+    dereference_into a, kvar_pit_low
+    dereference_into b, kvar_pit_high
     ret
 
 sc_get_date:

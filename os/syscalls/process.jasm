@@ -25,8 +25,7 @@ sc_exit:
     push b
 
     ; clear the screen + redraw shell prompt.
-    ; mimics handler_clear subroutine. hack until output syscalls are done.
-    call shell__clear_screen
+    call tty__clear
     call shell__draw_prompt_no_scroll
 
     ; recover exit code into a and transfer control back

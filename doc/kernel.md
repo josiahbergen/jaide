@@ -28,6 +28,14 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | ------------------------ | ------------------------------ |
 | `a`, `b`, `c`, `d`, `f`  | `e`, `x`, `y`, `z`, `sp`, `mb` |
 
+## kernel tty
+
+`os/kernel/tty.jasm` owns text-mode VRAM, cursor state, attributes, wrapping,
+newlines, and scrolling. Kernel code such as the built-in shell calls this
+module directly. The terminal output syscalls in `os/syscalls/output.jasm` are
+thin adapters over the same interface, so kernel and userspace output have the
+same behaviour without sending kernel calls through syscall dispatch.
+
 ## syscall table
 
 ### process
@@ -47,14 +55,14 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 | `0x13` | `set_cursor`  | B = x, C = y           | -            | Move kernel cursor. x: 0–79, y: 0–24.                                    |
 | `0x14` | `get_cursor`  | -                      | B = x, C = y | Read current cursor position.                                            |
 | `0x15` | `put_char_at` | B = char, C = x, D = y | -            | Write one glyph directly to VRAM. No cursor update, no scroll.           |
-| `0x16` | `set_col`     | B = attr               | -            | Set color attribute for subsequent `write_*` calls. Default is `0x0001`. |
+| `0x16` | `set_attr`    | B = attr               | -            | Set color attribute for subsequent `write_*` calls. Default is `0x0001`. |
 
 ### terminal input
 
 | #      | Name        | Args                  | Returns                            | Notes                                                          |
 | ------ | ----------- | --------------------- | ---------------------------------- | -------------------------------------------------------------- |
-| `0x20` | `read_char` | -                     | A = char                           | **Blocking.** Returns raw key code.                            |
-| `0x21` | `poll_key`  | -                     | A = char or 0                      | **Non-blocking.** Returns next key from buffer, or 0 if empty. |
+| `0x20` | `read_char` | -                     | A = char                           | **Blocking!** Returns raw key code.                            |
+| `0x21` | `poll_key`  | -                     | A = char or 0                      | Non-blocking. Returns next key from buffer, or 0 if empty. |
 | `0x22` | `read_line` | B = buff, C = max len | A = len (includes null terminator) | Collect input with echo and backspace until ENTER.             |
 
 ### filesystem
@@ -141,7 +149,10 @@ the kernel variable section contains these defined values:
 | 0x5106     | root start   | block index of the first root block           |
 | 0x5107     | root blocks  | number of blocks in the root directory        |
 | 0x5108     | data start   | block index of the first data block           |
-| 0x5109     | padding      | 54 words                                      |
+| 0x5109     | cursor row   | tty cursor row, 0-24                           |
+| 0x510A     | cursor col   | tty cursor column, 0-79                        |
+| 0x510B     | tty attr     | attribute used for subsequent tty writes      |
+| 0x510C     | padding      | 52 words                                       |
 
 ### user programs
 

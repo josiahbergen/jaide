@@ -5,6 +5,7 @@ jmp main
 
 import "os/kernel/defs.jasm" 
 import "os/kernel/macros.jasm"
+import "os/kernel/tty.jasm"
 
 import "os/syscalls/process.jasm"
 import "os/syscalls/output.jasm"
@@ -18,6 +19,8 @@ import "os/lib/string.jasm"
 data "KERNEL"
 
 main:
+    call tty__init
+
     mov x, 0
     mov y, 0
     call shell__draw_prompt_no_scroll
@@ -36,6 +39,9 @@ loop:
 ; returns:     a = result (zero if success, nonzero if error)
 
 syscall:
+    push y
+    push z
+
     ; we have a number in a, which should map to an entry in the function table
     ; move to the start of the function table
     mov z, sc_function_table
@@ -59,12 +65,16 @@ syscall_search_loop:
 
 syscall_not_found:
     mov a, 0x01
-    ret
+    jmp syscall_done
 
 syscall_found:
     inc z ; move to the function pointer
     get y, [z]
     call y ; execute handler
+
+syscall_done:
+    pop z
+    pop y
     ret ; we trust that the handler has set a value in a for us
 
 
@@ -80,7 +90,7 @@ sc_function_table:
     data 0x13, output__sc_set_cursor
     data 0x14, output__sc_get_cursor
     data 0x15, output__sc_put_char_at
-    data 0x16, output__sc_set_col
+    data 0x16, output__sc_set_attr
     ; tty input (blocking)
     data 0x20, input__sc_read_char
     data 0x21, input__sc_read_line

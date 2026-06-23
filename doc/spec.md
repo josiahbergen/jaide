@@ -2,7 +2,7 @@
 
 ## overview
 
-- load-store, little-endian, interrupt-driven, von-neumann architecture
+- load-store, little-endia, von-neumann architecture
 - 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
 - 44 distinct instruction mnemonics
 - 16-bit word length
@@ -138,34 +138,6 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 | 2      | exception | protection fault                        |
 | 3      | reserved  | reserved                                |
 | 4-127  | external  | available for external hardware devices |
-
-### a note on HALT
-
-calling `HALT` puts the cpu in a _non-permanent_, low-power idle state. the cpu will wait in this state until an enabled interrupt occurs. when the interrupt returns (see below), excecution will resume after the `HALT` instruction.
-
-### using INT and IRET
-
-when an interrupt `n` is called, jaide saves its state and transfers execution to the word found at the offset `n` into the interrupt table, starting at `0xFFFF` and moving downwards.
-
-more specifically, when `INT` is called:
-
-| action                | description                                              |
-| --------------------- | -------------------------------------------------------- |
-| `NOP if I == 0`       | if interrupts are masked, jaide will `NOP` and continue. |
-| `[SP--] <- PC`        | program counter is pushed                                |
-| `[SP--] <- F`         | flags are pushed                                         |
-| `I <- 0`              | ineterrupt mask is cleared                               |
-| `vector = 0xFFFF - n` | handler address is computed                              |
-| `PC <- MEM16[vector]` | execution jumps to handler                               |
-
-nested interrupts can be allowed by setting `I` at the top of your interrupt handler.
-
-normal execution can be restored by calling `IRET`. more specifically, when `IRET` is called:
-
-| action         | description                                         |
-| -------------- | --------------------------------------------------- |
-| `F <- [SP++]`  | flags are popped (unmasks interrupts if applicable) |
-| `PC <- [SP++]` | program counter is popped                           |
 
 ## memory-mapped I/O
 

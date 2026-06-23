@@ -1,5 +1,4 @@
 
-var_cursor_row: data 0 ; cursor starts at top of screen
 var_command_len: data 0
 var_command_buffer: times 20, 0
 
@@ -17,7 +16,7 @@ keyboard_interrupt:
     get c, [c]
 
     ; get start of string
-    dereference_into z, var_cursor_row
+    dereference_into z, kvar_cursor_row
     mul z, vram_row_length
     add z, vram_start ; z now points to the start of the string's row in vram
     add z, 4 ; account for the prompt string
@@ -90,7 +89,7 @@ keyboard_interrupt__backspace:
 keyboard_interrupt__enter:
 
     ; get vram of end of commannd buffer
-    dereference_into z, var_cursor_row
+    dereference_into z, kvar_cursor_row
     mul z, vram_row_length ; offset into vram
     add z, vram_start ; start of the string's row in vram
     add z, 4 ; account for the prompt string
@@ -173,130 +172,26 @@ dispatch_command__not_found:
 ; print command output, increment cursor (or scroll), and redraw prompt
 ;   a = string pointer
 echo:
-    call scroll
-    dereference_into y, var_cursor_row ; output line
-    mov x, 0
-    call print
+    call newline
+    mov b, a
+    call tty__write
 
 draw_prompt:
-    call scroll
+    call newline
 
 draw_prompt_no_scroll:
-    mov a, s_prompt
-    mov x, 0
-    dereference_into y, var_cursor_row
-    call print
+    mov b, s_prompt
+    call tty__write
+    dereference_into y, kvar_cursor_row
 
     ; draw the blinker
     blink_at 2, y
     ret
 
-; scroll the entire screen up by one row.
-; no arguments.
-; saves all registers.
-scroll:
-    dereference_into y, var_cursor_row
-    cmp y, 24
-    jz scroll_necessary
-
-    inc y
-    save_to var_cursor_row, y
-    ret
-
-scroll_necessary:
-    push x
-    push z
-    push y
-
-    mov x, vram_start ; dst = row 0
-    mov y, vram_start
-    add y, vram_row_length ; src = row 1
-    bcp x, y, 0x0F00 ; copy rows 1-24 up to rows 0-23 (3840 words)
-
-    ; set up clear of the last row (row 24)
-    add x, 0x0F00 ; x = start of last row
-    mov z, vram_start
-    add z, vram_length ; z = end of vram
-
-scroll_clear:
-
-    ; we are at the last row, clear it.
-    put [x], 0
-    inc x
-    cmp x, z ; end of row is in z
-    jnz scroll_clear
-
-    pop y
-    pop z
-    pop x
-    ret
-
-clear_screen:
-    ; the stratgy here is to clear the first row,
-    ; then copy the first row the the remaining rows.
-    mov x, vram_start
-    mov y, x
-    add y, vram_row_length ; end of first row
-
-clear_screen_first_row:
-    put [x], 0
-    inc x
-    cmp x, y ; are we at the end of the row?
-    jnz clear_screen_first_row
-
-    mov z, vram_start
-    add z, vram_length
-    
-    mov x, vram_start
-    mov y, x
-
-clear_screen_full_rows:
-    add y, vram_row_length
-    bcp y, x, vram_row_length
-
-    cmp y, z ; are we at the end of vram?
-    jnz clear_screen_full_rows
-
-    save_to var_cursor_row, 0
-    ret
-
-; print a white-on-black string. 
-; TODO: scroll up the screen if an overflow occurs
-; clobbers e
-;   a = string pointer
-;   x = x position
-;   y = y position
-print:
-    push a ; string pointer
-    push z ; memory address
-    xy_to_vram z, x, y ; prepare starting address
-
-print_loop:
-    get e, [a] ; get next character
-    cmp e, 0
-    jz print_end ; we done, onto the next step
-
-    cmp e, 0xA ; line feed
-    jz print_newline
-
-    ; put glyph to vram
-    put [z], e      ; word 0: character code
-    inc z
-    put [z], 0x0001 ; word 1: attrs (fg=1 white, bg=0 black)
-    inc z
-
-    inc a ; next character
-    jmp print_loop ; loop 'til we're done
-    
-print_newline:
-    call scroll
-    inc a ; move to next character
-    xy_to_vram z, x, y ; recalculate where we are drawing
-    jmp print_loop
-
-print_end:
-    pop z ; restore registers
-    pop a
+; Advance output to a fresh terminal line.
+newline:
+    mov b, 0x0a
+    call tty__putc
     ret
 
 ; command handlers
@@ -308,14 +203,15 @@ handler_exec:
     ret
 
 handler_list:
-    ; TODO: syscall to list files
-    mov a, s_not_implemented
-    call echo
+    mov a, 0x31 ; list
+    call kernel__syscall
+    call newline
+    call draw_prompt
     ret
 
 handler_disk:
 
-    dereference_into a, kernel_var_fs_mounted
+    dereference_into a, kvar_fs_mounted
     cmp a, 0x00
     jnz handler_disk_mounted
 
@@ -329,57 +225,57 @@ handler_disk_mounted:
     mov a, s_disk_info
     call echo
 
-    dereference_into a, kernel_var_blocks
+    dereference_into a, kvar_blocks
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
     call string__num_to_string
 
-    mov a, s_disk_info_blocks
-    call print
+    mov b, s_disk_info_blocks
+    call tty__write
 
-    mov a, handler_disk_buffer
-    call print
-    call scroll
+    mov b, handler_disk_buffer
+    call tty__write
+    call newline
 
-    dereference_into a, kernel_var_table_start
+    dereference_into a, kvar_table_start
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
     call string__num_to_string
 
-    mov a, s_disk_info_table
-    call print
+    mov b, s_disk_info_table
+    call tty__write
 
-    mov a, handler_disk_buffer
-    call print
-    call scroll
+    mov b, handler_disk_buffer
+    call tty__write
+    call newline
 
-    dereference_into a, kernel_var_root_start
+    dereference_into a, kvar_root_start
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
     call string__num_to_string
 
-    mov a, s_disk_info_root
-    call print
+    mov b, s_disk_info_root
+    call tty__write
 
-    mov a, handler_disk_buffer
-    call print
-    call scroll
+    mov b, handler_disk_buffer
+    call tty__write
+    call newline
 
-    dereference_into a, kernel_var_data_start
+    dereference_into a, kvar_data_start
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
     call string__num_to_string
 
-    mov a, s_disk_info_data
-    call print
+    mov b, s_disk_info_data
+    call tty__write
 
-    mov a, handler_disk_buffer
-    call print
-    call scroll
+    mov b, handler_disk_buffer
+    call tty__write
+    call newline
     call draw_prompt
     ret
 
@@ -406,7 +302,7 @@ handler_mount_error:
     ret
 
 handler_clear:
-    call clear_screen
+    call tty__clear
     call draw_prompt_no_scroll
     ret
 
