@@ -1,1 +1,79 @@
-asdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdfasdf;kljasdf;lkjasdf;lkjasdf;lkjasfd;lkjasfd;lkjasfd;lkjasdf;kljasdf
+# jaide: a 16-bit computing system architecture
+
+## overview
+
+- load-store, little-endia, von-neumann architecture
+- 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
+- 44 distinct instruction mnemonics
+- 16-bit word length
+- 12 registers: 8 general-purpose, 4 special, all 16-bit
+
+## programming jaide
+
+jaide is programmed with `jasm`. jasm is a custom assembly language. it has a custom assembler that produces binaries unique to jaide's architecture.
+
+see the [language specification](lang.md) for more information.
+
+the full grammar used for lexical analysis is contained in [jasm/language/grammar.py](../jasm/language/grammar.py).
+
+## how to run your code
+
+jasm files use the `.jasm` file extension. Compile your code with `python -m jasm <source> -o <output>`.
+
+once assembled to a binary file, run your code with `python -m jaide <binary>`.
+
+for now, binaries are simply a raw memory image.
+
+in the jaide emulator, type help to view a list of commands.
+
+## reset state
+
+on reset, the content of all registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+
+thus, the jaide will simply start execution at `0x0000`
+
+_it is recommended that SP be set to 0xFDFF on reset._
+
+## registers
+
+the jaide architecture supports up to 16 registers. all registers contain 16 bits.
+
+_currently, 8 general purpose and 4 special registers are implemented. the four unused registers are reserved for future floating-point support._
+
+### general purpose registers
+
+`A`, `B`, `C`, `D`, `E`, `X`, `Y`, and `Z`.
+
+### special registers
+
+`PC` program counter _(read-only)_
+
+`SP` stack pointer
+
+`MB` memory bank
+
+`F` flags _(zero, carry, negative, overflow, interrupts enabled)_
+
+the format of the flags register is `C Z N O I - - - - - - - - - - -`.
+
+## instructions
+
+instructions are 16 bits long (two bytes, little endian), and may contain a 16-bit immediate located directly after them.
+
+a single 16-bit instruction word is defined as follows:
+
+`CCCC DDDD` `AAAAAAAA` `EEEEEEEE` `EEEEEEEE`
+
+`AAAAAAAA` defines the opcode of the instruction (bits 8-15 of the word). the opcode implies an addressing mode.
+
+`CCCC` defines a source or address register (bits 0-3 of the word).
+
+`DDDD` defines a destination register (bits 4-7 of the word).
+
+`EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset.
+
+_all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
+
+### instruction set
+
+see the [instruction set](inst.txt) and for a comprehensive list of instructions
