@@ -13,4 +13,4 @@ start:
 align 0x100 ; fill entire rom
 
 ; kernel, "loaded" at 0x100
-import "os/kernel/kernel.jasm"
+import "jaideos/kernel/kernel.jasm"

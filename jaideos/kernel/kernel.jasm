@@ -3,23 +3,24 @@
 
 jmp main
 
-import "os/kernel/defs.jasm"
-import "os/kernel/macros.jasm"
-import "os/kernel/tty.jasm"
+import "jaideos/kernel/defs.jasm"
+import "jaideos/kernel/macros.jasm"
+import "jaideos/kernel/tty.jasm"
 
-import "os/syscalls/process.jasm"
-import "os/syscalls/output.jasm"
-import "os/syscalls/input.jasm"
-import "os/syscalls/fs.jasm"
-import "os/syscalls/time.jasm"
-import "os/syscalls/system.jasm"
+import "jaideos/syscalls/process.jasm"
+import "jaideos/syscalls/output.jasm"
+import "jaideos/syscalls/input.jasm"
+import "jaideos/syscalls/fs.jasm"
+import "jaideos/syscalls/time.jasm"
+import "jaideos/syscalls/system.jasm"
 
-import "os/lib/string.jasm"
+import "jaideos/lib/string.jasm"
 
 data "KERNEL"
 
 main:
     call tty__init
+    call shell__handler_mount
     call shell__draw_startup_message
 
     mov x, 0
@@ -114,4 +115,4 @@ sc_function_table:
     data 0xFFFF  ; end of table
 
 ; all the shell interface code lives here.
-import "os/kernel/shell.jasm"
+import "jaideos/kernel/shell.jasm"
