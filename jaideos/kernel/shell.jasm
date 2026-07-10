@@ -4,10 +4,10 @@ var_command_buffer: times 20, 0
 
 define command_buffer_length 20
 
-keyboard_interrupt:
+key_pressed:
     ; a = key code, passed in by the kernel polling loop
     cmp a, 0x7F
-    ja keyboard_interrupt__end
+    ja key_pressed__end
 
     ; normal (non-special) key pressed!
 
@@ -27,15 +27,15 @@ keyboard_interrupt:
     ; z now points to the end of the string in vram
 
     cmp a, 0x0D ; enter
-    jz keyboard_interrupt__enter
+    jz key_pressed__enter
 
     cmp a, 0x08 ; backspace
-    jz keyboard_interrupt__backspace
+    jz key_pressed__backspace
 
-keyboard_interrupt__append:
+key_pressed__append:
 
     cmp c, command_buffer_length
-    jae keyboard_interrupt__end ; buffer is full, ignore
+    jae key_pressed__end ; buffer is full, ignore
     
     ; put glyph to vram
     put [z], a      ; word 0: character code
@@ -57,12 +57,12 @@ keyboard_interrupt__append:
     mov e, var_command_len
     put [e], c
 
-    jmp keyboard_interrupt__end
+    jmp key_pressed__end
 
-keyboard_interrupt__backspace:
+key_pressed__backspace:
 
     cmp c, 0x00
-    jz keyboard_interrupt__end ; buffer is empty, ignore
+    jz key_pressed__end ; buffer is empty, ignore
 
     ; overwrite the blinker
     put [z], 0x00
@@ -84,9 +84,9 @@ keyboard_interrupt__backspace:
     add e, c
     put [e], 0
 
-    jmp keyboard_interrupt__end
+    jmp key_pressed__end
 
-keyboard_interrupt__enter:
+key_pressed__enter:
 
     ; get vram of end of commannd buffer
     dereference_into z, kvar_cursor_row
@@ -106,32 +106,32 @@ keyboard_interrupt__enter:
 
     cmp c, 0x00
     ; empty command, redraw prompt
-    jz keyboard_interrupt__enter__empty
+    jz key_pressed__enter__empty
 
     ; execute command
     call dispatch_command
-    jmp keyboard_interrupt__enter__clear
+    jmp key_pressed__enter__clear
 
-keyboard_interrupt__enter__empty:
+key_pressed__enter__empty:
     call draw_prompt
     
-keyboard_interrupt__enter__clear:
+key_pressed__enter__clear:
     ; clear the buffer
     mov b, var_command_buffer
     mov c, command_buffer_length
     add c, b ; end of buffer
 
-keyboard_interrupt__enter__buffer_loop:
+key_pressed__enter__buffer_loop:
     put [b], 0
     inc b
     cmp b, c
-    jnz keyboard_interrupt__enter__buffer_loop
+    jnz key_pressed__enter__buffer_loop
 
     ; save string length to 0
     mov e, var_command_len
     put [e], 0
 
-keyboard_interrupt__end:
+key_pressed__end:
     ret
 
 
@@ -173,6 +173,7 @@ dispatch_command__not_found:
 ;   a = string pointer
 echo:
     call newline
+echo_no_scroll:
     mov b, a
     call tty__write
 
@@ -220,17 +221,13 @@ handler_disk:
     ret
 
 handler_disk_mounted:
-
-    ; header
-    mov a, s_disk_info
-    call echo
+    call tty__newline
 
     dereference_into a, kvar_blocks
     mov b, handler_disk_buffer
 
     ; put string of number of blocks into buffer
     call string__num_to_string
-
     mov b, s_disk_info_blocks
     call tty__write
 
@@ -243,7 +240,6 @@ handler_disk_mounted:
 
     ; put string of number of blocks into buffer
     call string__num_to_string
-
     mov b, s_disk_info_table
     call tty__write
 
@@ -256,7 +252,6 @@ handler_disk_mounted:
 
     ; put string of number of blocks into buffer
     call string__num_to_string
-
     mov b, s_disk_info_root
     call tty__write
 
@@ -269,7 +264,6 @@ handler_disk_mounted:
 
     ; put string of number of blocks into buffer
     call string__num_to_string
-
     mov b, s_disk_info_data
     call tty__write
 
@@ -317,9 +311,9 @@ handler_shutdown:
     mmio_out mmio_system, a
     halt ; halt cpu just in case
 
-handler_marko:
-    mov a, s_marko_message
-    call echo
+draw_startup_message:
+    mov a, s_startup_message
+    call echo_no_scroll
     ret
 
 s_prompt:           data "$ ", 0
@@ -336,15 +330,15 @@ s_not_implemented:  data "not implemented.", 0
 s_invalid_command:  data "invalid command.", 0
 s_success:          data "ok", 0xA, 0
 s_error:            data "command returned with error status.", 0
-s_marko_message:    data "hi marko! you are looking at at this text through a custom shell written in my", 0xA
-                    data "custom assembly language, completely powered by my custom cpu architecture.", 0xA
-                    data "i think it's pretty cool!", 0
-s_disk_info_blocks: data "       total blocks", 0
-s_disk_info_table:  data "       allocation table start", 0
-s_disk_info_root:   data "       root start", 0
-s_disk_info_data:   data "       data start", 0
+s_disk_info_blocks: data "total blocks ............ ", 0
+s_disk_info_table:  data "allocation table start .. ", 0
+s_disk_info_root:   data "root start .............. ", 0
+s_disk_info_data:   data "data start .............. ", 0
 s_disk_info:        data "ok", 0
 s_disk_info_error:  data "error: no disk mounted.", 0
+s_startup_message:  data "ready.", 0xA
+                    data "jaideos shell v0.0.1 alpha", 0xA
+                    data "type 'help' for a list of commands.", 0xA, 0
 
 s_cmd_exec:         data "exec",  0
 s_cmd_list:         data "list",  0
@@ -353,7 +347,6 @@ s_cmd_mount:        data "mount", 0
 s_cmd_clear:        data "clear", 0
 s_cmd_help:         data "help",  0
 s_cmd_shutdown:     data "shutdown",  0
-s_cmd_marko:        data "marko", 0
 
 command_list:
     ; maps string pointers to function pointers
@@ -364,5 +357,4 @@ command_list:
     data s_cmd_clear,     handler_clear
     data s_cmd_help,      handler_help
     data s_cmd_shutdown,  handler_shutdown
-    data s_cmd_marko,     handler_marko
     data 0,               0 ; end of list

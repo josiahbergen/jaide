@@ -3,7 +3,7 @@
 
 jmp main
 
-import "os/kernel/defs.jasm" 
+import "os/kernel/defs.jasm"
 import "os/kernel/macros.jasm"
 import "os/kernel/tty.jasm"
 
@@ -20,6 +20,7 @@ data "KERNEL"
 
 main:
     call tty__init
+    call shell__draw_startup_message
 
     mov x, 0
     mov y, 0
@@ -31,7 +32,7 @@ loop:
     cmp a, 0
     jz loop
     mmio_in a, mmio_keyboard_data
-    call shell__keyboard_interrupt
+    call shell__key_pressed
     jmp loop
 
 ; system call interface

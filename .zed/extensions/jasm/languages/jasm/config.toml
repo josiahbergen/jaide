@@ -1,0 +1,11 @@
+name = "JASM"
+grammar = "jasm"
+path_suffixes = ["jasm"]
+line_comments = ["; "]
+brackets = [
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = false },
+    { start = "(", end = ")", close = true, newline = false },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["comment", "string"] },
+]
+word_characters = ["%"]

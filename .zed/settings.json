@@ -16,15 +16,13 @@
         "**/.classpath",
         "**/.settings",
         "**/.github",
-
-        "**/.pytest_cache/",
-        "**/__pycache__/",
-        "**/.vscode/",
-
-        "**/bin/",
-        "**/__init__.py/",
-
-        ".zed/",
+        "**/.pytest_cache",
+        "**/.ruff_cache",
+        "**/.venv",
+        "**/__pycache__",
+        "**/.vscode",
+        "**/bin",
+        ".zed",
         ".gitignore",
         ".python-version",
         "README.md",
