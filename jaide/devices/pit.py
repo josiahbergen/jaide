@@ -48,5 +48,11 @@ class PIT(Device):
 
             pass  # no IRQ; tick counter incremented here in future
 
+    def reset(self) -> None:
+        self.enabled = False
+        self.one_shot = False
+        self.counter = 0
+        self.reload = 0xFFFF
+
     def __str__(self) -> str:
         return f"pit: enabled={self.enabled}, one-shot={self.one_shot}, counter={self.counter}, reload={self.reload}"

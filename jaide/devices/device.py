@@ -46,6 +46,10 @@ class Device:
         """Tick the device. Runs once per CPU cycle."""
         pass
 
+    def reset(self) -> None:
+        """Reset device state. Called by the emulator when reset asserted."""
+        logger.warning(f"device {self.__class__.__name__} does not implement reset()")
+
     def _log_ready(self) -> None:
         logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()}")
 

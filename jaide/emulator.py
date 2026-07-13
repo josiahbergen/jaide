@@ -26,6 +26,8 @@ from .constants import (
     MMIO_SYSTEM,
     NUM_BANKS,
     REGISTERS,
+    ROM_END,
+    ROM_SIZE,
     VRAM_END,
     VRAM_SIZE,
     VRAM_START,
@@ -140,7 +142,7 @@ class Emulator:
             self.mmio_write(addr, value)
             return
 
-        if addr < 0x0100:  # writing to ROM (0x0000–0x00FF)
+        if addr <= ROM_END:  # writing to ROM (0x0000–0x00FF)
             logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
             return
 
@@ -228,7 +230,25 @@ class Emulator:
                 break
 
     def reset(self) -> None:
-        self.__init__()
+        rom = self.memory[:ROM_SIZE] # save rom contents
+        
+        # clear all memory
+        self.memory[:] = bytes(MEMORY_SIZE)
+        self.vram[:] = bytes(VRAM_SIZE)
+        for bank in self.banks:
+            bank[:] = bytes(BANK_SIZE)
+
+        self.memory[:ROM_SIZE] = rom  # restore rom
+
+        # reset registers
+        for register in self.reg.values():
+            register.set(0)
+        self.sp.set(0xFDFF)
+        self.halted = False
+
+        for device in self.devices:
+            device.reset()
+
         logger.info("emulator reset!")
 
 
@@ -277,7 +297,7 @@ class Emulator:
         except KeyboardInterrupt:
             # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
-            logger.info("execution stopped (user interrupt).")
+            logger.info("! execution stopped (user interrupt).")
         except Exception as e:
             # general exception. this is an emulator code error, 
             # not an assembly error. allow the repl to persist.
@@ -320,7 +340,7 @@ class Emulator:
         full = a + b + carry_in
         result = mask16(full)
         carry = 1 if full > 0xFFFF else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
+        overflow = 1 if (((a ^ b) & 0x8000) == 0 and ((a ^ result) & 0x8000) != 0) else 0
         self.set_all_flags(result == 0, carry, result & 0x8000 != 0, overflow)
         return result
 
@@ -329,7 +349,7 @@ class Emulator:
         full = a - b - borrow_in
         result = mask16(full)
         carry = 1 if a >= b + borrow_in else 0
-        overflow = 1 if (((a ^ b) & 0x80) != 0 and ((a ^ result) & 0x80) != 0) else 0
+        overflow = 1 if (((a ^ b) & 0x8000) != 0 and ((a ^ result) & 0x8000) != 0) else 0
         self.set_all_flags(result == 0, carry, result & 0x8000 != 0, overflow)
         return result
 
@@ -372,5 +392,4 @@ class Emulator:
         self.sp.set(self.sp.value + 1)  # increment stack pointer
         self.flag_set(FLAG_Z, value == 0)
         return value
-
 

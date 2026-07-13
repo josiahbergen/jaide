@@ -12,6 +12,7 @@ from jaide.constants import (
     MMIO_SYSTEM,
     VRAM_START,
 )
+from jaide.emulator import Emulator
 from jaide.exceptions import EmulatorException
 
 
@@ -95,6 +96,43 @@ class TestVramAccess:
         byte_offset = (VRAM_START + 0x200) * 2
         assert emu.memory[byte_offset]     == 0
         assert emu.memory[byte_offset + 1] == 0
+
+
+class TestReset:
+
+    def test_reset_preserves_rom_and_configured_devices(self):
+        emu = Emulator(verbosity=-1, enabled_devices={"pit": True})
+        pit = emu.devices[0]
+        emu.memory[0:2] = b"\x34\x12"
+
+        emu.reset()
+
+        assert emu.read16(0x0000) == 0x1234
+        assert emu.devices == [pit]
+
+    def test_reset_clears_machine_and_device_state(self):
+        emu = Emulator(verbosity=-1, enabled_devices={"pit": True})
+        pit = emu.devices[0]
+        emu.reg["A"].set(0x1234)
+        emu.pc.set(0x4321)
+        emu.write16(0x0100, 0xBEEF)
+        emu.write16(VRAM_START, 0xCAFE)
+        emu.mb.set(1)
+        emu.write16(BANK_WINDOW_START, 0xABCD)
+        emu.halted = True
+        pit.enabled = True
+
+        emu.reset()
+
+        assert emu.reg["A"].value == 0
+        assert emu.pc.value == 0
+        assert emu.sp.value == 0xFDFF
+        assert emu.read16(0x0100) == 0
+        assert emu.read16(VRAM_START) == 0
+        emu.mb.set(1)
+        assert emu.read16(BANK_WINDOW_START) == 0
+        assert not emu.halted
+        assert not pit.enabled
 
 
 class TestMmioWrite:

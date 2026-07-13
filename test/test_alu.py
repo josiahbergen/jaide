@@ -41,16 +41,20 @@ class TestAddCore:
         assert emu.flag_get(FLAG_C)
 
     def test_overflow_positive(self, emu):
-        # 0x0040 + 0x0060 = 0x00A0. both operands have bit 7 clear,
-        # result has bit 7 set → overflow
-        result = emu._add_core(0x0040, 0x0060)
-        assert result == 0x00A0
+        # Largest positive signed 16-bit value plus one becomes negative.
+        result = emu._add_core(0x7FFF, 0x0001)
+        assert result == 0x8000
         assert emu.flag_get(FLAG_O)
 
     def test_no_overflow_different_signs(self, emu):
-        # operands differ in bit 7 → overflow cannot occur
-        result = emu._add_core(0x0080, 0x0001)
-        assert result == 0x0081
+        # Operands have different 16-bit signs, so signed overflow cannot occur.
+        result = emu._add_core(0x8000, 0x0001)
+        assert result == 0x8001
+        assert not emu.flag_get(FLAG_O)
+
+    def test_no_overflow_with_bit_7_transition(self, emu):
+        result = emu._add_core(0x0040, 0x0060)
+        assert result == 0x00A0
         assert not emu.flag_get(FLAG_O)
 
     def test_large_values_no_carry(self, emu):
@@ -89,12 +93,15 @@ class TestSubCore:
         assert not emu.flag_get(FLAG_C)
 
     def test_overflow(self, emu):
-        # 0x0080 - 0x0001: operands differ in bit 7, result bit 7 differs from a
-        # a=0x0080 (bit7=1), b=0x0001 (bit7=0) → (a^b)&0x80 != 0
-        # result=0x007F (bit7=0), (a^result)&0x80 != 0 → overflow
+        # Most-negative signed 16-bit value minus one wraps positive.
+        result = emu._sub_core(0x8000, 0x0001)
+        assert result == 0x7FFF
+        assert emu.flag_get(FLAG_O)
+
+    def test_no_overflow_with_bit_7_transition(self, emu):
         result = emu._sub_core(0x0080, 0x0001)
         assert result == 0x007F
-        assert emu.flag_get(FLAG_O)
+        assert not emu.flag_get(FLAG_O)
 
     def test_no_overflow(self, emu):
         result = emu._sub_core(100, 50)

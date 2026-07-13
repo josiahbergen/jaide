@@ -38,5 +38,10 @@ class Keyboard(Device):
         self._pending = self._key_queue.popleft()
         self._has_key = True
 
+    def reset(self) -> None:
+        self._key_queue.clear()
+        self._pending = 0
+        self._has_key = False
+
     def __str__(self) -> str:
         return f"keyboard: pending=0x{self._pending:02X}, has_key={self._has_key}"

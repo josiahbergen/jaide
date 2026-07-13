@@ -80,6 +80,14 @@ class Graphics(Device):
         logger.debug(f"graphics controller {'enabled' if self.enabled else 'disabled'}")
         self._inactive_drawn = False
 
+    def reset(self) -> None:
+        self.enabled = True
+        self.key_queue.clear()
+        self._last_render = 0.0
+        self._blink_timer = 0
+        self._last_hash = None
+        self._inactive_drawn = False
+
     def tick(self) -> None:
 
         now = time.monotonic()

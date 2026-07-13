@@ -8,6 +8,9 @@ MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
 BANK_SIZE   = 0x4000 * 2   # bytes per bank (0x4000 = 16384 words, 2¹⁴)
 NUM_BANKS   = 31           # MB=1..31 map to banks[0..30] for user processes
 
+ROM_END  = 0x00FF
+ROM_SIZE = 0x0100 * 2  # 256 words, enough for a simple bootloader
+
 BANK_WINDOW_START = 0x7000
 BANK_WINDOW_END   = 0xAFFF
 

@@ -8,9 +8,12 @@ from ..util.logger import logger
 from .device import Device
 
 STATUS_IDLE = 0
-STATUS_READING = 1
-STATUS_WRITING = 2
+STATUS_BUSY = 1
 STATUS_ERROR = 2
+
+COMMAND_READ = 0
+COMMAND_WRITE = 1
+SECTOR_WORDS = 256
 
 class Disk(Device):
     def __init__(self, disk_file: str, read16: Callable[[int], int], write16: Callable[[int, int], None]):
@@ -23,6 +26,9 @@ class Disk(Device):
         self.status = STATUS_IDLE
         self.sector_number = 0
         self.memory_address = 0
+        self._command: int | None = None
+        self._active_sector = 0
+        self._active_memory_address = 0
 
         if not disk_file:
             logger.fatal("no image file provided!", scope="disk.py:Disk.__init__()")
@@ -32,7 +38,8 @@ class Disk(Device):
         self.disk_file = disk_file
 
         try:
-            self.disk = bytearray(open(self.disk_file, "rb").read())
+            with open(self.disk_file, "rb") as f:
+                self.disk = bytearray(f.read())
         except FileNotFoundError:
             logger.fatal(f"image file {self.disk_file} not found!", scope="disk.py:Disk.__init__()")
 
@@ -52,56 +59,79 @@ class Disk(Device):
         logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()} (using {self.disk_file})")
 
     def execute_command(self, value: int) -> None:
-        if self.status in [STATUS_READING, STATUS_WRITING]:
+        if self.status == STATUS_BUSY:
             # already doing something, ignore
             # TODO: add a command queue to handle stuff like this
             return
 
-        if value == 0x00: 
-            logger.debug(f"got command: read sector {self.sector_number} to 0x{self.memory_address:04X}")
-            self.status = STATUS_READING
-            self._cursor = 0
-
-        elif value == 0x01:
-            logger.debug(f"got command: write sector {self.sector_number} from 0x{self.memory_address:04X}")
-            self.status = STATUS_WRITING
-            self._cursor = 0
-
-        else: 
+        if value not in (COMMAND_READ, COMMAND_WRITE):
             logger.warning(f"invalid disk command: 0x{value:02X}")
+            self.status = STATUS_ERROR
+            self._command = None
+            return
+
+        sector_start = self.sector_number * SECTOR_WORDS * 2
+        if sector_start + SECTOR_WORDS * 2 > len(self.disk):
+            logger.warning(f"disk sector {self.sector_number} is out of range")
+            self.status = STATUS_ERROR
+            self._command = None
+            return
+
+        if value == COMMAND_READ:
+            logger.debug(f"got command: read sector {self.sector_number} to 0x{self.memory_address:04X}")
+        else:
+            logger.debug(f"got command: write sector {self.sector_number} from 0x{self.memory_address:04X}")
+
+        self.status = STATUS_BUSY
+        self._command = value
+        self._active_sector = self.sector_number
+        self._active_memory_address = self.memory_address
+        self._cursor = 0
 
     def tick(self) -> None:
-        self._reset_if_done()
+        if self.status != STATUS_BUSY or self._command is None:
+            return
 
-        if self.status == STATUS_READING:
+        disk_byte = (self._active_sector * SECTOR_WORDS + self._cursor) * 2
+        memory_word = self._active_memory_address + self._cursor
+
+        if self._command == COMMAND_READ:
             # kinda scuffed, but we have to parse out a little-endian value from the disk image
             # into a regular python int, and pass it into write16. which then converts it back to
             # a 16-bit little-endian value.
-            value = (self.disk[self._cursor * 2 + 1] << 8) | self.disk[self._cursor * 2]
-            logger.verbose(f"reading word {self._cursor} of sector {self.sector_number} (0x{value:04X}) into 0x{self.memory_address + self._cursor:04X}")
-            self.write16(self.memory_address + self._cursor, value)
-            self._cursor += 1
+            value = (self.disk[disk_byte + 1] << 8) | self.disk[disk_byte]
+            logger.verbose(f"reading word {self._cursor} of sector {self._active_sector} (0x{value:04X}) into 0x{memory_word:04X}")
+            self.write16(memory_word, value)
 
-        if self.status == STATUS_WRITING:
-            logger.verbose(f"writing 0x{self.read16(self.memory_address + self._cursor):04X} to disk (from 0x{self._cursor * 2:04X})")
-            value = self.read16(self.memory_address + self._cursor)
-            self.disk[self._cursor * 2 : self._cursor * 2 + 2] = [ value & 0xFF, (value >> 8) & 0xFF ]
-            self._cursor += 1
-        
-    def _reset_if_done(self) -> None:
-        if self._cursor < 256:
-            return
+        else:
+            value = self.read16(memory_word)
+            logger.verbose(f"writing 0x{value:04X} to word {self._cursor} of sector {self._active_sector}")
+            self.disk[disk_byte : disk_byte + 2] = [value & 0xFF, (value >> 8) & 0xFF]
 
-        logger.debug(f"transfer complete!")
+        self._cursor += 1
+        if self._cursor == SECTOR_WORDS:
+            self._complete_transfer()
 
-        # save modified disk image to the real file
-        if self.status == STATUS_WRITING:
+    def _complete_transfer(self) -> None:
+        logger.debug("transfer complete!")
+
+        if self._command == COMMAND_WRITE:
             with open(self.disk_file, "wb") as f:
                 f.write(self.disk)
 
         self.status = STATUS_IDLE
+        self._command = None
         self._cursor = 0
-        logger.debug(f"transfer complete! status reset to idle.")
+        logger.debug("transfer complete! status reset to idle.")
+
+    def reset(self) -> None:
+        self.status = STATUS_IDLE
+        self.sector_number = 0
+        self.memory_address = 0
+        self._command = None
+        self._active_sector = 0
+        self._active_memory_address = 0
+        self._cursor = 0
 
     def __str__(self) -> str:
         return f"disk: status={self.status} sector={self.sector_number} address={self.memory_address}"

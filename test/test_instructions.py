@@ -832,18 +832,18 @@ class TestFlagNO:
         assert not emu.flag_get(FLAG_N)
 
     def test_add_sets_overflow_flag(self, assemble_and_load):
-        # 0x0040 + 0x0060 = 0x00A0 (both bit-7 clear, result bit-7 set → FLAG_O)
+        # 0x7FFF + 1 crosses the signed 16-bit boundary.
+        emu = assemble_and_load("mov A, 0x7FFF\nadd A, 0x0001")
+        emu.step()
+        emu.step()
+        assert emu.reg["A"].value == 0x8000
+        assert emu.flag_get(FLAG_O)
+
+    def test_overflow_flag_clear_when_no_overflow(self, assemble_and_load):
         emu = assemble_and_load("mov A, 0x0040\nadd A, 0x0060")
         emu.step()
         emu.step()
         assert emu.reg["A"].value == 0x00A0
-        assert emu.flag_get(FLAG_O)
-
-    def test_overflow_flag_clear_when_no_overflow(self, assemble_and_load):
-        emu = assemble_and_load("mov A, 0x0001\nadd A, 0x0001")
-        emu.step()
-        emu.step()
-        assert emu.reg["A"].value == 2
         assert not emu.flag_get(FLAG_O)
 
     def test_sub_sets_negative_flag(self, assemble_and_load):
@@ -856,6 +856,21 @@ class TestFlagNO:
 
 
 class TestBcp:
+
+    @pytest.mark.xfail(
+        reason="BCP fast path bypasses the memory bus and ROM write protection",
+        strict=True,
+    )
+    def test_bcp_respects_rom_write_protection(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x0000\nmov B, 0x0100\nbcp A, B, 1")
+        original = emu.read16(0x0000)
+        emu.write16(0x0100, 0xBEEF)
+
+        emu.step()
+        emu.step()
+        emu.step()
+
+        assert emu.read16(0x0000) == original
 
     def test_bcp_same_region(self, assemble_and_load):
         src_addr = 0x3000
