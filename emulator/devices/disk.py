@@ -86,7 +86,7 @@ class Disk(Device):
         self._command = value
         self._active_sector = self.sector_number
         self._active_memory_address = self.memory_address
-        self._active_bank = self.bus.current_bank
+        self._active_bank = self.bus.current_bank()
         self._cursor = 0
 
     def tick(self) -> None:

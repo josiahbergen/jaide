@@ -46,17 +46,19 @@ COLORS: list[tuple[int, int, int]] = [
 
 
 class Graphics(Device):
-    def __init__(self, key_queue: deque, vram: memoryview, shutdown: Callable[[], None]):
+    def __init__(self, key_queue: deque, vram: memoryview, is_running: Callable[[], bool], shutdown: Callable[[], None]):
         """Graphics controller. Renders VRAM to a pygame window.
 
         vram      -- read-only view of bus VRAM (mapped at 0x4000-0x4FFF)
         key_queue -- shared deque; key events are appended here for KeyboardDevice
+        is_running -- reports whether the emulator run loop is active
         """
         super().__init__()
 
         self.vram: memoryview    = vram
         self.enabled: bool       = True
         self.key_queue: deque    = key_queue
+        self.is_running: Callable[[], bool] = is_running
         self.shutdown: Callable[[], None] = shutdown
         self._last_render: float = 0.0  # seconds
 
@@ -65,6 +67,7 @@ class Graphics(Device):
         self._blink_timer: int      = 0
         self._last_hash: int | None = None
         self._inactive_drawn: bool = False
+        self._was_running: bool = self.is_running()
 
         pygame.init()
         self.screen: pygame.Surface = pygame.display.set_mode((SCALED_WIDTH, SCALED_HEIGHT))
@@ -79,6 +82,7 @@ class Graphics(Device):
         self.enabled = bool(value & 0x01)
         logger.debug(f"graphics controller {'enabled' if self.enabled else 'disabled'}")
         self._inactive_drawn = False
+        self._last_hash = None
 
     def reset(self) -> None:
         self.enabled = True
@@ -87,6 +91,7 @@ class Graphics(Device):
         self._blink_timer = 0
         self._last_hash = None
         self._inactive_drawn = False
+        self._was_running = self.is_running()
 
     def tick(self) -> None:
 
@@ -109,11 +114,19 @@ class Graphics(Device):
                 if scancode:
                     self.key_queue.append(scancode)
 
-        # render pixels
-        if self.enabled:
+        running = self.is_running()
+        if running != self._was_running:
+            self._was_running = running
+            self._inactive_drawn = False
+            self._last_hash = None
+
+        # render pixels, or a status badge while output is inactive
+        if not running:
+            self._render_inactive("emulator stopped")
+        elif self.enabled:
             self._render()
         else:
-            self._render_inactive()
+            self._render_inactive("video disabled")
 
         pygame.display.flip() # draw
 
@@ -168,7 +181,7 @@ class Graphics(Device):
         scaled_surface = pygame.transform.scale(native_surface, (SCALED_WIDTH, SCALED_HEIGHT))
         self.screen.blit(scaled_surface, (0, 0))
 
-    def _render_inactive(self) -> None:
+    def _render_inactive(self, message: str) -> None:
         if self._inactive_drawn:
             return
         
@@ -177,7 +190,7 @@ class Graphics(Device):
         pygame.draw.rect(self.screen, COLORS[2], (0, 0, SCALED_WIDTH, GRAPHICS_CHAR_H * SCALE))
         pygame.draw.rect(self.screen, COLORS[0], (0, GRAPHICS_CHAR_H * SCALE, SCALED_WIDTH, SCALED_HEIGHT - GRAPHICS_CHAR_H * SCALE))
         font = pygame.font.SysFont(None, int((GRAPHICS_CHAR_H + 1) * SCALE))
-        self.screen.blit(font.render("video disabled", True, COLORS[0], COLORS[2]), (4 * SCALE, 2 * SCALE))
+        self.screen.blit(font.render(message, True, COLORS[0], COLORS[2]), (4 * SCALE, 2 * SCALE))
         self._inactive_drawn = True
 
     def __str__(self) -> str:

@@ -62,12 +62,14 @@ class Emulator:
         # graphics and keyboard device (two-in-one via pygame)
         if enabled_devices.get("graphics", False):
             _key_queue = deque()
-            self.devices.append(Graphics(_key_queue, self.bus.vram_view, self.shutdown))
+            self.devices.append(Graphics(_key_queue, self.bus.vram_view, lambda: self.running, self.shutdown))
             self.devices.append(Keyboard(_key_queue))
 
         # debugger etc.
         self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
         self.halted: bool = False  # hardware halt
+        self.running = False  # true only while the run loop is active
+
 
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
         from .handlers import handler_map
@@ -192,6 +194,7 @@ class Emulator:
 
     def run(self) -> None:
 
+        self.running = True
         try:
             while True:
                 # normal execution
@@ -209,6 +212,8 @@ class Emulator:
             # general exception. this is an emulator code error, 
             # not an assembly error. allow the repl to persist.
             logger.error(f"fatal! while running instruction at 0x{(self.pc.value)}:\n{traceback.format_exc()}")
+        finally:
+            self.running = False
 
 
     def step(self) -> None:

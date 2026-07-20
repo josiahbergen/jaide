@@ -19,9 +19,9 @@ from .util.logger import logger
 
 class MemoryBus:
     
-    def __init__(self, get_selected_bank: Callable[[], int],mmio_read:  Callable[[int], int], mmio_write: Callable[[int, int], None]):
+    def __init__(self, current_bank: Callable[[], int],mmio_read:  Callable[[int], int], mmio_write: Callable[[int, int], None]):
         # functions supplied by the cpu/devices
-        self.get_selected_bank = get_selected_bank
+        self.current_bank = current_bank
         self.mmio_read = mmio_read
         self.mmio_write = mmio_write
         # initialize bytearrays for main memory, vram, and banks
@@ -112,7 +112,7 @@ class MemoryBus:
 
         # memory bank register effectively overflows after NUM_BANKS
         # TODO: is this documented, or accurate?
-        selected_bank = self.get_selected_bank() if bank is None else bank
+        selected_bank = self.current_bank() if bank is None else bank
         selected_bank %= (NUM_BANKS + 1)
 
         if selected_bank and BANK_WINDOW_START <= address <= BANK_WINDOW_END:

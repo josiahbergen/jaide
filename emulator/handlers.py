@@ -35,15 +35,15 @@ def handle_get(emu, decoded: tuple[int, ...]) -> None:
     # reg_a = ssss = src ptr register, reg_b = dddd = dest register
     if modes == (MODES.REG, MODES.REG_POINTER):
         # dest <- [src_ptr]
-        emu.reg_set(reg_b, emu.read16(emu.reg_get(reg_a)))
+        emu.reg_set(reg_b, emu.bus.read16(emu.reg_get(reg_a)))
     elif modes == (MODES.REG, MODES.REL_POINTER):
         # dest <- [pc + offset]  (imm16 is signed offset to label)
         addr = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.reg_set(reg_b, emu.read16(addr))
+        emu.reg_set(reg_b, emu.bus.read16(addr))
     elif modes == (MODES.REG, MODES.OFF_POINTER):
         # dest <- [label + ptr_reg]  (imm16 is signed offset to base label)
         base = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.reg_set(reg_b, emu.read16(mask16(base + emu.reg_get(reg_a))))
+        emu.reg_set(reg_b, emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
     else:
         raise EmulatorException(f"unexpected GET variant at 0x{emu.pc.value:04x}.")
 
@@ -54,18 +54,18 @@ def handle_put(emu, decoded: tuple[int, ...]) -> None:
     # reg_a = ssss = src register, reg_b = dddd = dest ptr register
     if modes == (MODES.REG_POINTER, MODES.REG):
         # [dest_ptr] <- src
-        emu.write16(emu.reg_get(reg_b), emu.reg_get(reg_a))
+        emu.bus.write16(emu.reg_get(reg_b), emu.reg_get(reg_a))
     elif modes == (MODES.OFF_POINTER, MODES.REG):
         # [label + dest_ptr] <- src
         base = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.write16(mask16(base + emu.reg_get(reg_b)), emu.reg_get(reg_a))
+        emu.bus.write16(mask16(base + emu.reg_get(reg_b)), emu.reg_get(reg_a))
     elif modes == (MODES.REL_POINTER, MODES.REG):
         # [pc + imm] <- src  (position-independent store to label)
         addr = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.write16(addr, emu.reg_get(reg_a))
+        emu.bus.write16(addr, emu.reg_get(reg_a))
     elif modes == (MODES.REG_POINTER, MODES.IMM):
         # [dest_ptr] <- imm  (dddd = dest ptr reg, imm = value)
-        emu.write16(emu.reg_get(reg_b), imm16)
+        emu.bus.write16(emu.reg_get(reg_b), imm16)
     else:
         raise EmulatorException(f"unexpected PUT variant at 0x{emu.pc.value:04x}.")
 
@@ -301,7 +301,7 @@ def handle_jmp(emu, decoded: tuple[int, ...]) -> None:
         emu.pc.set(_jump_target(emu, imm16))
     elif modes == (MODES.OFF_POINTER,):
         base = _jump_target(emu, imm16)
-        emu.pc.set(emu.read16(mask16(base + emu.reg_get(reg_a))))
+        emu.pc.set(emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
     else:
         raise EmulatorException(f"unexpected JMP variant at 0x{emu.pc.value:04x}.")
 
@@ -387,8 +387,8 @@ def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
     dst = emu.reg_get(reg_b)   # dddd = dst address
     src = emu.reg_get(reg_a)   # ssss = src address
     for i in range(count):
-        value = emu.read16(src + i * 2)
-        emu.write16(dst + i * 2, value)
+        value = emu.bus.read16(src + i * 2)
+        emu.bus.write16(dst + i * 2, value)
 
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
