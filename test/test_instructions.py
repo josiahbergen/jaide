@@ -857,10 +857,6 @@ class TestFlagNO:
 
 class TestBcp:
 
-    @pytest.mark.xfail(
-        reason="BCP fast path bypasses the memory bus and ROM write protection",
-        strict=True,
-    )
     def test_bcp_respects_rom_write_protection(self, assemble_and_load):
         emu = assemble_and_load("mov A, 0x0000\nmov B, 0x0100\nbcp A, B, 1")
         original = emu.read16(0x0000)
@@ -906,6 +902,17 @@ class TestBcp:
         emu.step()
         for i in range(count):
             assert emu.read16(dst_addr + i) == 0xBEEF + i
+
+    def test_bcp_overlapping_copy_uses_snapshot_semantics(self, assemble_and_load):
+        emu = assemble_and_load("mov A, 0x0101\nmov B, 0x0100\nbcp A, B, 3")
+        for offset, value in enumerate((1, 2, 3, 4)):
+            emu.write16(0x0100 + offset, value)
+
+        emu.step()
+        emu.step()
+        emu.step()
+
+        assert [emu.read16(0x0100 + offset) for offset in range(4)] == [1, 1, 2, 3]
 
     def test_bcp_zero_count_is_noop(self, assemble_and_load):
         emu = assemble_and_load("mov A, 0x3100\nmov B, 0x3000\nbcp A, B, 0")

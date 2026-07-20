@@ -161,6 +161,7 @@ the JASM helpers `mmio_in` and `mmio_out` in `jaideos/util.jasm` wrap `GET`/`PUT
 | `0x30` | `0xFE30` | RTC      | R      | minute                     |
 | `0x30` | `0xFE30` | RTC      | R      | hour                       |
 | `0x30` | `0xFE30` | RTC      | R      | day of year                |
+| `0x40` | `0xFE40` | graphics | R/W    | enable (nonzero) / disable (zero) |
 | `0xFF` | `0xFEFF` | system   | W      | system control (see below) |
 
 see the [device documentation](devices/) for per-device details.

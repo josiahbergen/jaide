@@ -19,9 +19,7 @@ from jaide.exceptions import EmulatorException
 class TestRomWriteProtection:
 
     def test_write_to_rom_is_silently_ignored(self, emu):
-        # Pre-load a sentinel into ROM via the raw bytearray (bypassing write16)
-        emu.memory[0x0050 * 2]     = 0xAB
-        emu.memory[0x0050 * 2 + 1] = 0xCD
+        emu.bus.load_bytes(0x0050, b"\xAB\xCD")
         original = emu.read16(0x0050)
         emu.write16(0x0050, 0x1234)  # should be silently ignored
         assert emu.read16(0x0050) == original  # unchanged
@@ -85,17 +83,12 @@ class TestVramAccess:
         assert emu.read16(VRAM_START + 0x100) == 0xCAFE
 
     def test_vram_backed_by_vram_buffer(self, emu):
-        # VRAM_START word maps to vram[0] (byte offset 0)
         emu.write16(VRAM_START, 0x1234)
-        assert emu.vram[0] == 0x34  # low byte (little-endian)
-        assert emu.vram[1] == 0x12  # high byte
+        assert emu.bus.vram_view[0] == 0x34  # low byte (little-endian)
+        assert emu.bus.vram_view[1] == 0x12  # high byte
 
-    def test_vram_does_not_alias_flat_memory(self, emu):
-        # writes to VRAM go to emu.vram, not emu.memory
-        emu.write16(VRAM_START + 0x200, 0xABCD)
-        byte_offset = (VRAM_START + 0x200) * 2
-        assert emu.memory[byte_offset]     == 0
-        assert emu.memory[byte_offset + 1] == 0
+    def test_vram_view_is_read_only(self, emu):
+        assert emu.bus.vram_view.readonly
 
 
 class TestReset:
@@ -103,7 +96,7 @@ class TestReset:
     def test_reset_preserves_rom_and_configured_devices(self):
         emu = Emulator(verbosity=-1, enabled_devices={"pit": True})
         pit = emu.devices[0]
-        emu.memory[0:2] = b"\x34\x12"
+        emu.bus.load_bytes(0, b"\x34\x12")
 
         emu.reset()
 

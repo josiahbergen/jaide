@@ -2,8 +2,7 @@
 # device base class for the jaide emulator.
 # josiah bergen, march 2026
 
-from typing import Callable
-
+from ..bus import MemoryBus
 from ..util.logger import logger
 from .device import Device
 
@@ -15,13 +14,13 @@ COMMAND_READ = 0
 COMMAND_WRITE = 1
 SECTOR_WORDS = 256
 
+
 class Disk(Device):
-    def __init__(self, disk_file: str, read16: Callable[[int], int], write16: Callable[[int, int], None]):
+    def __init__(self, disk_file: str, bus: MemoryBus):
         """Disk controller."""
         super().__init__()
 
-        self.read16 = read16
-        self.write16 = write16
+        self.bus = bus
 
         self.status = STATUS_IDLE
         self.sector_number = 0
@@ -29,6 +28,7 @@ class Disk(Device):
         self._command: int | None = None
         self._active_sector = 0
         self._active_memory_address = 0
+        self._active_bank = 0
 
         if not disk_file:
             logger.fatal("no image file provided!", scope="disk.py:Disk.__init__()")
@@ -86,6 +86,7 @@ class Disk(Device):
         self._command = value
         self._active_sector = self.sector_number
         self._active_memory_address = self.memory_address
+        self._active_bank = self.bus.current_bank
         self._cursor = 0
 
     def tick(self) -> None:
@@ -101,10 +102,10 @@ class Disk(Device):
             # a 16-bit little-endian value.
             value = (self.disk[disk_byte + 1] << 8) | self.disk[disk_byte]
             logger.verbose(f"reading word {self._cursor} of sector {self._active_sector} (0x{value:04X}) into 0x{memory_word:04X}")
-            self.write16(memory_word, value)
+            self.bus.write16(memory_word, value, bank=self._active_bank)
 
         else:
-            value = self.read16(memory_word)
+            value = self.bus.read16(memory_word, bank=self._active_bank)
             logger.verbose(f"writing 0x{value:04X} to word {self._cursor} of sector {self._active_sector}")
             self.disk[disk_byte : disk_byte + 2] = [value & 0xFF, (value >> 8) & 0xFF]
 
@@ -131,6 +132,7 @@ class Disk(Device):
         self._command = None
         self._active_sector = 0
         self._active_memory_address = 0
+        self._active_bank = 0
         self._cursor = 0
 
     def __str__(self) -> str:

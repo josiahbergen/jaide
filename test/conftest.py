@@ -25,7 +25,7 @@ def assemble_and_load(emu):
     """
     def _helper(source: str) -> Emulator:
         binary = assemble_string(source)
-        emu.memory[0:len(binary)] = binary
+        emu.bus.load_bytes(0, binary)
         return emu
     return _helper
 
@@ -38,12 +38,11 @@ def assemble_and_load_ram(emu):
     in the ROM region (word addresses 0x0000–0x01FF).  PC is set to 0x4200 so
     all PC-relative offsets computed by the assembler remain correct at runtime.
     """
-    RAM_WORD = 0x4200
+    RAM_WORD = 0x2000
 
     def _helper(source: str) -> Emulator:
         binary = assemble_string(source)
-        addr = RAM_WORD * 2
-        emu.memory[addr:addr + len(binary)] = binary
+        emu.bus.load_bytes(RAM_WORD, binary)
         emu.pc.set(RAM_WORD)
         return emu
 

@@ -6,7 +6,7 @@ JAIDEFLAGS = --pit --rtc --graphics --disk --image jfs/images/disk.img -r
 SOURCE_DIR = jaideos
 BIN_DIR    = bin
 
-ifeq ($(jaideos),Windows_NT)
+ifeq ($(OS),Windows_NT)
 CLEAR      = cls
 RM_DIR     = if exist $(BIN_DIR) rmdir /s /q $(BIN_DIR)
 else

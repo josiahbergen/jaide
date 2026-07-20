@@ -133,7 +133,7 @@ class REPL:
 
 
     def disasm_at(self, addr: int) -> str:
-        word = self.emulator.read16(addr)
+        word = self.emulator.bus.peek16(addr)
         regs, instr = word & 0xFF, (word >> 8) & 0xFF
         opcode = instr
         reg_a = (regs >> 4) & 0xF
@@ -143,7 +143,7 @@ class REPL:
             return f"??? (unknown opcode 0x{opcode:02x})"
 
         fmt = OPCODE_FORMATS[opcode]
-        imm16 = self.emulator.read16(addr + 1) if fmt.imm_operand is not None else 0
+        imm16 = self.emulator.bus.peek16(addr + 1) if fmt.imm_operand is not None else 0
 
         reg_a_str = f" {REGISTERS[reg_a]}" if fmt.src_operand is not None else ""
         reg_b_str = f" {REGISTERS[reg_b]}" if fmt.dest_operand is not None else ""
@@ -200,14 +200,10 @@ class REPL:
         logger.info(f"set memory at 0x{addr:04X} to 0x{value:04X}.")
 
     def c_mem(self, word_addr: int, length_words: int):
-        byte_addr = word_addr * 2  # convert word address to byte address for memory array access
-        length_bytes = length_words * 2
-        chunk = self.emulator.memory[byte_addr : byte_addr + length_bytes]
-        for i in range(0, len(chunk), 32):
-            row = chunk[i : i + 32]
-            words: list[int] = [(row[j] | row[j + 1] << 8) for j in range(0, len(row), 2)]
-            word_offset = i // 2  # convert byte offset to word offset
-            logger.info(f"0x{word_addr + word_offset:04X} | {' '.join([f'{w:04X}' for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
+        words = [self.emulator.bus.peek16(word_addr + offset) for offset in range(length_words)]
+        for word_offset in range(0, len(words), 16):
+            row = words[word_offset : word_offset + 16]
+            logger.info(f"0x{word_addr + word_offset:04X} | {' '.join([f'{w:04X}' for w in row])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in row)}")
 
     def c_disasm(self, addr: int):
         logger.info(self.disasm_at(addr))
@@ -216,13 +212,7 @@ class REPL:
         logger.info(self.disasm_at(self.emulator.pc.value))
 
     def c_vram(self):
-        chunk = self.emulator.vram[:32]
-        for i in range(0, len(chunk), 32):
-            for i in range(0, len(chunk), 32):
-                row = chunk[i : i + 32]
-                words: list[int] = [(row[j] | row[j + 1] << 8) for j in range(0, len(row), 2)]
-                word_offset = i // 2  # convert byte offset to word offset
-                logger.info(f"0x{word_offset:04X} | {' '.join([f'{w:04X}' for w in words])} | {''.join(chr(w) if 0x20 <= w <= 0x7E else '.' for w in words)}")
+        self.c_mem(0x4000, 16)
 
     def c_mmio(self):
         if not self.emulator.devices:

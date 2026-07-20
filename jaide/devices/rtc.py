@@ -22,6 +22,9 @@ class RTC(Device):
     def tick(self) -> None:
         pass
 
+    def reset(self) -> None:
+        pass
+
     def __str__(self) -> str:
         t = time.localtime()
         return f"rtc: second={t.tm_sec}, minute={t.tm_min}, hour={t.tm_hour}, day_of_year={t.tm_yday}"

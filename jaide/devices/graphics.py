@@ -46,15 +46,15 @@ COLORS: list[tuple[int, int, int]] = [
 
 
 class Graphics(Device):
-    def __init__(self, key_queue: deque, vram: bytearray, shutdown: Callable[[], None]):
+    def __init__(self, key_queue: deque, vram: memoryview, shutdown: Callable[[], None]):
         """Graphics controller. Renders VRAM to a pygame window.
 
-        vram      -- reference to emulator.vram (mapped at 0x4000–0x4FFF)
+        vram      -- read-only view of bus VRAM (mapped at 0x4000-0x4FFF)
         key_queue -- shared deque; key events are appended here for KeyboardDevice
         """
         super().__init__()
 
-        self.vram: bytearray     = vram
+        self.vram: memoryview    = vram
         self.enabled: bool       = True
         self.key_queue: deque    = key_queue
         self.shutdown: Callable[[], None] = shutdown
@@ -70,8 +70,8 @@ class Graphics(Device):
         self.screen: pygame.Surface = pygame.display.set_mode((SCALED_WIDTH, SCALED_HEIGHT))
         pygame.display.set_caption("jaide graphics controller output")
 
-        self.write_dispatch[0x40] = self._set_control
-        self.read_dispatch[0x40]  = lambda: 0x01 if self.enabled else 0x00
+        self.write_dispatch[0xFE40] = self._set_control
+        self.read_dispatch[0xFE40]  = lambda: 0x01 if self.enabled else 0x00
 
         self._log_ready()
 
