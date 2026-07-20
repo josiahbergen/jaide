@@ -383,25 +383,12 @@ def handle_clc(emu, _decoded: tuple[int, ...]) -> None:
 
 
 def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
+    _, reg_a, reg_b, count = decoded
     dst = emu.reg_get(reg_b)   # dddd = dst address
     src = emu.reg_get(reg_a)   # ssss = src address
-    count = imm16
-
-    src_mem, src_off = emu._resolve_memory(src)
-    dst_mem, dst_off = emu._resolve_memory(dst)
-
-    if src_mem is not dst_mem:
-        # cross-region copy: fall back to word-by-word
-        for i in range(count):
-            emu.write16(dst + i, emu.read16(src + i))
-        return
-
-    s = src_off * 2
-    d = dst_off * 2
-    n = count * 2
-    src_mem[d:d + n] = src_mem[s:s + n]
+    for i in range(count):
+        value = emu.read16(src + i * 2)
+        emu.write16(dst + i * 2, value)
 
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {

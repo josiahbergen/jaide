@@ -11,26 +11,15 @@ from typing import Callable
 
 from common.isa import INSTRUCTIONS, OPCODE_FORMATS
 
+from .bus import MemoryBus
 from .constants import (
-    BANK_SIZE,
-    BANK_WINDOW_END,
-    BANK_WINDOW_START,
     FLAG_C,
     FLAG_N,
     FLAG_O,
     FLAG_STRINGS,
     FLAG_Z,
-    MEMORY_SIZE,
-    MMIO_BASE,
-    MMIO_END,
     MMIO_SYSTEM,
-    NUM_BANKS,
     REGISTERS,
-    ROM_END,
-    ROM_SIZE,
-    VRAM_END,
-    VRAM_SIZE,
-    VRAM_START,
 )
 from .devices.device import Device
 from .devices.disk import Disk
@@ -44,42 +33,36 @@ from .util.disasm import disassemble
 from .util.logger import logger
 
 
-def mask16(x: int) -> int:
-    return x & 0xFFFF  # mask to 16 bits
+def mask16(value: int) -> int:
+     # mask value to 16 bits
+    return value & 0xFFFF
 
 
 class Emulator:
     def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = ""):
-
         logger.set_level(verbosity)
 
-        # general purpose registers
+        # registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
+        self.pc = self.reg["PC"]  # program counter
+        self.sp = self.reg["SP"]  # stack pointer
+        self.f  = self.reg["F"]   # flags
+        self.mb = self.reg["MB"]  # memory bank
 
-        # special registers
-        self.pc: Register = self.reg["PC"]  # program counter
-        self.sp: Register = self.reg["SP"]  # stack pointer
-        self.f: Register = self.reg["F"]    # flags
-        self.mb: Register = self.reg["MB"]  # memory bank
+        # set stack pointer to 0xfdff as recommended by the spec
+        self.sp.set(0xfdff)
 
-        # set stack pointer to 0xFDFF as recommended by the spec
-        self.sp.set(0xFDFF)
-
-        # memory and i/o
-        self.memory: bytearray = bytearray(MEMORY_SIZE)
-        self.vram: bytearray = bytearray(VRAM_SIZE)
-        self.banks: list[bytearray] = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
-
+        # memory bus and devices
+        self.bus = MemoryBus(lambda: self.mb.value, self.mmio_read, self.mmio_write)
         self.devices: list[Device] = []
-
         if enabled_devices.get("pit", False): self.devices.append(PIT())
         if enabled_devices.get("rtc", False): self.devices.append(RTC())
-        if enabled_devices.get("disk", False): self.devices.append(Disk(image_file, self.read16, self.write16))
+        if enabled_devices.get("disk", False): self.devices.append(Disk(image_file, self.bus))
 
-        # graphics and keyboard device (two-in-one implementation)
+        # graphics and keyboard device (two-in-one via pygame)
         if enabled_devices.get("graphics", False):
             _key_queue = deque()
-            self.devices.append(Graphics(_key_queue, self.vram, self.shutdown))
+            self.devices.append(Graphics(_key_queue, self.bus.vram_view, self.shutdown))
             self.devices.append(Keyboard(_key_queue))
 
         # debugger etc.
@@ -91,18 +74,6 @@ class Emulator:
         self.handlers: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = handler_map
 
     # memory
-
-    def _resolve_memory(self, addr: int) -> tuple[bytearray, int]:
-        """Map a word address to (backing store, word offset within that store)."""
-        if VRAM_START <= addr <= VRAM_END:
-            return self.vram, addr - VRAM_START
-
-        bank = self.mb.value % 32
-        if bank != 0 and BANK_WINDOW_START <= addr <= BANK_WINDOW_END:
-            return self.banks[bank - 1], addr - BANK_WINDOW_START
-
-        return self.memory, addr
-
     def load_binary(self, file: str, addr: int = 0):
 
         # check if file exists
@@ -110,65 +81,15 @@ class Emulator:
             logger.error(f"file {file} does not exist.")
             return
 
-        try:
-            # read the file
-            with open(file, "rb") as f:
-                binary = f.read()
-        except Exception as e:
-            logger.error(f"error reading file {file}: {e}.")
-            return
+        # get binary data from file
+        with open(file, "rb") as f:
+            binary = f.read()
 
-        self.memory[addr : addr + len(binary)] = binary
+        # load 'er up
+        self.bus.load_bytes(addr, binary)
         logger.info(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
 
-
-    def read16(self, addr: int) -> int:
-        # fetch a 16-bit little-endian value from memory using word addressing
-        addr = mask16(addr)
-        if MMIO_BASE <= addr <= MMIO_END:
-            return self.mmio_read(addr)
-
-        memory, addr = self._resolve_memory(addr)
-
-        lo = memory[addr * 2]
-        hi = memory[addr * 2 + 1]
-        return (hi << 8) | lo
-
-
-    def write16(self, addr: int, value: int):
-        # write a 16-bit little-endian value to memory using word addressing
-        addr = mask16(addr)
-        if MMIO_BASE <= addr <= MMIO_END:
-            self.mmio_write(addr, value)
-            return
-
-        if addr <= ROM_END:  # writing to ROM (0x0000–0x00FF)
-            logger.warning(f"write to ROM at 0x{addr:04X}.", "write16")
-            return
-
-        phys_addr = addr
-        memory, addr = self._resolve_memory(addr)
-
-        if addr * 2 >= len(memory):
-            logger.warning(f"attempted to write to out of bounds memory (0x{phys_addr:04X}).")
-            return
-
-        bank = self.mb.value % 32
-        in_bank = bank != 0 and BANK_WINDOW_START <= phys_addr <= BANK_WINDOW_END
-        in_vram = VRAM_START <= phys_addr <= VRAM_END
-        logger.verbose(
-            f"writing 0x{value:04X} to 0x{phys_addr:04X}"
-            f"{' (bank ' + str(bank) + ')' if in_bank else ''}"
-            f"{' (vram)' if in_vram else ''}..."
-        )
-
-        value = mask16(value)
-        memory[addr * 2] = value & 0xFF
-        memory[addr * 2 + 1] = (value >> 8) & 0xFF
-
-
     # registers
-
     def reg_get(self, index: int) -> int:
         if index < 0 or index >= len(REGISTERS):
             raise EmulatorException(f"invalid register index {index}.")
@@ -216,13 +137,7 @@ class Emulator:
 
         if addr == MMIO_SYSTEM:
             logger.debug(f"system MMIO write: 0x{value:04X} -> 0x{addr:04X}")
-            match value:
-                case 0x01:  # reset
-                    self.reset()
-                case 0x02:  # power off
-                    self.shutdown()
-                case _:
-                    pass
+            self.reset() if value == 0x01 else self.shutdown() if value == 0x02 else None
 
         for device in self.devices:
             if addr in device.write_dispatch:
@@ -230,15 +145,7 @@ class Emulator:
                 break
 
     def reset(self) -> None:
-        rom = self.memory[:ROM_SIZE] # save rom contents
-        
-        # clear all memory
-        self.memory[:] = bytes(MEMORY_SIZE)
-        self.vram[:] = bytes(VRAM_SIZE)
-        for bank in self.banks:
-            bank[:] = bytes(BANK_SIZE)
-
-        self.memory[:ROM_SIZE] = rom  # restore rom
+        self.bus.reset()
 
         # reset registers
         for register in self.reg.values():
@@ -260,7 +167,7 @@ class Emulator:
 
     def fetch(self) -> int:
         # fetch word and increment program counter
-        value = self.read16(self.pc.value)
+        value = self.bus.read16(self.pc.value)
         self.pc.set(self.pc.value + 1)
         return value
 
@@ -384,12 +291,11 @@ class Emulator:
     def _push_core(self, value: int) -> None:
         # decrement sp (put pointer into location of new value)
         self.sp.set(self.sp.value - 1)
-        self.write16(self.sp.value, value)
+        self.bus.write16(self.sp.value, value)
 
 
     def _pop_core(self) -> int:
-        value = self.read16(self.sp.value)  # read value from stack
+        value = self.bus.read16(self.sp.value)  # read value from stack
         self.sp.set(self.sp.value + 1)  # increment stack pointer
         self.flag_set(FLAG_Z, value == 0)
         return value
-
