@@ -45,7 +45,7 @@ clear:
 	@$(CLEAR)
 
 help:
-	@echo "--------------------------------"
+# 	@echo "--------------------------------"
 	@echo "usage: make <target>"
 	@echo "targets:"
 	@echo "  (none)  build all and run"
@@ -55,4 +55,4 @@ help:
 	@echo "  stats   show statistics"
 	@echo "  clean   clean build directory"
 	@echo "  help    show this message"
-	@echo "--------------------------------"
+# 	@echo "--------------------------------"
