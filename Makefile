@@ -1,9 +1,9 @@
 JASM       = uv run -m jasm -v 0
 JASMFLAGS  = --nolink --nowarn
-JAIDE      = uv run -m jaide
-JAIDEFLAGS = --pit --rtc --graphics --disk --image jfs/images/disk.img -r
+EMULATOR      = uv run -m emulator
+EMULATORFLAGS = --pit --rtc --graphics --disk --image jfs/images/disk.img -r
 
-SOURCE_DIR = jaideos
+SOURCE_DIR = kernel
 BIN_DIR    = bin
 
 ifeq ($(OS),Windows_NT)
@@ -19,10 +19,10 @@ endif
 all: clear build run
 
 build:
-	@$(JASM) jaideos/boot.jasm -o bin/boot.bin $(JASMFLAGS)
+	@$(JASM) $(SOURCE_DIR)/boot.jasm -o bin/boot.bin $(JASMFLAGS)
 
 run:
-	@$(JAIDE) bin/boot.bin $(JAIDEFLAGS)
+	@$(EMULATOR) bin/boot.bin $(EMULATORFLAGS)
 
 # test: clear
 # 	@echo running test suite...
@@ -34,7 +34,7 @@ disk:
 	@echo "successfully created disk image."
 
 stats: clear
-	@cloc --include-ext=jasm,py,md,txt,ebnf --exclude-dir=.venv --read-lang-def=doc/lang/jasm_def.txt .
+	@cloc --include-ext=jasm,py,md,txt,ebnf --exclude-dir=.venv --read-lang-def=docs/lang/jasm_def.txt .
 
 clean:
 	@echo cleaning up...

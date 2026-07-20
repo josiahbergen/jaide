@@ -20,7 +20,7 @@ the full grammar used for lexical analysis is contained in [jasm/language/gramma
 
 jasm files use the `.jasm` file extension. Compile your code with `python -m jasm <source> -o <output>`.
 
-once assembled to a binary file, run your code with `python -m jaide <binary>`.
+once assembled to a binary file, run your code with `python -m emulator <binary>`.
 
 for now, binaries are simply a raw memory image.
 
@@ -76,7 +76,7 @@ _all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as 
 
 ### instruction set
 
-see the [instruction set](inst.txt) and for a comprehensive list of instructions
+see the [instruction set](lang/inst.txt) for a comprehensive list of instructions
 
 ## memory
 
@@ -143,7 +143,7 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 
 device registers live in the 256-word region from `0xFE00` to `0xFEFF`. access them with `GET` and `PUT`.
 
-the JASM helpers `mmio_in` and `mmio_out` in `jaideos/util.jasm` wrap `GET`/`PUT` for fixed addresses.
+the JASM helpers `mmio_in` and `mmio_out` in `kernel/kernel/macros.jasm` wrap `GET`/`PUT` for fixed addresses.
 
 ### register map
 

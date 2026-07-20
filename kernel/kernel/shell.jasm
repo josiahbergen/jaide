@@ -337,7 +337,7 @@ s_disk_info_data:   data "data start .............. ", 0
 s_disk_info:        data "ok", 0
 s_disk_info_error:  data "error: no disk mounted.", 0
 s_startup_message:  data "ready.", 0xA
-                    data "jaideos shell v0.0.1 alpha", 0xA
+                    data "kernel shell v0.0.1 alpha", 0xA
                     data "type 'help' for a list of commands.", 0xA, 0
 
 s_cmd_exec:         data "exec",  0

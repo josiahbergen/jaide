@@ -13,11 +13,11 @@ import pygame
 from colorama import Fore as f
 
 from common.isa import OPCODE_FORMATS
-from jaide.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, REGISTERS
-from jaide.devices.graphics import FRAME_INTERVAL, Graphics
-from jaide.emulator import Emulator
-from jaide.exceptions import EmulatorException, ReplException
-from jaide.util.logger import logger
+from emulator.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, REGISTERS
+from emulator.devices.graphics import FRAME_INTERVAL, Graphics
+from emulator.emulator import Emulator
+from emulator.exceptions import EmulatorException, ReplException
+from emulator.util.logger import logger
 
 
 def parse_hex16(value: str) -> int:

@@ -1,5 +1,5 @@
 from common.isa import OPCODE_FORMATS
-from jaide.constants import REGISTERS
+from emulator.constants import REGISTERS
 
 
 def disassemble(decoded: tuple[int, ...]) -> str:

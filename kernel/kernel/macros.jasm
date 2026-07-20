@@ -1,6 +1,6 @@
 
 ;    macros.jasm
-;    jaideos kernel macros
+;    kernel macros
 ;    josiah bergen, may 2026
 ;
 ;    all assembler macros for the kernel and shell.

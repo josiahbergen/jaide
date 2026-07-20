@@ -3,18 +3,18 @@
 
 jmp main
 
-import "jaideos/kernel/defs.jasm"
-import "jaideos/kernel/macros.jasm"
-import "jaideos/kernel/tty.jasm"
+import "kernel/kernel/defs.jasm"
+import "kernel/kernel/macros.jasm"
+import "kernel/kernel/tty.jasm"
 
-import "jaideos/syscalls/process.jasm"
-import "jaideos/syscalls/output.jasm"
-import "jaideos/syscalls/input.jasm"
-import "jaideos/syscalls/fs.jasm"
-import "jaideos/syscalls/time.jasm"
-import "jaideos/syscalls/system.jasm"
+import "kernel/syscalls/process.jasm"
+import "kernel/syscalls/output.jasm"
+import "kernel/syscalls/input.jasm"
+import "kernel/syscalls/fs.jasm"
+import "kernel/syscalls/time.jasm"
+import "kernel/syscalls/system.jasm"
 
-import "jaideos/lib/string.jasm"
+import "kernel/lib/string.jasm"
 
 data "KERNEL"
 
@@ -115,4 +115,4 @@ sc_function_table:
     data 0xFFFF  ; end of table
 
 ; all the shell interface code lives here.
-import "jaideos/kernel/shell.jasm"
+import "kernel/kernel/shell.jasm"

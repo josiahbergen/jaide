@@ -20,7 +20,7 @@ the full grammar used for lexical analysis is contained in [jasm/language/gramma
 
 jasm files use the `.jasm` file extension. Compile your code with `python -m jasm <source> -o <output>`.
 
-once assembled to a binary file, run your code with `python -m jaide <binary>`.
+once assembled to a binary file, run your code with `python -m emulator <binary>`.
 
 for now, binaries are simply a raw memory image.
 

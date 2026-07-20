@@ -2,4 +2,4 @@
 
 jaide is a custom computing architecture.
 
-see the [spec](doc/spec.md) and [developer documentation](doc/lang.md) for more information.
+see the [spec](docs/spec.md) and [developer documentation](docs/lang.md) for more information.

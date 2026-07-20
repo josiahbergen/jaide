@@ -1,5 +1,5 @@
 
-;    system interface for the jaideos kernel.
+;    system interface for the kernel.
 ;    josiah bergen, may 2026
 ;
 ;    this file contains implentations for the following system calls:
