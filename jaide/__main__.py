@@ -7,17 +7,17 @@ import os
 from tap import Tap
 
 from .emulator import Emulator
-from .repl import REPL
+from .repl import run_interactive
 from .util.logger import logger
 
 
 class EmulatorArgumentParser(Tap):
-    binary: str = ""   # a binary file to load
+    binary: str = ""  # a binary file to load
     run: bool = False  # run the binary file immediately
     verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
 
     # devices
-    pit: bool = False  
+    pit: bool = False
     rtc: bool = False
     graphics: bool = False
     disk: bool = False
@@ -28,6 +28,7 @@ class EmulatorArgumentParser(Tap):
         self.add_argument("binary", nargs="?")
         self.add_argument("-r", "--run")
         self.add_argument("-v", "--verbosity")
+
 
 def check_files(file: str) -> None:
     scope = "__main__.py:check_files()"
@@ -44,8 +45,9 @@ def check_files(file: str) -> None:
     if not file.endswith(".bin"):
         logger.warning("file does not have a valid binary extension. are you sure you want to continue?", scope, choice=True)
 
+
 def main():
-    """ main entry point for the emulator. """
+    """main entry point for the emulator."""
     args = EmulatorArgumentParser().parse_args()
 
     devices: dict[str, bool] = {
@@ -66,11 +68,11 @@ def main():
 
     if args.run:
         logger.info("starting execution...")
-        emulator.run() # auto-run
+        emulator.run()  # auto-run
 
     try:
-        # start read-eval-print loop
-        REPL(emulator)
+        # read terminal input off-thread while the main thread services graphics
+        run_interactive(emulator)
 
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
@@ -78,6 +80,7 @@ def main():
         # logger.info("\nbye! (signal from __main__)")
         logger.info("")
         emulator.shutdown()
+
 
 if __name__ == "__main__":
     main()
