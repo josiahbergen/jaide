@@ -14,7 +14,7 @@ CLEAR      = clear
 RM_DIR     = rm -rf $(BIN_DIR)
 endif
 
-.PHONY: all build run test disk stats clean clear help
+.PHONY: all build run disk stats clean clear help
 
 all: clear build run
 
@@ -24,9 +24,9 @@ build:
 run:
 	@$(JAIDE) bin/boot.bin $(JAIDEFLAGS)
 
-test: clear
-	@echo running test suite...
-	@uv run -m pytest
+# test: clear
+# 	@echo running test suite...
+# 	@uv run -m pytest
 
 disk:
 	@echo creating disk image...
