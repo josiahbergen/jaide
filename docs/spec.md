@@ -143,7 +143,7 @@ interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define 
 
 device registers live in the 256-word region from `0xFE00` to `0xFEFF`. access them with `GET` and `PUT`.
 
-the JASM helpers `mmio_in` and `mmio_out` in `kernel/kernel/macros.jasm` wrap `GET`/`PUT` for fixed addresses.
+the JASM helpers `mmio_in` and `mmio_out` in `kernel/src/macros.jasm` wrap `GET`/`PUT` for fixed addresses.
 
 ### register map
 

@@ -1,6 +1,6 @@
 ;    terminal output system-call adapters for the kernel.
 ;
-;    the terminal implementation lives in kernel/kernel/tty.jasm. these handlers
+;    the terminal implementation lives in kernel/src/tty.jasm. these handlers
 ;    only translate the public syscall interface into that kernel interface.
 ;
 ;    | id   | name        | args                   | returns      |

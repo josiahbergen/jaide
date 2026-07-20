@@ -216,7 +216,7 @@ xy_to_vram z, x, y ; puts some memory address in z
 
 ### MMIO helpers
 
-`kernel/kernel/macros.jasm` defines assembler macros (not CPU instructions) for memory-mapped device access:
+`kernel/src/macros.jasm` defines assembler macros (not CPU instructions) for memory-mapped device access:
 
 ```jasm
 mmio_in A, mmio_keyboard_data   ; read MMIO register into A (trashes E)

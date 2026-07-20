@@ -3,9 +3,9 @@
 
 jmp main
 
-import "kernel/kernel/defs.jasm"
-import "kernel/kernel/macros.jasm"
-import "kernel/kernel/tty.jasm"
+import "kernel/src/defs.jasm"
+import "kernel/src/macros.jasm"
+import "kernel/src/tty.jasm"
 
 import "kernel/syscalls/process.jasm"
 import "kernel/syscalls/output.jasm"
@@ -115,4 +115,4 @@ sc_function_table:
     data 0xFFFF  ; end of table
 
 ; all the shell interface code lives here.
-import "kernel/kernel/shell.jasm"
+import "kernel/src/shell.jasm"

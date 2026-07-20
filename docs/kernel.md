@@ -30,7 +30,7 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 
 ## kernel tty
 
-`kernel/kernel/tty.jasm` owns text-mode VRAM, cursor state, attributes, wrapping,
+`kernel/src/tty.jasm` owns text-mode VRAM, cursor state, attributes, wrapping,
 newlines, and scrolling. Kernel code such as the built-in shell calls this
 module directly. The terminal output syscalls in `kernel/syscalls/output.jasm` are
 thin adapters over the same interface, so kernel and userspace output have the
