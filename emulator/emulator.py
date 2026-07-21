@@ -42,6 +42,11 @@ class Emulator:
     def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = ""):
         logger.set_level(verbosity)
 
+        # debugging, etc.
+        self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
+        self.halted: bool = False  # hardware halt
+        self.running = False  # true only while the run loop is active
+
         # registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
         self.pc = self.reg["PC"]  # program counter
@@ -64,12 +69,6 @@ class Emulator:
             _key_queue = deque()
             self.devices.append(Graphics(_key_queue, self.bus.vram_view, lambda: self.running, self.shutdown))
             self.devices.append(Keyboard(_key_queue))
-
-        # debugger etc.
-        self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
-        self.halted: bool = False  # hardware halt
-        self.running = False  # true only while the run loop is active
-
 
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
         from .handlers import handler_map

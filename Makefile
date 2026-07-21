@@ -1,7 +1,7 @@
 JASM       = uv run -m jasm -v 0
 JASMFLAGS  = --nolink --nowarn
-EMULATOR      = uv run -m emulator
-EMULATORFLAGS = --pit --rtc --graphics --disk --image jfs/images/disk.img -r
+EMU        = uv run -m emulator
+EMUFLAGS   = --pit --rtc --graphics --disk --image jfs/images/disk.img -r -v 2
 
 SOURCE_DIR = kernel
 BIN_DIR    = bin
@@ -22,7 +22,7 @@ build:
 	@$(JASM) $(SOURCE_DIR)/boot.jasm -o bin/boot.bin $(JASMFLAGS)
 
 run:
-	@$(EMULATOR) bin/boot.bin $(EMULATORFLAGS)
+	@$(EMU) bin/boot.bin $(EMUFLAGS)
 
 # test: clear
 # 	@echo running test suite...

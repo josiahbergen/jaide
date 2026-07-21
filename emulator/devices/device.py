@@ -21,7 +21,7 @@ class Device:
         if read_handler is None:
             raise EmulatorException(f"{self.__class__.__name__} has no read handler for MMIO 0x{addr:04X}.")
 
-        logger.debug(f"{self.__class__.__name__}: READ at MMIO 0x{addr:04X}...")
+        # logger.debug(f"{self.__class__.__name__}: READ at MMIO 0x{addr:04X}...")
         return read_handler()
 
     def mmio_write(self, addr: int, value: int):

@@ -188,7 +188,7 @@ class Graphics(Device):
         # blank the screen then draw a red bar and little message to indicate that graphics are disabled
         # ugly ahh code though
         pygame.draw.rect(self.screen, COLORS[2], (0, 0, SCALED_WIDTH, GRAPHICS_CHAR_H * SCALE))
-        pygame.draw.rect(self.screen, COLORS[0], (0, GRAPHICS_CHAR_H * SCALE, SCALED_WIDTH, SCALED_HEIGHT - GRAPHICS_CHAR_H * SCALE))
+        # pygame.draw.rect(self.screen, COLORS[0], (0, GRAPHICS_CHAR_H * SCALE, SCALED_WIDTH, SCALED_HEIGHT - GRAPHICS_CHAR_H * SCALE))
         font = pygame.font.SysFont(None, int((GRAPHICS_CHAR_H + 1) * SCALE))
         self.screen.blit(font.render(message, True, COLORS[0], COLORS[2]), (4 * SCALE, 2 * SCALE))
         self._inactive_drawn = True
