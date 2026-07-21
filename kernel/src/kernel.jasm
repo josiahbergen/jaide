@@ -20,7 +20,6 @@ data "KERNEL"
 
 main:
     call tty__init
-    call shell__handler_mount
     call shell__draw_startup_message
 
     mov x, 0

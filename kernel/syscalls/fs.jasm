@@ -63,21 +63,35 @@ sc_mount_error:
     ret
 
 sc_list:
-    dereference_into a, kvar_root_start ; root sector 0
-    mov b, 0 ; index 0, start of scratch
+    mov b, 0x0a ; newline
+    mov a, 0x11 ; write_char
+    call kernel__syscall
+
+
+    dereference_into a, kvar_root_start ; absolute block index of the start of the root sectors
+    mov b, 0 ; cache index 0, start of scratch
     call load_to_cache
 
-    inc a ; root sector 2
-    inc b ; index 1
+    inc a ; now, put the second root sector
+    inc b ; into cache index 1
     call load_to_cache
 
     ; so now, the root entries are in the cache! yay!
     ; we can print out the filenames now
     mov x, fs_cache_base ; index of first file
-    mov d, 0
-    ret
 
 sc_list__loop:
+    ; x points to the start of a root entry
+    add x, 6 ; check for empty block index
+    get b, [x]
+    cmp b, 0
+    jz sc_list__done
+
+    sub x, 6 ; back to the start of the entry so we can print the filename
+   
+sc_list__print_filename:
+    mov d, 0
+sc_list__print_filename_loop:
     get b, [x]
     mov c, b
     and b, 0x00FF  ; 2nd char of word
@@ -90,15 +104,24 @@ sc_list__loop:
     mov a, 0x11 ; write_char
     call kernel__syscall
 
-    cmp d, 8
-    jz sc_list__done
+    cmp d, 5
+    jz sc_list__print_filename_done
     inc d
     inc x
+    jmp sc_list__print_filename_loop
+
+sc_list__print_filename_done:
+    mov b, 0x0a ; newline
+    mov a, 0x11 ; write_char
+    call kernel__syscall
+
+    add x, 3 ; move to index 0 of the next entry
     jmp sc_list__loop
 
 sc_list__done:
     mov a, 0x00
     ret
+    
 
 sc_open:
 sc_read:

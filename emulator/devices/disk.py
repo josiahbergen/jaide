@@ -114,8 +114,6 @@ class Disk(Device):
             self._complete_transfer()
 
     def _complete_transfer(self) -> None:
-        logger.debug("transfer complete!")
-
         if self._command == COMMAND_WRITE:
             with open(self.disk_file, "wb") as f:
                 f.write(self.disk)

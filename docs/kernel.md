@@ -24,74 +24,73 @@ syscalls can be invoked via a software interrupt with `int 0x10`.
 
 ### register usage
 
-| caller-saved (clobbered) | callee-saved (preserved)       |
-| ------------------------ | ------------------------------ |
-| `a`, `b`, `c`, `d`, `f`  | `e`, `x`, `y`, `z`, `sp`, `mb` |
+| caller-saved (clobbered)                           | callee-saved (preserved)       |
+| -------------------------------------------------- | ------------------------------ |
+| `a`, `b`, `c`, `d`, `f`, `e`, `x`, `y`, `z`, `sp`  | `mb`                           |
+
 
 ## kernel tty
 
-`kernel/src/tty.jasm` owns text-mode VRAM, cursor state, attributes, wrapping,
-newlines, and scrolling. Kernel code such as the built-in shell calls this
-module directly. The terminal output syscalls in `kernel/syscalls/output.jasm` are
-thin adapters over the same interface, so kernel and userspace output have the
-same behaviour without sending kernel calls through syscall dispatch.
+`kernel/src/tty.jasm` contains the underlying logic behind all text-mode graphics. 
+
+the terminal output syscalls in `kernel/syscalls/output.jasm` are thin wrappers over the interface defined by `tty.jasm`. kernel code (such as the built-in shell) calls this module directly. 
 
 ## syscall table
 
 ### process
 
-| #      | Name   | Args          | Returns                              | Notes                                                |
+| #      | name   | args          | returns                              | notes                                                |
 | ------ | ------ | ------------- | ------------------------------------ | ---------------------------------------------------- |
-| `0x00` | `exit` | B = exit code |                                      | Return to shell. No-op if called from shell context. |
-| `0x01` | `exec` | B = string    | A = error (never returns on success) | Load and execute file from disk.                     |
+| `0x00` | `exit` | b = exit code |                                      | return to shell. no-op if called from shell context. |
+| `0x01` | `exec` | b = string    | a = error (never returns on success) | load and execute file from disk.                     |
 
 ### terminal output
 
-| #      | Name          | Args                   | Returns      | Notes                                                                    |
+| #      | name          | args                   | returns      | notes                                                                    |
 | ------ | ------------- | ---------------------- | ------------ | ------------------------------------------------------------------------ |
-| `0x10` | `write_str`   | B = string             | -            | Print string at cursor. Scrolls.                                         |
-| `0x11` | `write_char`  | B = char               | -            | Print one character. Advances cursor. Scrolls at EOL.                    |
-| `0x12` | `clear`       | -                      | -            | Blank VRAM, reset cursor to (0, 0).                                      |
-| `0x13` | `set_cursor`  | B = x, C = y           | -            | Move kernel cursor. x: 0–79, y: 0–24.                                    |
-| `0x14` | `get_cursor`  | -                      | B = x, C = y | Read current cursor position.                                            |
-| `0x15` | `put_char_at` | B = char, C = x, D = y | -            | Write one glyph directly to VRAM. No cursor update, no scroll.           |
-| `0x16` | `set_attr`    | B = attr               | -            | Set color attribute for subsequent `write_*` calls. Default is `0x0001`. |
+| `0x10` | `write_str`   | b = string             | -            | print string at cursor. scrolls.                                         |
+| `0x11` | `write_char`  | b = char               | -            | print one character. advances cursor, scrolls.                           |
+| `0x12` | `clear`       | -                      | -            | blank vram, reset cursor to (0, 0).                                      |
+| `0x13` | `set_cursor`  | b = x, c = y           | -            | move kernel cursor. x: 0–79, y: 0–24.                                    |
+| `0x14` | `get_cursor`  | -                      | b = x, c = y | read current cursor position.                                            |
+| `0x15` | `put_char_at` | b = char, c = x, d = y | -            | write one glyph directly to vram. no cursor update, no scroll.           |
+| `0x16` | `set_attr`    | b = attr               | -            | set color attribute for subsequent `write_*` calls. default is `0x0001`. |
 
 ### terminal input
 
-| #      | Name        | Args                  | Returns                            | Notes                                                          |
+| #      | name        | args                  | returns                            | notes                                                          |
 | ------ | ----------- | --------------------- | ---------------------------------- | -------------------------------------------------------------- |
-| `0x20` | `read_char` | -                     | A = char                           | **Blocking!** Returns raw key code.                            |
-| `0x21` | `poll_key`  | -                     | A = char or 0                      | Non-blocking. Returns next key from buffer, or 0 if empty. |
-| `0x22` | `read_line` | B = buff, C = max len | A = len (includes null terminator) | Collect input with echo and backspace until ENTER.             |
+| `0x20` | `read_char` | -                     | a = char                           | **blocking!** returns raw key code.                            |
+| `0x21` | `poll_key`  | -                     | a = char or 0                      | non-blocking. returns next key from buffer, or 0 if empty. |
+| `0x22` | `read_line` | b = buff, c = max len | a = len (includes null terminator) | collect input with echo and backspace until enter.             |
 
 ### filesystem
 
-| #      | Name       | Args                               | Returns                               | Notes                                                                 |
+| #      | name       | args                               | returns                               | notes                                                                 |
 | ------ | ---------- | ---------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| `0x30` | `fs_mount` | -                                  | A = status                            | Read boot sector, validate magic, cache header values.                |
-| `0x31` | `fs_list`  | B = buff, C = max entries          | A = count                             | Copy root directory entries into buffer.                              |
-| `0x32` | `fs_open`  | B = filename                       | A = fd                                | Walk root dir, return index into kernel FD table. Error if not found. |
-| `0x33` | `fs_read`  | B = fd, C = dest addr, D = n_words | A = words read                        | Read words from current file position, following FAT chain.           |
-| `0x34` | `fs_write` | B = fd, C = src addr, D = n_words  | A = status                            | Write words at current file position. Allocates new blocks as needed. |
-| `0x35` | `fs_seek`  | B = fd, C = word offset            | A = status                            | Move read/write position within file.                                 |
-| `0x36` | `fs_close` | B = fd                             | -                                     | Release FD table slot. Flush any pending writes.                      |
-| `0x37` | `fs_stat`  | B = filename                       | A = status, B = start block, C = size | Query file metadata without opening.                                  |
+| `0x30` | `fs_mount` | -                                  | a = status                            | read boot sector, validate magic, cache header values.                |
+| `0x31` | `fs_list`  | b = buff, c = max entries          | a = count                             | copy root directory entries into buffer.                              |
+| `0x32` | `fs_open`  | b = filename                       | a = fd                                | walk root dir, return index into kernel fd table. error if not found. |
+| `0x33` | `fs_read`  | b = fd, c = dest addr, d = n_words | a = words read                        | read words from current file position, following fat chain.           |
+| `0x34` | `fs_write` | b = fd, c = src addr, d = n_words  | a = status                            | write words at current file position. allocates new blocks as needed. |
+| `0x35` | `fs_seek`  | b = fd, c = word offset            | a = status                            | move read/write position within file.                                 |
+| `0x36` | `fs_close` | b = fd                             | -                                     | release fd table slot. flush any pending writes.                      |
+| `0x37` | `fs_stat`  | b = filename                       | a = status, b = start block, c = size | query file metadata without opening.                                  |
 
 ### time
 
-| #      | Name        | Args | Returns                      | Notes                                                          |
+| #      | name        | args | returns                      | notes                                                          |
 | ------ | ----------- | ---- | ---------------------------- | -------------------------------------------------------------- |
-| `0x40` | `get_ticks` |      | A = low word, B = high word  | 32-bit kernel tick counter, incremented by PIT ISR (vector 5). |
-| `0x41` | `get_date`  |      | A = year, B = month, C = day | Read RTC (MMIO `0xFE30–0xFE33`).                               |
-| `0x41` | `get_time`  |      | A = hours, B = minutes,      | Read RTC (MMIO `0xFE30–0xFE33`).                               |
+| `0x40` | `get_ticks` |      | a = low word, b = high word  | 32-bit kernel tick counter, incremented by pit isr (vector 5). |
+| `0x41` | `get_date`  |      | a = year, b = month, c = day | read rtc (mmio `0xfe30–0xfe33`).                               |
+| `0x41` | `get_time`  |      | a = hours, b = minutes,      | read rtc (mmio `0xfe30–0xfe33`).                               |
 
 ### system
 
-| #      | Name       | Args | Returns | Notes           |
+| #      | name       | args | returns | notes           |
 | ------ | ---------- | ---- | ------- | --------------- |
-| `0x50` | `reset`    | -    | -       | Reset system    |
-| `0x51` | `shutdown` | -    | -       | Shutdown system |
+| `0x50` | `reset`    | -    | -       | reset system    |
+| `0x51` | `shutdown` | -    | -       | shutdown system |
 
 ## memory layout
 
@@ -99,27 +98,27 @@ the jaide kernel requires a specific memory layout:
 
 | range             | purpose                                      |
 | ----------------- | -------------------------------------------- |
-| `0x0000`–`0x00FF` | bios rom                                     |
-| `0x0100`–`0x3FFF` | kernel code                                  |
-| `0x4000`–`0x4FFF` | video memory                                 |
-| `0x5000`–`0x5FFF` | kernel data                                  |
-| `0x6000`–`0x6FFF` | filesystem block cache                       |
-| `0x7000`–`0xAFFF` | user program space (banked)                  |
-| `0xB000`–`0xFCFF` | reserved                                     |
-| `0xFD00`–`0xFDFF` | stack                                        |
-| `0xFE00`–`0xFEFF` | mmio                                         |
-| `0xFF00`–`0xFFFF` | interrupt vector table                       |
+| `0x0000`–`0x00ff` | bios rom                                     |
+| `0x0100`–`0x3fff` | kernel code                                  |
+| `0x4000`–`0x4fff` | video memory                                 |
+| `0x5000`–`0x5fff` | kernel data                                  |
+| `0x6000`–`0x6fff` | filesystem block cache                       |
+| `0x7000`–`0xafff` | user program space (banked)                  |
+| `0xb000`–`0xfcff` | reserved                                     |
+| `0xfd00`–`0xfdff` | stack                                        |
+| `0xfe00`–`0xfeff` | mmio                                         |
+| `0xff00`–`0xffff` | interrupt vector table                       |
 
 ### kernel data layout
 
 | range             | size (words) | purpose                  |
 | ----------------- | ------------ | ------------------------ |
-| `0x5200...0x5FFF` | 0xE00        | reserved/scratch         |
-| `0x51C0...0x51FF` | 0x40         | shell variables          |
-| `0x5180...0x51BF` | 0x40         | filesystem cache indices |
-| `0x5140...0x517F` | 0x40         | file descriptor table*   |
-| `0x5100...0x513F` | 0x40         | kernel variables**       |
-| `0x5000...0x50FF` | 0x100        | disk scratch buffer      |
+| `0x5200...0x5fff` | 0xe00        | reserved/scratch         |
+| `0x51c0...0x51ff` | 0x40         | shell variables          |
+| `0x5180...0x51bf` | 0x40         | filesystem cache indices |
+| `0x5140...0x517f` | 0x40         | file descriptor table*   |
+| `0x5100...0x513f` | 0x40         | kernel variables**       |
+| `0x5000...0x50ff` | 0x100        | disk scratch buffer      |
 
 #### file descriptor table
 
@@ -140,8 +139,8 @@ the kernel variable section contains these defined values:
 
 | address    | name         | description                                   |
 | ---------- | ------------ | --------------------------------------------- |
-| 0x5100     | pit low      | low word of 32-bit kernel PIT counter         |
-| 0x5101     | pit high     | high word of 32-bit kernel PIT counter        |
+| 0x5100     | pit low      | low word of 32-bit kernel pit counter         |
+| 0x5101     | pit high     | high word of 32-bit kernel pit counter        |
 | 0x5102     | fs mounted   | 0x01 if filesystem mounted, 0x00 otherwise    |
 | 0x5103     | blocks       | total number of blocks on the disk            |
 | 0x5104     | table start  | block index of the first element in the table |
@@ -150,10 +149,10 @@ the kernel variable section contains these defined values:
 | 0x5107     | root blocks  | number of blocks in the root directory        |
 | 0x5108     | data start   | block index of the first data block           |
 | 0x5109     | cursor row   | tty cursor row, 0-24                           |
-| 0x510A     | cursor col   | tty cursor column, 0-79                        |
-| 0x510B     | tty attr     | attribute used for subsequent tty writes      |
-| 0x510C     | padding      | 52 words                                       |
+| 0x510a     | cursor col   | tty cursor column, 0-79                        |
+| 0x510b     | tty attr     | attribute used for subsequent tty writes      |
+| 0x510c     | padding      | 52 words                                       |
 
 ### user programs
 
-programs loaded by `exec` are placed at **`0x7000`** in their assigned memory bank (`MB = 1`–`31`). the entry point is **`0x7000`**. each bank provides 16,384 words (32 KiB) for code and data.
+programs loaded by `exec` are placed at **`0x7000`** in their assigned memory bank (`mb = 1`–`31`). the entry point is **`0x7000`**. each bank provides 16,384 words (32 kib) for code and data.
