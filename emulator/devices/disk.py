@@ -111,17 +111,16 @@ class Disk(Device):
 
         self._cursor += 1
         if self._cursor == SECTOR_WORDS:
-            self._complete_transfer()
+            # transfer complete
+            self.status = STATUS_IDLE
+            self._command = None
+            self._cursor = 0
 
-    def _complete_transfer(self) -> None:
-        if self._command == COMMAND_WRITE:
-            with open(self.disk_file, "wb") as f:
-                f.write(self.disk)
-
-        self.status = STATUS_IDLE
-        self._command = None
-        self._cursor = 0
-        logger.debug("transfer complete! status reset to idle.")
+            if self._command == COMMAND_WRITE:
+                with open(self.disk_file, "wb") as f:
+                    f.write(self.disk)
+                    
+            logger.debug("transfer complete! status reset to idle.")
 
     def reset(self) -> None:
         self.status = STATUS_IDLE

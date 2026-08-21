@@ -387,8 +387,8 @@ def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
     dst = emu.reg_get(reg_b)   # dddd = dst address
     src = emu.reg_get(reg_a)   # ssss = src address
     for i in range(count):
-        value = emu.bus.read16(src + i * 2)
-        emu.bus.write16(dst + i * 2, value)
+        value = emu.bus.read16(src + i)
+        emu.bus.write16(dst + i, value)
 
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
