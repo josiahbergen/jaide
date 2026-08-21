@@ -115,29 +115,6 @@ VRAM lives at `0x4000`–`0x4FFF` in flat memory and is not banked. user program
 
 stack overflow/underflow behaviour is undefined.
 
-## interrupts
-
-jaide supports up to 256 interrupt vectors. these can be triggered programatically, by external devices, or by the cpu itself.
-
-### hardware interrupts
-
-jaide checks the `IRQ` (interrupt reqest) line at the end of every instruction cycle, before the next fetch. if `IRQ` is high and the interrupt flag is set:
-
-1. jaide sets the `INTA` (interrupt acknowledge) line high, and waits.
-2. the external device places a desired 16-bit interrupt vector on the data bus. `IRQ` is cleared to communicate that the the vector is ready.
-3. the cpu reads the vector, clears `INTA`, and proceeds with the standard interrupt procedure (see below)
-
-interrupts 0 to 3 are reserved for hardware interrutps. a programmer may define handlers for each of them.
-
-### vector allocation
-
-| vector | type      | description                             |
-| ------ | --------- | --------------------------------------- |
-| 0      | exception | unhandled fault                         |
-| 1      | exception | invalid instruction                     |
-| 2      | exception | protection fault                        |
-| 3      | reserved  | reserved                                |
-| 4-127  | external  | available for external hardware devices |
 
 ## memory-mapped I/O
 

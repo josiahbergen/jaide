@@ -134,13 +134,6 @@ imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <
 RET                 return from a subroutine
                     oooooooo ---- ---- -------- --------  pc <- [++sp]
 
-INT src             generate an interrupt
-reg                 oooooooo ssss ---- -------- --------  see "interrupts" section in the spec
-imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  
-
-IRET                return from an interrupt subroutine
-                    oooooooo ---- ---- -------- --------  see "interrupts" section in the spec
-
 
 NOTE: THE ENCODING ABOVE DISPLAYS THE 16-BIT INSTRUCTION WORD IN "LOGICAL" ORDER (OPCODE RA RB IMMEDIATE). 
 THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.

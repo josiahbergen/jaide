@@ -4,9 +4,7 @@ the kernel is pretty cool. read all about it below!
 
 ## syscall interface
 
-the kernel supports a low-level interface of syscalls, mostly for system + driver functionality.
-
-syscalls can be invoked via a software interrupt with `int 0x10`.
+the kernel supports a low-level interface of syscalls, mostly for system + driver functionality. 
 
 ### arguments
 
