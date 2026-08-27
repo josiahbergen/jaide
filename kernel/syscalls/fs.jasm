@@ -65,7 +65,7 @@ sc_mount_error:
 sc_list:
     mov b, 0x0a ; newline
     mov a, 0x11 ; write_char
-    call kernel__syscall
+    call kernel__dispatch_syscall
 
 
     dereference_into a, kvar_root_start ; absolute block index of the start of the root sectors
@@ -97,12 +97,12 @@ sc_list__print_filename_loop:
     and b, 0x00FF  ; 2nd char of word
 
     mov a, 0x11 ; write_char
-    call kernel__syscall
+    call kernel__dispatch_syscall
 
     rsh c, 8  ; 1st char of word
     mov b, c
     mov a, 0x11 ; write_char
-    call kernel__syscall
+    call kernel__dispatch_syscall
 
     cmp d, 5
     jz sc_list__print_filename_done
@@ -113,7 +113,7 @@ sc_list__print_filename_loop:
 sc_list__print_filename_done:
     mov b, 0x0a ; newline
     mov a, 0x11 ; write_char
-    call kernel__syscall
+    call kernel__dispatch_syscall
 
     add x, 3 ; move to index 0 of the next entry
     jmp sc_list__loop

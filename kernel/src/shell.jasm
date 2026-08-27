@@ -205,7 +205,7 @@ handler_exec:
 
 handler_list:
     mov a, 0x31 ; list
-    call kernel__syscall
+    call kernel__dispatch_syscall
     call newline
     call draw_prompt
     ret
@@ -280,7 +280,7 @@ data 0xA       ; newline
 handler_mount:
 
     mov a, 0x30 ; mount
-    call kernel__syscall
+    call kernel__dispatch_syscall
 
     cmp a, 0x00
     jz handler_mount_success

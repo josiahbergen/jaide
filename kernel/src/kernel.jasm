@@ -36,10 +36,10 @@ loop:
     jmp loop
 
 ; system call interface
-; called via:  call kernel__syscall  (a = syscall number, args in b, c, d, e)
+; called via:  call kernel__dispatch_syscall  (a = syscall number, args in b, c, d, e)
 ; returns:     a = result (zero if success, nonzero if error)
 
-syscall:
+dispatch_syscall:
     push y
     push z
 

@@ -134,6 +134,12 @@ imm16               oooooooo ---- ---- xxxxxxxx xxxxxxxx  [--sp] <- pc + 1, pc <
 RET                 return from a subroutine
                     oooooooo ---- ---- -------- --------  pc <- [++sp]
 
+SYSCALL             enter the kernel through the protected syscall vector
+                    oooooooo ---- ---- -------- --------  see docs/userspace-boundary.md
+
+RESUME              restore a saved processor context
+                    oooooooo ---- ---- -------- --------  see docs/userspace-boundary.md
+
 
 NOTE: THE ENCODING ABOVE DISPLAYS THE 16-BIT INSTRUCTION WORD IN "LOGICAL" ORDER (OPCODE RA RB IMMEDIATE). 
 THIS IS NOT THE ORDER IN WHICH THE BYTES ARE STORED IN MEMORY.

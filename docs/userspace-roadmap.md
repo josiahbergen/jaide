@@ -2,6 +2,8 @@
 
 this roadmap defines the boundary between the jaide kernel and user programs. its first two application milestones are a `cat`-style program and a character-graphics demo.
 
+the processor-mode and kernel-entry contract is defined in [userspace-boundary.md](userspace-boundary.md).
+
 ## goals
 
 - run an untrusted program without giving it direct access to the kernel, other process banks, vram, or mmio.
@@ -23,7 +25,7 @@ ordinary instructions cannot modify the mode directly. only cpu control logic ma
 - a processor fault or hardware interrupt enters supervisor mode through the same protected context-save path.
 - a supervisor-only resume operation restores a complete user context and changes to user mode. the kernel uses this operation for both initial process entry and return from a syscall or fault.
 
-the exact instruction or hardware-gate encoding for syscall entry and user resume must be selected before implementation. it must not make an arbitrary kernel address callable from user mode. kernel function addresses are never an abi.
+user processes enter the kernel with the zero-operand `syscall` instruction and return through the supervisor-only `resume` instruction. kernel function addresses are never an abi.
 
 ## memory access
 
@@ -134,7 +136,7 @@ the kernel validates user buffers before starting a read and records the current
 
 ### 1. freeze the boundary
 
-- choose and document the protected syscall-entry and supervisor-only user-resume mechanisms.
+- keep the `syscall` and `resume` contract synchronized across the cpu, emulator, kernel, assembler, and documentation.
 - specify the saved user context and kernel stack transition.
 - finalize the user memory permissions and privileged registers.
 - finalize syscall register preservation, pointer validation, and error codes.
