@@ -8,7 +8,6 @@ wheels/
 .pytest_cache/
 .ruff_cache/
 .venv
-uv.lock
 
 # build files
 **/bin/

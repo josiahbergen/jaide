@@ -22,4 +22,4 @@ jobs:
         run: uv sync
 
       - name: run test suite
-        run: uv run -m pytest
+        run: uv run poe test

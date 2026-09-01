@@ -49,10 +49,11 @@ class Emulator:
 
         # registers
         self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
-        self.pc = self.reg["PC"]  # program counter
-        self.sp = self.reg["SP"]  # stack pointer
-        self.f  = self.reg["F"]   # flags
-        self.mb = self.reg["MB"]  # memory bank
+        self.pc  = self.reg["PC"]  # program counter
+        self.sp  = self.reg["SP"]  # stack pointer
+        self.f   = self.reg["F"]   # flags
+        self.mb  = self.reg["MB"]  # memory bank
+        self.mde = self.reg["MDE"] # user/supervisor mode switch
 
         # set stack pointer to 0xfdff as recommended by the spec
         self.sp.set(0xfdff)

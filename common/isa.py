@@ -61,8 +61,8 @@ class INSTRUCTIONS(ZeroIndexedEnum):
     CALL = auto()
     RET  = auto()
     BCP  = auto()
-    SYSCALL = auto()
-    RESUME  = auto()
+    # SYSCALL = auto()
+    # RESUME  = auto()
 
 
 class REGISTERS(ZeroIndexedEnum):
@@ -152,8 +152,8 @@ INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
     INSTRUCTIONS.NOP:  [ () ],
 
     INSTRUCTIONS.BCP:     [ (MODES.REG, MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SYSCALL: [ () ],
-    INSTRUCTIONS.RESUME:  [ () ],
+    # INSTRUCTIONS.SYSCALL: [ () ],
+    # INSTRUCTIONS.RESUME:  [ () ],
 }
 
 
@@ -281,8 +281,8 @@ _FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int
     (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
 
     (INSTRUCTIONS.BCP, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
-    (INSTRUCTIONS.SYSCALL, ()):                            (None, None, None),
-    (INSTRUCTIONS.RESUME, ()):                             (None, None, None),
+    # (INSTRUCTIONS.SYSCALL, ()):                            (None, None, None),
+    # (INSTRUCTIONS.RESUME, ()):                             (None, None, None),
 }
 
 
