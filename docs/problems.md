@@ -6,7 +6,6 @@
 - assembler options are dropped by `generate_context`; the `--nolink` check also appears inverted.
 - assembler imports resolve relative to the working directory, and label namespaces collide for files with the same basename.
 - assembler library errors call `sys.exit()` instead of raising structured exceptions.
-- hardware interrupt entry, interrupt handling, and the interrupt-enable flag are not implemented.
 - syscall IDs and MMIO definitions are duplicated across Python, JASM, and documentation and have drifted.
 - MMIO dispatch is still spread across the emulator and devices. A future `MMIO` class could centralize registration, detect address collisions, expose an inspectable register map, and support side-effect-free debugger reads.
 - JFS uses native-endian `array("H")`, disagrees with the docs about byte/word file sizes, cannot represent empty files, and does not handle an out-of-space disk cleanly.
