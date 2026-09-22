@@ -1,6 +1,7 @@
 from typing import Callable
 
 from .constants import (
+    USER_MODE,
     BANK_SIZE,
     BANK_WINDOW_END,
     BANK_WINDOW_START,
@@ -16,14 +17,20 @@ from .constants import (
 )
 from .util.logger import logger
 
+from .emulator import Emulator
+from .exceptions import ProtectionFault
+
+USER_MEMORY_START = 0x7000
+USER_MEMORY_END = 0xAFFF
 
 class MemoryBus:
     
-    def __init__(self, current_bank: Callable[[], int],mmio_read:  Callable[[int], int], mmio_write: Callable[[int, int], None]):
+    def __init__(self, emulator: Emulator):
         # functions supplied by the cpu/devices
-        self.current_bank = current_bank
-        self.mmio_read = mmio_read
-        self.mmio_write = mmio_write
+        self.current_bank = lambda: emulator.mb.value
+        self.current_mode = lambda: emulator.mode
+        self.mmio_read = emulator.mmio_read
+        self.mmio_write = emulator.mmio_write
         # initialize bytearrays for main memory, vram, and banks
         self.memory = bytearray(MEMORY_SIZE)
         self.vram = bytearray(VRAM_SIZE)
@@ -49,6 +56,12 @@ class MemoryBus:
     def write16(self, address: int, value: int, *, bank: int | None = None) -> None:
         # write 16-bit word to memory, dispatching to mmio_write if necessary.
         address, value = address & 0xFFFF, value & 0xFFFF # mask address and value to 16 bits
+
+        current_mode = self.current_mode()
+        in_user_boundary = address >= USER_MEMORY_START and address <= USER_MEMORY_END
+
+        if current_mode == USER_MODE and not in_user_boundary:
+            raise ProtectionFault(f"unauthorized write to protected memory at 0x{address:04X}.")
 
         if MMIO_BASE <= address <= MMIO_END:
             # if write is to mmio, dispatch to mmio_write

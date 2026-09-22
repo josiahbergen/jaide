@@ -13,6 +13,8 @@ from common.isa import INSTRUCTIONS, OPCODE_FORMATS
 
 from .bus import MemoryBus
 from .constants import (
+    SUPERVISOR_MODE,
+    USER_MODE,
     FLAG_C,
     FLAG_N,
     FLAG_O,
@@ -20,6 +22,12 @@ from .constants import (
     FLAG_Z,
     MMIO_SYSTEM,
     REGISTERS,
+    EVENT_FAULT,
+    EVENT_INTERRUPT,
+    EVENT_SYSCALL,
+    FAULT_INSTRUCTION,
+    FAULT_PROTECTION,
+    FAULT_ZERO_DIVISION,
 )
 from .devices.device import Device
 from .devices.disk import Disk
@@ -27,7 +35,7 @@ from .devices.graphics import Graphics
 from .devices.keyboard import Keyboard
 from .devices.pit import PIT
 from .devices.rtc import RTC
-from .exceptions import EmulatorException
+from .exceptions import EmulatorException, ProtectionFault, InvalidInstructionFault, DivisionByZeroFault
 from .register import Register
 from .util.disasm import disassemble
 from .util.logger import logger
@@ -42,24 +50,30 @@ class Emulator:
     def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = ""):
         logger.set_level(verbosity)
 
-        # debugging, etc.
-        self.breakpoints: set[int] = set[int]()  # empty set of breakpoints
-        self.halted: bool = False  # hardware halt
-        self.running = False  # true only while the run loop is active
+        # debugging and processor state
+        self.breakpoints: set[int] = set[int]()
+        self.running: bool = False  # true only while the run loop is active
+        self.waiting: bool = False  # waiting for an interrupt
+        self.stopped: bool = False  # hardware halt
+
+        # internal registers
+        self.mode: int = SUPERVISOR_MODE  # execution mode
+        self.ie: bool = False             # interrupts disabled
+        self.ssp = Register("SSP", 0, lambda: self.mode)
 
         # registers
-        self.reg: dict[str, Register] = {reg: Register(reg, 0) for reg in REGISTERS}
-        self.pc  = self.reg["PC"]  # program counter
-        self.sp  = self.reg["SP"]  # stack pointer
-        self.f   = self.reg["F"]   # flags
-        self.mb  = self.reg["MB"]  # memory bank
-        self.mde = self.reg["MDE"] # user/supervisor mode switch
+        self.reg: dict[str, Register] = {reg: Register(reg, 0, lambda: self.mode) for reg in REGISTERS}
+        self.pc = self.reg["PC"]  # program counter
+        self.sp = self.reg["SP"]  # stack pointer
+        self.mb = self.reg["MB"]  # memory bank
+        self.f  = self.reg["F"]   # flags
 
-        # set stack pointer to 0xfdff as recommended by the spec
+        # set stack pointers to 0xfdff as recommended by the spec
         self.sp.set(0xfdff)
+        self.ssp.set(0xfdff)
 
         # memory bus and devices
-        self.bus = MemoryBus(lambda: self.mb.value, self.mmio_read, self.mmio_write)
+        self.bus = MemoryBus(self)
         self.devices: list[Device] = []
         if enabled_devices.get("pit", False): self.devices.append(PIT())
         if enabled_devices.get("rtc", False): self.devices.append(RTC())
@@ -134,6 +148,7 @@ class Emulator:
         logger.warning(f"no device at MMIO 0x{addr:04X}, read is undefined.")
         return 0
 
+
     def mmio_write(self, addr: int, value: int) -> None:
         value = mask16(value)
 
@@ -146,6 +161,37 @@ class Emulator:
                 device.mmio_write(addr, value)
                 break
 
+
+    def pending_interrupts(self) -> list[int] | None:
+        return [device.interrupt_number for device in self.devices if device.interrupt_raised == True] if self.ie else None
+
+    def enter_supervisor(self, event: int, detail: int, target: int) -> None:
+        # save old cpu context (for switching back later)
+        old_sp   = self.sp.value
+        old_f    = self.f.value
+        old_mb   = self.mb.value
+        old_mode = self.mode
+
+        # set execution mode to supervisor and disable interrupts
+        self.mode = SUPERVISOR_MODE
+        self.ie = False
+
+        # move stack pointer to supervisor stack if necessary
+        self.sp.set(self.ssp.value if old_mode == USER_MODE else self.sp.value)
+
+        # push context frame onto the stack
+        self._push_core(detail)    # event detail 
+        self._push_core(event)     # event type
+        self._push_core(old_mode)  # old execution mode
+        self._push_core(old_sp)    # ... stack pointer
+        self._push_core(old_f)     # ... flags
+        self._push_core(old_mb)    # ... and memory bank
+        self._push_core(target)    # target pc address
+
+        # finally, move execution to the kernel's entry point
+        self.pc.set(0x0100)
+
+
     def reset(self) -> None:
         self.bus.reset()
 
@@ -153,7 +199,7 @@ class Emulator:
         for register in self.reg.values():
             register.set(0)  # conveniently, this puts us in supervisor mode
         self.sp.set(0xFDFF)
-        self.halted = False
+        self.stopped = False
 
         for device in self.devices:
             device.reset()
@@ -183,7 +229,7 @@ class Emulator:
         reg_b = regs & 0xF  # dddd/low nibble
 
         if opcode not in OPCODE_FORMATS:
-            raise EmulatorException(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}.")
+            raise InvalidInstructionFault(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}.")
 
         fmt = OPCODE_FORMATS[opcode]
         imm16 = self.fetch() if fmt.imm_operand is not None else 0
@@ -219,16 +265,30 @@ class Emulator:
     def step(self) -> None:
 
         # hardware-level overrides
-        if self.halted:
+        if self.stopped:
             raise EmulatorException("halted")
         if self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
-        # tick all devices
         for device in self.devices:
+            # tick all devices, no matter what
             device.tick()
 
-        # normal fetch/decode/execute
+        if pending_interrupts := self.pending_interrupts():
+            # if interrupts are enabled and there are pending interrupts,
+            # wake the cpu if applicable and enter supervisor mode to handle it
+            self.waiting = False
+            interrupt_number = pending_interrupts.pop(0)
+            self.enter_supervisor(EVENT_INTERRUPT, interrupt_number, self.pc.value)
+            return
+
+        if self.waiting:
+            time.sleep(0.001)  # yield to avoid killing the cpu
+            return
+
+        # finally, save the instruction address (for error reporting)
+        # and proceed with normal fetch/decode/execute
+        instruction_address = self.pc.value
         decoded = self.decode()
         opcode = decoded[0]
 
@@ -238,7 +298,23 @@ class Emulator:
             f"{" ".join([f"{FLAG_STRINGS[i]}" if self.flag_get(i) else "-" for i in FLAG_STRINGS])}"
         )
 
-        self.handlers[OPCODE_FORMATS[opcode].mnemonic](self, decoded)
+        try:
+            # run instruction handler
+            self.handlers[OPCODE_FORMATS[opcode].mnemonic](self, decoded)
+        except ProtectionFault as e:
+            # catch various non-fatal cpu faults.
+            # these run here because they are not actual emulation faults,
+            # and transfer control flow to supervisor mode to deal with the problem.
+            logger.error(f"permission fault: {e.message} (at 0x{instruction_address:04X}).")
+            self.enter_supervisor(EVENT_FAULT, FAULT_PROTECTION, instruction_address)
+        except InvalidInstructionFault as e:
+            # invalid instructions
+            logger.error(f"invalid instruction fault: {e.message} (at 0x{instruction_address:04X}).")
+            self.enter_supervisor(EVENT_FAULT, FAULT_INSTRUCTION, instruction_address)
+        except DivisionByZeroFault as e:
+            # division by zero
+            logger.error(f"division by zero fault: {e.message} (at 0x{instruction_address:04X}).")
+            self.enter_supervisor(EVENT_FAULT, FAULT_ZERO_DIVISION, instruction_address)
 
     # core helpers
 

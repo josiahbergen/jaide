@@ -9,7 +9,10 @@ this document may be out-of-date. use common/isa.py to generate up-to-date infor
 NOP                 no operation
                     oooooooo  ---- ---- -------- -------- n/a
 
-HALT                halt until interrupt
+HALT                stop instruction execution
+                    oooooooo ---- ---- -------- --------  n/a
+
+WAIT                atomically wait for one hardware interrupt (supervisor only)
                     oooooooo ---- ---- -------- --------  n/a
 
 GET dest, src       load word from memory

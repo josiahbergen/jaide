@@ -14,6 +14,10 @@ class Device:
         self.read_dispatch: dict[int, Callable[..., int]] = {}
         self.write_dispatch: dict[int, Callable[[int], None]] = {}
 
+        # devices may raise hardware interrupts
+        self.interrupt_raised: bool = False
+        self.interrupt_number: int = 0 
+
     def mmio_read(self, addr: int) -> int:
         """Dispatch a request to read from a device."""
 

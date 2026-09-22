@@ -12,3 +12,13 @@ class EmulatorException(Exception):
         # pytest uses `with` to test exception calling,
         # so we need to implement __enter__ here
         return self
+
+
+class InvalidInstructionFault(EmulatorException):
+    pass
+
+class ProtectionFault(EmulatorException):
+    pass
+
+class DivisionByZeroFault(EmulatorException):
+    pass

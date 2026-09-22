@@ -10,21 +10,21 @@ the kernel supports a low-level interface of syscalls, mostly for system + drive
 
 | register      | use                          |
 | ------------- | ---------------------------- |
-| `a`           | syscall number               |
-| `b`, `c`, `d` | other arguments (as defined) |
+| `a`                | syscall number               |
+| `b`, `c`, `d`, `e` | other arguments (as defined) |
 
 ### return values
 
 | register      | use                               |
 | ------------- | --------------------------------- |
-| `a`           | zero on success, nonzero on error |
-| `b`, `c`, `d` | as defined                        |
+| `a`                | primary result or error status |
+| `b`, `c`, `d`, `e` | secondary results, as defined  |
 
 ### register usage
 
-| caller-saved (clobbered)                           | callee-saved (preserved)       |
-| -------------------------------------------------- | ------------------------------ |
-| `a`, `b`, `c`, `d`, `f`, `e`, `x`, `y`, `z`, `sp`  | `mb`                           |
+| caller-saved (clobbered) | callee-saved (preserved)      |
+| ------------------------ | ----------------------------- |
+| `a`, `b`, `c`, `d`, `e` | `x`, `y`, `z`, `f`, `sp`, `mb` |
 
 
 ## kernel tty
@@ -79,7 +79,7 @@ the terminal output syscalls in `kernel/syscalls/output.jasm` are thin wrappers 
 
 | #      | name        | args | returns                      | notes                                                          |
 | ------ | ----------- | ---- | ---------------------------- | -------------------------------------------------------------- |
-| `0x40` | `get_ticks` |      | a = low word, b = high word  | 32-bit kernel tick counter, incremented by pit isr (vector 5). |
+| `0x40` | `get_ticks` |      | a = low word, b = high word  | 32-bit kernel tick counter, incremented by pit interrupt `0x05`. |
 | `0x41` | `get_date`  |      | a = year, b = month, c = day | read rtc (mmio `0xfe30–0xfe33`).                               |
 | `0x41` | `get_time`  |      | a = hours, b = minutes,      | read rtc (mmio `0xfe30–0xfe33`).                               |
 
@@ -105,7 +105,7 @@ the jaide kernel requires a specific memory layout:
 | `0xb000`–`0xfcff` | reserved                                     |
 | `0xfd00`–`0xfdff` | stack                                        |
 | `0xfe00`–`0xfeff` | mmio                                         |
-| `0xff00`–`0xffff` | interrupt vector table                       |
+| `0xff00`–`0xffff` | reserved                                     |
 
 ### kernel data layout
 

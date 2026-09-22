@@ -1,12 +1,12 @@
 # programmable interrupt timer (pit)
 
-the pit raises interrupt `0x05` at a defined, programmable interval.
+the pit asserts interrupt line `0x05` at a defined, programmable interval.
 
 ## operation
 
 the pit is disabled by default. it must be enabled by passing 0x01 to the flags (see below).
 
-when on, the pit continuously counts down from its `reset` value, and when this counter reaches zero, it fires interrupt `0x05` and resets its counter.
+when on, the pit continuously counts down from its `reset` value. when the counter reaches zero, it asserts its interrupt line and resets the counter. reading the flags register acknowledges the event and deasserts the line.
 
 ## MMIO registers
 

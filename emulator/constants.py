@@ -37,6 +37,17 @@ FLAG_STRINGS: dict[int, str] = {
     FLAG_O: "O",
 }
 
+SUPERVISOR_MODE = 0
+USER_MODE = 1
+
+EVENT_FAULT     = 0
+EVENT_INTERRUPT = 1
+EVENT_SYSCALL   = 2
+
+FAULT_INSTRUCTION   = 0
+FAULT_PROTECTION    = 1
+FAULT_ZERO_DIVISION = 2
+
 # Human-readable mnemonic strings (for logging / disassembly)
 MNEMONICS: dict[int, str] = {
     opcode: fmt.mnemonic.name

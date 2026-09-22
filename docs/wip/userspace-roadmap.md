@@ -2,7 +2,7 @@
 
 this roadmap defines the boundary between the jaide kernel and user programs. its first two application milestones are a `cat`-style program and a character-graphics demo.
 
-the processor-mode and kernel-entry contract is defined in [userspace-boundary.md](userspace-boundary.md).
+the processor-mode and kernel-entry contract is defined in [privilege.md](../hardware/privilege.md).
 
 ## goals
 
@@ -23,9 +23,15 @@ ordinary instructions cannot modify the mode directly. only cpu control logic ma
 - reset starts in supervisor mode.
 - the selected syscall-entry mechanism changes user mode to supervisor mode while saving the user context and switching to a protected kernel stack.
 - a processor fault or hardware interrupt enters supervisor mode through the same protected context-save path.
-- a supervisor-only resume operation restores a complete user context and changes to user mode. the kernel uses this operation for both initial process entry and return from a syscall or fault.
+- a supervisor-only `transfer` operation consumes a context frame and enters the scope it describes. the kernel uses it for initial process entry and return from a syscall, fault, or hardware interrupt.
+- supervisor code accepts a hardware interrupt only through the atomic `wait` instruction. this lets blocking syscalls sleep without an interrupt mask or a lost-wakeup window.
 
-user processes enter the kernel with the zero-operand `syscall` instruction and return through the supervisor-only `resume` instruction. kernel function addresses are never an abi.
+the cpu tracks device-interrupt eligibility in an internal `irq_allowed` bit.
+kernel entry clears it, `wait` sets it while sleeping, and `transfer` sets it
+according to the validated target mode. it is not a general-purpose register or
+part of the user-writable flags.
+
+user processes enter the kernel with the zero-operand `syscall` instruction and return through the supervisor-only `transfer` instruction. kernel function addresses are never an abi.
 
 ## memory access
 
@@ -36,7 +42,6 @@ in user mode, instruction fetches, reads, writes, and stack accesses are limited
 - kernel code or data;
 - vram;
 - mmio;
-- the interrupt vector table;
 - the kernel stack; or
 - another process's bank.
 
@@ -74,7 +79,7 @@ the first process format is a flat, statically linked image loaded at `0x7000` i
 - executable size validation; and
 - how the kernel distinguishes the foreground process from the shell.
 
-the loader owns bank selection, rejects images that collide with the initial stack, constructs the startup state, and enters user mode through the supervisor-only resume operation. process exit restores the kernel context and resets the complete console state before redrawing the shell.
+the loader owns bank selection, rejects images that collide with the initial stack, constructs the startup state, and enters user mode through the supervisor-only `transfer` operation. process exit restores the kernel context and resets the complete console state before redrawing the shell.
 
 ## kernel and userspace layers
 
@@ -136,7 +141,7 @@ the kernel validates user buffers before starting a read and records the current
 
 ### 1. freeze the boundary
 
-- keep the `syscall` and `resume` contract synchronized across the cpu, emulator, kernel, assembler, and documentation.
+- keep the `syscall`, `wait`, and `transfer` contract synchronized across the cpu, emulator, kernel, assembler, and documentation.
 - specify the saved user context and kernel stack transition.
 - finalize the user memory permissions and privileged registers.
 - finalize syscall register preservation, pointer validation, and error codes.
@@ -148,7 +153,7 @@ done when the cpu, emulator, kernel, assembler, and application abi can be imple
 
 - add the internal mode state and supervisor reset state.
 - enforce user fetch, read, write, stack, `mb`, vram, and mmio restrictions.
-- implement protected syscall entry, protected user resume, kernel stack switching, and protection faults.
+- implement protected syscall entry, atomic interrupt waiting, protected context transfer, kernel stack switching, and protection faults.
 - add tests for direct kernel jumps, invalid pointers, cross-bank access, vram writes, mmio access, and malformed returns.
 
 done when deliberately hostile test programs remain contained in their own banks and valid syscalls return safely.

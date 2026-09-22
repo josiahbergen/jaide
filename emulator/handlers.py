@@ -1,10 +1,10 @@
 from typing import Callable
 
-from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS
+from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, REGISTERS
 
-from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z
+from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MODE, EVENT_SYSCALL
 from .emulator import Emulator, mask16
-from .exceptions import EmulatorException
+from .exceptions import InvalidInstructionFault, EmulatorException, ProtectionFault, DivisionByZeroFault
 from .util.logger import logger
 
 
@@ -45,7 +45,7 @@ def handle_get(emu, decoded: tuple[int, ...]) -> None:
         base = mask16(emu.pc.value + emu._signed16(imm16))
         emu.reg_set(reg_b, emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
     else:
-        raise EmulatorException(f"unexpected GET variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected GET variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_put(emu, decoded: tuple[int, ...]) -> None:
@@ -67,7 +67,7 @@ def handle_put(emu, decoded: tuple[int, ...]) -> None:
         # [dest_ptr] <- imm  (dddd = dest ptr reg, imm = value)
         emu.bus.write16(emu.reg_get(reg_b), imm16)
     else:
-        raise EmulatorException(f"unexpected PUT variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected PUT variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_mov(emu, decoded: tuple[int, ...]) -> None:
@@ -83,7 +83,7 @@ def handle_mov(emu, decoded: tuple[int, ...]) -> None:
         # dest(reg_a) <- address of label
         emu.reg_set(reg_a, mask16(emu.pc.value + emu._signed16(imm16)))
     else:
-        raise EmulatorException(f"unexpected MOV variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected MOV variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_push(emu, decoded: tuple[int, ...]) -> None:
@@ -94,7 +94,7 @@ def handle_push(emu, decoded: tuple[int, ...]) -> None:
     elif modes == (MODES.IMM,):
         emu._push_core(imm16)
     else:
-        raise EmulatorException(f"unexpected PUSH variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected PUSH variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_pop(emu, decoded: tuple[int, ...]) -> None:
@@ -164,7 +164,7 @@ def handle_mod(emu, decoded: tuple[int, ...]) -> None:
     dest = emu.reg_get(reg_b)
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
     if src == 0:
-        raise EmulatorException(f"division by zero at 0x{emu.pc.value:04x}.")
+        raise DivisionByZeroFault(f"division by zero at 0x{emu.pc.value:04x}.")
     result = mask16(dest % src)
     emu.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
     emu.reg_set(reg_b, result)
@@ -177,7 +177,7 @@ def handle_div(emu, decoded: tuple[int, ...]) -> None:
     src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
 
     if src == 0:
-        raise EmulatorException(f"division by zero at 0x{emu.pc.value:04x}.")
+        raise DivisionByZeroFault(f"division by zero at 0x{emu.pc.value:04x}.")
     result = mask16(dest // src)
     remainder = dest % src
 
@@ -303,7 +303,7 @@ def handle_jmp(emu, decoded: tuple[int, ...]) -> None:
         base = _jump_target(emu, imm16)
         emu.pc.set(emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
     else:
-        raise EmulatorException(f"unexpected JMP variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected JMP variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_jz(emu, decoded: tuple[int, ...]) -> None:
@@ -363,7 +363,7 @@ def handle_call(emu, decoded: tuple[int, ...]) -> None:
     elif modes == (MODES.IMM,):
         emu.pc.set(imm16)
     else:
-        raise EmulatorException(f"unexpected CALL variant at 0x{emu.pc.value:04x}.")
+        raise InvalidInstructionFault(f"unexpected CALL variant at 0x{emu.pc.value:04x}.")
 
 
 def handle_ret(emu, _decoded: tuple[int, ...]) -> None:
@@ -390,6 +390,57 @@ def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
         value = emu.bus.read16(src + i)
         emu.bus.write16(dst + i, value)
 
+
+def handle_syscall(emu, decoded: tuple[int, ...]) -> None:
+    if emu.mode == SUPERVISOR_MODE:
+        raise InvalidInstructionFault("attempted to syscall while already in supervisor mode")
+
+    # enter supervisor mode, using the contents of register a as the event detail
+    emu.enter_supervisor(EVENT_SYSCALL, emu.reg_get(REGISTERS.A), emu.pc.value)
+
+
+def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
+    if emu.mode == USER_MODE:
+        raise ProtectionFault("attempted to transfer while in an unprivileged mode")
+
+    # pop the target context from the supervisor stack
+    target_pc    = emu._pop_core()
+    target_sp    = emu._pop_core()
+    target_mb    = emu._pop_core()
+    target_flags = emu._pop_core()
+    target_mode  = emu._pop_core()
+    _kind        = emu._pop_core()  # unused
+    _detail      = emu._pop_core()  # unused
+
+    if target_pc < 0x7000 or target_pc > 0xAFFF:
+        raise ProtectionFault("attempted to transfer to an invalid user address")
+    if target_sp < 0x7000 or target_sp > 0xAFFF:
+        raise ProtectionFault("attempted to transfer to an invalid user stack pointer")
+    if target_mb > 31:
+        raise ProtectionFault("attempted to transfer to an invalid user bank")
+    if target_mode not in (SUPERVISOR_MODE, USER_MODE):
+        raise ProtectionFault("attempted to transfer to an invalid mode")
+
+    if target_mode == USER_MODE:
+        # save the final supervisor stack pointer
+        emu.ssp.set(emu.sp.value)
+
+    # restore the target context
+    emu.pc.set(target_pc)
+    emu.sp.set(target_sp)
+    emu.mb.set(target_mb)
+    emu.f.set(target_flags)
+    emu.waiting = False
+    emu.ie = True
+    emu.mode = target_mode
+
+def handle_wait(emu, _decoded: tuple[int, ...]) -> None:
+    if emu.mode == USER_MODE:
+        raise ProtectionFault("attempted to wait while in an unprivileged mode")
+    
+    # enable interrupts and begin waiting
+    emu.ie = True
+    emu.waiting = True
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.HALT : handle_halt,

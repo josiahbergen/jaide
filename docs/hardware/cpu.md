@@ -4,7 +4,7 @@
 
 - load-store, little-endia, von-neumann architecture
 - 16-bit address bus touches 128Kib of word-addressable memory (~64k unique words, more with banking)
-- 44 distinct instruction mnemonics
+- fixed-width instructions with optional 16-bit immediates
 - 16-bit word length
 - 12 registers: 8 general-purpose, 4 special, all 16-bit
 
@@ -28,11 +28,12 @@ in the jaide emulator, type help to view a list of commands.
 
 ## reset state
 
-on reset, the content of all registers is `0x0000`. the contents of RAM are undefined. ROM is not modified.
+on reset, general-purpose registers, flags, `mb`, and `pc` are `0x0000`.
+`sp` and the protected supervisor stack pointer are `0xfdff`. the cpu starts in
+supervisor mode with no active kernel event. the contents of ram are undefined
+and rom is not modified.
 
-thus, the jaide will simply start execution at `0x0000`
-
-_it is recommended that SP be set to 0xFDFF on reset._
+execution starts at `0x0000`.
 
 ## registers
 
@@ -52,9 +53,9 @@ _currently, 8 general purpose and 4 special registers are implemented. the four 
 
 `MB` memory bank
 
-`F` flags _(zero, carry, negative, overflow, interrupts enabled)_
+`F` flags _(zero, carry, negative, overflow)_
 
-the format of the flags register is `C Z N O I - - - - - - - - - - -`.
+the format of the flags register is `C Z N O - - - - - - - - - - - -`.
 
 ## instructions
 
@@ -84,7 +85,7 @@ jaide supports up to 128 Kib of memory.
 
 | Range             | Size      | Purpose                                      |
 | ----------------- | --------- | -------------------------------------------- |
-| `0xFF00...0xFFFF` | 512 bytes | interrupt vector table                       |
+| `0xFF00...0xFFFF` | 512 bytes | reserved                                     |
 | `0xFE00...0xFEFF` | 512 bytes | memory-mapped I/O                            |
 | `0xFD00...0xFDFF` | 512 bytes | stack (recommended)                          |
 | `0xB000...0xFCFF` | ~39 KiB   | reserved (future kernel heap / expansion)    |
@@ -95,7 +96,7 @@ jaide supports up to 128 Kib of memory.
 | `0x0100...0x3FFF` | ~16 KiB   | kernel code                                  |
 | `0x0000...0x00FF` | 512 bytes | BIOS ROM                                     |
 
-_the stack grows downwards. it is recommended that SP be set to 0xFDFF._
+_the stack grows downwards. reset initializes SP to 0xFDFF._
 
 _banked memory can be swapped using the MB register._
 

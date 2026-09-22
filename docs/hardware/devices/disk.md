@@ -6,7 +6,7 @@ the disk controller allows for reading and writing to a hard disk.
 
 ### operation
 
-the disk controller utilizes dma-style data transfer to and from a hard disk. on a read command, it copies 256 words into memory over 256 ticks (one word per tick). the device raises interrupt vector 6 on transfer complete.
+the disk controller utilizes dma-style data transfer to and from a hard disk. on a read command, it copies 256 words into memory over 256 ticks (one word per tick). the device asserts interrupt line `0x06` on transfer complete. reading its completed status acknowledges the event and deasserts the line.
 
 ### mmio registers
 

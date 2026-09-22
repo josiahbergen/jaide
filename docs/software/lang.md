@@ -252,7 +252,7 @@ mnemonic    = "GET" | "PUT" | "MOV" | "PUSH" | "POP" | "ADD" | "ADC"
             | "SUB" | "SBC" | "INC" | "DEC" | "LSH" | "RSH" | "AND"
             | "OR" | "NOR" | "NOT" | "XOR" | "INB" | "OUTB" | "CMP"
             | "JMP" | "JZ" | "JNZ" | "JC" | "JNC" | "CALL" | "RET"
-            | "HALT" | "NOP" ;
+            | "HALT" | "WAIT" | "NOP" ;
 
 register    = "A" | "B" | "C" | "D" | "E" | "X" | "Y" | "PC" | "SP" | "MB" | "F" | "Z" | ;
 
