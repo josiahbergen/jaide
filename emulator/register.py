@@ -3,9 +3,9 @@
 # josiah bergen, january 2026
 
 from typing import Callable
-from constants import USER_MODE
+from .constants import USER_MODE
 
-from exceptions import ProtectionFault
+from .exceptions import ProtectionFault
 
 
 class Register:

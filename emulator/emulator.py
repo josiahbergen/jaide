@@ -73,7 +73,12 @@ class Emulator:
         self.ssp.set(0xfdff)
 
         # memory bus and devices
-        self.bus = MemoryBus(self)
+        self.bus = MemoryBus(
+            current_bank=lambda: self.mb.value,
+            current_mode=lambda: self.mode,
+            mmio_read=self.mmio_read,
+            mmio_write=self.mmio_write,
+        )
         self.devices: list[Device] = []
         if enabled_devices.get("pit", False): self.devices.append(PIT())
         if enabled_devices.get("rtc", False): self.devices.append(RTC())
@@ -183,9 +188,9 @@ class Emulator:
         self._push_core(detail)    # event detail 
         self._push_core(event)     # event type
         self._push_core(old_mode)  # old execution mode
-        self._push_core(old_sp)    # ... stack pointer
+        self._push_core(old_mb)    # ... memory bank
         self._push_core(old_f)     # ... flags
-        self._push_core(old_mb)    # ... and memory bank
+        self._push_core(old_sp)    # ... and stack pointer
         self._push_core(target)    # target pc address
 
         # finally, move execution to the kernel's entry point

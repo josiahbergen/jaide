@@ -17,7 +17,6 @@ from .constants import (
 )
 from .util.logger import logger
 
-from .emulator import Emulator
 from .exceptions import ProtectionFault
 
 USER_MEMORY_START = 0x7000
@@ -25,12 +24,11 @@ USER_MEMORY_END = 0xAFFF
 
 class MemoryBus:
     
-    def __init__(self, emulator: Emulator):
-        # functions supplied by the cpu/devices
-        self.current_bank = lambda: emulator.mb.value
-        self.current_mode = lambda: emulator.mode
-        self.mmio_read = emulator.mmio_read
-        self.mmio_write = emulator.mmio_write
+    def __init__(self, current_bank: Callable[[], int], current_mode: Callable[[], int], mmio_read: Callable[[int], int], mmio_write: Callable[[int, int], None]):
+        self.current_bank = current_bank
+        self.current_mode = current_mode
+        self.mmio_read = mmio_read
+        self.mmio_write = mmio_write
         # initialize bytearrays for main memory, vram, and banks
         self.memory = bytearray(MEMORY_SIZE)
         self.vram = bytearray(VRAM_SIZE)
@@ -44,7 +42,11 @@ class MemoryBus:
     def read16(self, address: int, *, bank: int | None = None) -> int:
         # read and return 16-bit word from memory, dispatching to mmio_read if necessary. 
         address &= 0xFFFF # mask address to 16 bits
-        
+
+        in_user_boundary = USER_MEMORY_START <= address <= USER_MEMORY_END
+        if self.current_mode() == USER_MODE and not in_user_boundary:
+            raise ProtectionFault(f"unauthorized read from protected memory at 0x{address:04X}.")
+
         if MMIO_BASE <= address <= MMIO_END:
             # if read is from mmio, dispatch to mmio_read
             return self.mmio_read(address) & 0xFFFF
