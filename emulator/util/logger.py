@@ -61,8 +61,9 @@ class Logger:
         """ Print error message and exit the program with error status. """
         # formatted = b.RED + f.BLACK + "\n fatal! " + b.RESET + f.RED + " " + scope + ": " + message + f.RESET
 
-        newline = '\n' if self.level >= self.log_level.INFO else ''
-        formatted = f"{newline}{b.RED}{f.BLACK} fatal! {b.RESET}{f.RED} {scope}: {message}{f.RESET}"
+        # newline = '\n' if self.level >= self.log_level.INFO else ''
+        newline = ''
+        formatted = f"{newline}{b.RED}{f.BLACK} fatal! {b.RESET}{f.RED} {scope}{":" if message else ""} {message}{f.RESET}"
 
         print(formatted)
         sys.exit(1)  # exit with error
@@ -73,7 +74,8 @@ class Logger:
         # formatted = f"\n{b.RED}{f.BLACK} stopped! {b.RESET}{f.RESET} {scope}: {message}{f.RESET}"
 
         # newline = '\n' if self.level >= self.log_level.INFO else ''
-        formatted = f"\n{b.RED}{f.BLACK} {message} {b.RESET}{f.RESET} process killed at {scope} {f.RESET}"
+        # formatted = f"{b.RED}{f.BLACK} {message} {b.RESET}{f.RESET} process killed at {scope} {f.RESET}"
+        formatted = f"{f.RED}{message}:{f.RESET} process killed at {scope} {f.RESET}"
         print(formatted)
         sys.exit(0)  # exit with non-error
 
@@ -103,19 +105,13 @@ class Logger:
         formatted = f"{f.YELLOW}warn: {f.RESET}{scope}{message}"
         end_char = '' if choice else '\n'
         print(formatted, end=end_char)
-        if not choice:
-            return
-        if not self.yesno():
+        if choice and not self.yesno():
             self.kill("abort", scope)
 
 
-    def yesno(self, message: str | None = None) -> bool:
+    def yesno(self) -> bool:
         """ Print a yes/no question and return a boolean answer. """
-        prompt = (message or "") + " (y/n): "
-
-        while not (ans := input(prompt).lower().strip()).startswith(("y", "n")):
-            print("invalid answer.", end="")
-        return ans.startswith("y")
+        return input(f"\n{f.YELLOW}warn:{f.RESET} would you like to continue? (y/N): ").lower().strip().startswith("y")
 
 
     def nl(self):

@@ -18,13 +18,13 @@ instructions. user code cannot read or write `irq_allowed`. kernel entry clears
 it, `transfer` derives it from the target mode, and `wait` enables it only while
 sleeping.
 
-| transition                       | resulting `irq_allowed` |
-| -------------------------------- | ----------------------- |
-| reset                            | `0`                     |
-| `transfer` to user               | `1`                     |
-| `transfer` to supervisor         | `0`                     |
-| syscall, fault, or interrupt entry | `0`                   |
-| supervisor `wait`                | `1` while waiting       |
+| transition                         | resulting `irq_allowed` |
+| --------------------------------   | ----------------------- |
+| reset                              | `0`                     |
+| `transfer` to user                 | `1`                     |
+| `transfer` to supervisor           | `0`                     |
+| syscall, fault, or interrupt entry | `0`                     |
+| supervisor `wait`                  | `1` while waiting       |
 
 ordinary supervisor execution is therefore non-interruptible. user execution
 may be interrupted between instructions, and supervisor code opens one atomic
@@ -53,9 +53,8 @@ all transfers between execution scopes use this seven-word frame:
 | `+5`   | event kind  |
 | `+6`   | detail      |
 
-event kind is `0` for a fault, `1` for a syscall, and `2` for a hardware
-interrupt. detail is respectively the fault code, syscall number, or interrupt
-number.
+event kind is `0` for a fault, `2` for a hardware interrupt, and `2` for a syscall. 
+detail is the fault code, interrupt number, or syscall number respectively.
 
 the frame does not contain general-purpose registers. a hardware-interrupt stub
 must save and restore every register it uses. a syscall stub preserves registers

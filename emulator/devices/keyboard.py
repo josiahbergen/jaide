@@ -8,6 +8,8 @@ from .device import Device
 
 
 class Keyboard(Device):
+    interrupt_number = 0x04
+
     def __init__(self, key_queue: deque):
         """Keyboard controller. Reads translated scancodes from the shared queue populated by the graphics controller.
 
@@ -29,6 +31,7 @@ class Keyboard(Device):
         key = self._pending
         self._pending = 0
         self._has_key = False
+        self.interrupt_raised = False
         return key
 
     def tick(self) -> None:
@@ -37,8 +40,10 @@ class Keyboard(Device):
 
         self._pending = self._key_queue.popleft()
         self._has_key = True
+        self.interrupt_raised = True
 
     def reset(self) -> None:
+        super().reset()
         self._key_queue.clear()
         self._pending = 0
         self._has_key = False

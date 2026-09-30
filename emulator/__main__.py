@@ -43,7 +43,7 @@ def check_files(file: str) -> None:
 
     # check if file has a valid binary extension
     if not file.endswith(".bin"):
-        logger.warning("file does not have a valid binary extension. are you sure you want to continue?", scope, choice=True)
+        logger.warning("file does not have a valid binary extension.", scope, choice=True)
 
 
 def main():

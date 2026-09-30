@@ -168,7 +168,7 @@ class Emulator:
 
 
     def pending_interrupts(self) -> list[int] | None:
-        return [device.interrupt_number for device in self.devices if device.interrupt_raised == True] if self.ie else None
+        return sorted(device.interrupt_number for device in self.devices if device.interrupt_raised and device.interrupt_number is not None) if self.ie else None
 
     def enter_supervisor(self, event: int, detail: int, target: int) -> None:
         # save old cpu context (for switching back later)
@@ -198,17 +198,23 @@ class Emulator:
 
 
     def reset(self) -> None:
-        self.bus.reset()
+        # reset protection state
+        self.mode = SUPERVISOR_MODE
+        self.ie = False
 
         # reset registers
         for register in self.reg.values():
             register.set(0)  # conveniently, this puts us in supervisor mode
         self.sp.set(0xFDFF)
-        self.stopped = False
+        self.ssp.set(0xFDFF)
 
+        # reset bus and devices
+        self.bus.reset()
         for device in self.devices:
             device.reset()
 
+        self.waiting = False
+        self.stopped = False
         logger.info("emulator reset!")
 
 
@@ -248,9 +254,8 @@ class Emulator:
         self.running = True
         try:
             while True:
-                # normal execution
-                time.sleep(0)
                 self.step()
+                time.sleep(0.0001)
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
@@ -258,10 +263,11 @@ class Emulator:
         except KeyboardInterrupt:
             # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
-            logger.info("! execution stopped (user interrupt).")
+            print("\r\033[2K", end="", flush=True)  # clear the terminal's "^C" echo
+            logger.warning("execution stopped! (user interrupt)")
         except Exception as e:
-            # general exception. this is an emulator code error, 
-            # not an assembly error. allow the repl to persist.
+            # general exception. this is an emulation issue, 
+            # not a real cpu fault. allow the repl to persist.
             logger.error(f"fatal! while running instruction at 0x{(self.pc.value)}:\n{traceback.format_exc()}")
         finally:
             self.running = False

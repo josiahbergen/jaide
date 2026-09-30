@@ -85,6 +85,7 @@ class Graphics(Device):
         self._last_hash = None
 
     def reset(self) -> None:
+        super().reset()
         self.enabled = True
         self.key_queue.clear()
         self._last_render = 0.0

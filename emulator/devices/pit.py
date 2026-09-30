@@ -7,6 +7,8 @@ from .device import Device
 
 
 class PIT(Device):
+    interrupt_number = 0x05
+
     def __init__(self):
         """Programmable interval timer."""
         super().__init__()
@@ -32,6 +34,7 @@ class PIT(Device):
     def _get_flags(self) -> int:
         value = 0 | self.enabled
         value |= self.one_shot << 1
+        self.interrupt_raised = False
         return value
 
     def tick(self) -> None:
@@ -46,9 +49,10 @@ class PIT(Device):
             else:
                 self.counter = self.reload  # run it back baby
 
-            pass  # no IRQ; tick counter incremented here in future
+            self.interrupt_raised = True
 
     def reset(self) -> None:
+        super().reset()
         self.enabled = False
         self.one_shot = False
         self.counter = 0

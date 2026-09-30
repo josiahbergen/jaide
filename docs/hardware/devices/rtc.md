@@ -2,6 +2,10 @@
 
 the real time clock is a simple read-only device that allows querying the current date and time.
 
+## interrupts
+
+the rtc has no irq line. reads from `0xFE30` through `0xFE33` only return time values; they do not acknowledge an interrupt.
+
 ## MMIO registers
 
 the rtc supports reading from four registers:

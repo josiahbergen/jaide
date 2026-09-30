@@ -2,21 +2,23 @@
 # device base class for the jaide emulator.
 # josiah bergen, march 2026
 
-from typing import Callable
+from typing import Callable, ClassVar
 
 from ..exceptions import EmulatorException
 from ..util.logger import logger
 
 
 class Device:
+    # Devices without an interrupt line have no interrupt number.
+    interrupt_number: ClassVar[int | None] = None
+
     def __init__(self):
         # by default, no read or write handlers are defined
         self.read_dispatch: dict[int, Callable[..., int]] = {}
         self.write_dispatch: dict[int, Callable[[int], None]] = {}
 
-        # devices may raise hardware interrupts
+        # Latched until the device acknowledges its event through MMIO.
         self.interrupt_raised: bool = False
-        self.interrupt_number: int = 0 
 
     def mmio_read(self, addr: int) -> int:
         """Dispatch a request to read from a device."""
@@ -52,7 +54,7 @@ class Device:
 
     def reset(self) -> None:
         """Reset device state. Called by the emulator when reset asserted."""
-        logger.warning(f"device {self.__class__.__name__} does not implement reset()")
+        self.interrupt_raised = False
 
     def _log_ready(self) -> None:
         logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()}")

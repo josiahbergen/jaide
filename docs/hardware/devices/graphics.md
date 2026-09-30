@@ -4,6 +4,12 @@ the jaide graphics controller is a graphical processing unit for the jaide compu
 
 it uses memory bank `0x01` for vram, and contains 16Kib of font and attribute ROM.
 
+## interrupts
+
+the graphics controller has no irq line. reading its control register at `0xFE40` reports whether output is enabled and does not acknowledge an interrupt.
+
+key input is delivered through the [keyboard controller](keyboard.md), which has its own irq line and acknowledgement register. reading the graphics control register does not acknowledge a keyboard event.
+
 ## resolution
 
 the controller outputs 80x25 8x16 tiles, for a total size of 640×400.

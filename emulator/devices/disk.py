@@ -16,6 +16,8 @@ SECTOR_WORDS = 256
 
 
 class Disk(Device):
+    interrupt_number = 0x06
+
     def __init__(self, disk_file: str, bus: MemoryBus):
         """Disk controller."""
         super().__init__()
@@ -51,12 +53,16 @@ class Disk(Device):
         self.write_dispatch[0xFE20] = self.execute_command
         self.write_dispatch[0xFE21] = lambda value: setattr(self, "sector_number", value)
         self.write_dispatch[0xFE22] = lambda value: setattr(self, "memory_address", value)
-        self.read_dispatch[0xFE23] = lambda: self.status
+        self.read_dispatch[0xFE23] = self._read_status
 
         self._log_ready()
 
     def _log_ready(self) -> None:
         logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()} (using {self.disk_file})")
+
+    def _read_status(self) -> int:
+        self.interrupt_raised = False
+        return self.status
 
     def execute_command(self, value: int) -> None:
         if self.status == STATUS_BUSY:
@@ -68,6 +74,7 @@ class Disk(Device):
             logger.warning(f"invalid disk command: 0x{value:02X}")
             self.status = STATUS_ERROR
             self._command = None
+            self.interrupt_raised = True
             return
 
         sector_start = self.sector_number * SECTOR_WORDS * 2
@@ -75,6 +82,7 @@ class Disk(Device):
             logger.warning(f"disk sector {self.sector_number} is out of range")
             self.status = STATUS_ERROR
             self._command = None
+            self.interrupt_raised = True
             return
 
         if value == COMMAND_READ:
@@ -112,17 +120,19 @@ class Disk(Device):
         self._cursor += 1
         if self._cursor == SECTOR_WORDS:
             # transfer complete
-            self.status = STATUS_IDLE
-            self._command = None
-            self._cursor = 0
-
             if self._command == COMMAND_WRITE:
                 with open(self.disk_file, "wb") as f:
                     f.write(self.disk)
-                    
+
+            self.status = STATUS_IDLE
+            self._command = None
+            self._cursor = 0
+            self.interrupt_raised = True
+
             logger.debug("transfer complete! status reset to idle.")
 
     def reset(self) -> None:
+        super().reset()
         self.status = STATUS_IDLE
         self.sector_number = 0
         self.memory_address = 0
