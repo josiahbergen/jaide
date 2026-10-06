@@ -48,6 +48,22 @@ the jasm assembler supports the following flags:
 
 _note: linkable (position-independent) code is not yet implemented. `--nolink` is currently the only supported mode._
 
+### source mapping and breakpoints
+
+assembly also writes `<output>.debug.json`. this is a JSON array with one entry per 16-bit word in the binary, in file order. entry `i` describes memory address `load_address + i`.
+
+each entry contains:
+
+| field       | meaning                                                 |
+| ----------- | ------------------------------------------------------- |
+| instruction | full instruction or data directive                      |
+| source      | filename:line number                                    |
+| breakpoint  | whether the instruction contains an emulator breakpoint |
+
+`break` emits no words, but is instead saved in the source map. it marks the first word of the next instruction, skipping labels, data, and alignment. it also works inside macros. a `break` without a following instruction is an assembly error.
+
+the emulator attempts to load an associated source map alongside a binary automatically. inside the emulator, `source [address]` displays the full instruction and its source location. omitting address uses the PC.
+
 ## constants
 
 numbers can be expressed in base `2`, `10`, or `16`. standard prefixes are used.

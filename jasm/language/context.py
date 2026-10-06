@@ -4,6 +4,7 @@
 
 from ..util.logger import logger
 from .ir.base import MacroDefinitionNode
+from common.debug import SourceMap
 
 
 class AssemblyContext:
@@ -17,10 +18,14 @@ class AssemblyContext:
         self.macros: dict[str, MacroDefinitionNode] = {}  # macros
         self.origin: int | None = None  # starting pc
 
-        self.files: set[str] = set[str]() # all files that contributed to the binary
+        self.files = set[str]() # all files that contributed to the binary
         self.files.add(self.root)
 
-        # optional behavior changes (more to come, hopefully)
+        # source mapping toggle and handler
+        self.source_mapping: bool = True
+        self.source_map = SourceMap()
+
+        # optional behavior changes (more to co me, hopefully)
         self.linkable: bool = options.get("linkable", True) if options else True  # linkable mode
         self.write: bool = options.get("write", True) if options else True  # write mode
 
@@ -52,7 +57,6 @@ class AssemblyContext:
             logger.warning(f'constant "{name}" re-defined! note that constant names are case-insensitive.', scope)
 
         self.constants[name] = value
-
 
     def set_origin(self, address: int) -> None:
         scope = "context.py:AssemblyContext.set_origin()"
