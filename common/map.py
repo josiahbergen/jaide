@@ -7,6 +7,9 @@ from jasm.language.ir.base import AlignDirectiveNode, DataDirectiveNode, Instruc
 
 type DirectiveNode = DataDirectiveNode | TimesDirectiveNode | AlignDirectiveNode
 
+class SourceMapException(Exception):
+    pass
+
 @dataclass
 class SourceWord:
     instruction: str
@@ -21,6 +24,9 @@ class SourceMap:
 
     def reset(self) -> None:
         self.words.clear()
+
+    def from_json(self, raw: bytes) -> None:
+        self.words = [SourceWord(**word) for word in json.loads(raw)]
 
     def add_node(self, node: DirectiveNode | InstructionNode, bytes: bytearray, breakpoint: bool = False) -> None:
         for i in range(0, len(bytes), 2):
@@ -40,9 +46,12 @@ class SourceMap:
         # write a source map file to the same directory as a binary,
         # keeping the same filename but with a .map.json extension: /bin/kernel.bin -> /bin/kernel.map.json
 
-        binary = Path(binary_path)
-        binary_name = binary.name.split(".", 1)[0]  # extract filename without extension
+        map = Path(binary_path).with_suffix(".map.json")
+        map.write_text(json.dumps([asdict(word) for word in self.words], indent=2) + "\n")
 
-        # write file
-        map_path = binary.parent / f"{binary_name}.map.json"
-        map_path.write_text(json.dumps([asdict(word) for word in self.words], indent=2) + "\n")
+
+    def get_source(self, addr: int) -> str:
+        if addr < 0 or addr >= len(self.words):
+            return "unknown"
+        source = self.words[addr]
+        return f"{source.instruction}, word {source.index} (from {source.source})"

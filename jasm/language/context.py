@@ -4,7 +4,7 @@
 
 from ..util.logger import logger
 from .ir.base import MacroDefinitionNode
-from common.debug import SourceMap
+from common.map import SourceMap
 
 
 class AssemblyContext:
@@ -36,7 +36,7 @@ class AssemblyContext:
         if label in self.labels.keys():
             logger.fatal(f'label "{label}" defined multiple times! note that labels are case-insensitive.', scope)
 
-        logger.debug(f'context: label "{label}" defined at PC {pc}')
+        logger.verbose(f'context: label "{label}" defined at PC {pc}')
         self.labels[label] = pc
 
     def add_macro(self, name: str, macro: MacroDefinitionNode) -> None:

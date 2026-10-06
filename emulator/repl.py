@@ -90,7 +90,7 @@ def run(emulator: Emulator, args: list[str]) -> None:
 def step(emulator: Emulator, args: list[str]) -> None:
     """step                     execute one instruction"""
     arguments(args)
-    emulator.step()
+    emulator.step(pass_breakpoints=True)
 
 
 def breakpoint(emulator: Emulator, args: list[str]) -> None:
@@ -161,6 +161,13 @@ def disasm(emulator: Emulator, args: list[str]) -> None:
     addr = hex16(args[0]) if args else emulator.pc.value
     logger.info(disasm_at(emulator, addr))
 
+def src(emulator: Emulator, args: list[str]) -> None:
+    """src [<addr>]             display source code at an address or the PC"""
+    if len(args) > 1:
+        raise ValueError(f"expected at most 1 argument, got {len(args)}")
+    addr = hex16(args[0]) if args else emulator.pc.value
+    logger.info(emulator.source_map.get_source(addr))
+
 
 def reset(emulator: Emulator, args: list[str]) -> None:
     """reset                    reset the emulator"""
@@ -191,6 +198,7 @@ COMMANDS = {
     "mset": set_memory,
     "mem": memory,
     "disasm": disasm,
+    "src": src,
     "reset": reset,
     "help": help_command,
     "quit": quit_command,
@@ -198,7 +206,7 @@ COMMANDS = {
 
 
 def read_commands(requests: Queue[CommandRequest]) -> None:
-    logger.info("jaide emulator; type 'help' for a list of commands")
+    logger.info("welcome to the emulator. type 'help' for a list of commands.")
 
     while True:
         try:

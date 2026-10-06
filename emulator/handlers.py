@@ -19,7 +19,7 @@ def _jump_target(emu: Emulator, imm16: int) -> int:
     return mask16(emu.pc.value + emu._signed16(imm16))
 
 # operation handlers
-# decoded is always (opcode, reg_a, reg_b, imm16)
+# decoded is always (opcode, reg_a, reg_b, imm16) where
 # reg_a = ssss (high nibble), reg_b = dddd (low nibble)
 # see OPCODE_FORMATS for which operand each field represents per opcode.
 

@@ -42,7 +42,7 @@ def generate_binary(context: AssemblyContext) -> bytearray:
 
             continue  # no code to generate
 
-        logger.debug(f"bytes: finished generating {len(binary) - old_len} bytes for {node} on line {node.line} (0x{node.pc:04X})")
+        logger.verbose(f"bytes: finished generating {len(binary) - old_len} bytes for {node} on line {node.line} (0x{node.pc:04X})")
 
     if len(context.ir) > 0 and pending_breakpoint:
         last_node = context.ir[-1]
@@ -58,6 +58,8 @@ def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytea
 
     if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
         # jump to absolute (non-label) address
+        print(node.operands[0])
+        print(context.linkable)
         logger.fatal(f"jump to absolute address on line {node.line}. use --nolink to enable low-level functionality.", scope)
 
     fmt = OPCODE_FORMATS[node.opcode]

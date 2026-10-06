@@ -5,6 +5,7 @@
 import os
 
 from tap import Tap
+from pathlib import Path
 
 from .emulator import Emulator
 from .repl import run_interactive
@@ -38,17 +39,23 @@ def check_files(file: str) -> None:
         logger.fatal("no source file provided.", scope)
 
     # check if file exists
-    if not os.path.exists(file):
+    if not Path(file).exists():
         logger.fatal(f"file {file} does not exist.", scope)
 
     # check if file has a valid binary extension
     if not file.endswith(".bin"):
         logger.warning("file does not have a valid binary extension.", scope, choice=True)
 
+    # check for a source map file
+    if not Path(file).with_suffix(".map.json").exists():
+        logger.warning("no source map file found. some debugging features will be unavailable.", scope)
+        logger.warning(f"checked file: {Path(file).with_suffix('.map.json')}", scope)
+
 
 def main():
     """main entry point for the emulator."""
     args = EmulatorArgumentParser().parse_args()
+    scope = "__main__.py:main()"
 
     devices: dict[str, bool] = {
         "pit": args.pit,
@@ -64,7 +71,7 @@ def main():
         check_files(args.binary)
         emulator.load_binary(args.binary)
     else:
-        logger.warning("no binary file provided, you will need to load one manually.", "__main__.py:main()")
+        logger.warning("no binary file provided, you will need to load one manually.", scope)
 
     if args.run:
         logger.info("starting execution...")
@@ -77,7 +84,6 @@ def main():
     except KeyboardInterrupt:
         # the user has pressed ctrl+c inside the repl,
         # so we'll mirror the behavior of the quit command
-        # logger.info("\nbye! (signal from __main__)")
         logger.info("")
         emulator.shutdown()
 

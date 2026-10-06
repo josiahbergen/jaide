@@ -20,8 +20,9 @@ dev = [
 ]
 
 [tool.poe.tasks]
-all = { sequence = ["build", "run"], help = "Build and run the emulator" }
-build = { cmd = "python -m jasm -v 0 kernel/boot.jasm -o bin/boot.bin --nolink --nowarn -v 2", help = "Build the boot image" }
+all = { sequence = ["clear", "build", "run"], help = "Build and run the emulator" }
+clear = { cmd = "clear" }
+build = { cmd = "python -m jasm -v 0 kernel/boot.jasm -o bin/boot.bin --nowarn -v 2", help = "Build the boot image" }
 run = { cmd = "python -m emulator bin/boot.bin --pit --rtc --graphics --disk --image jfs/images/disk.img -r -v 2", help = "Run the emulator" }
 test = { cmd = "pytest", help = "Run the test suite" }
 stats = { cmd = "cloc --include-ext=jasm,py,md,txt,ebnf --force-lang=Assembly,jasm --exclude-dir=.venv .", help = "Show project statistics" }

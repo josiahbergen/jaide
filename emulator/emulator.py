@@ -2,7 +2,7 @@
 # jaide emulator
 # josiah bergen, january 2026
 
-import os
+from pathlib import Path
 import sys
 import time
 import traceback
@@ -10,6 +10,7 @@ from collections import deque
 from typing import Callable
 
 from common.isa import INSTRUCTIONS, OPCODE_FORMATS
+from common.map import SourceMap
 
 from .bus import MemoryBus
 from .constants import (
@@ -55,6 +56,7 @@ class Emulator:
         self.running: bool = False  # true only while the run loop is active
         self.waiting: bool = False  # waiting for an interrupt
         self.stopped: bool = False  # hardware halt
+        self.source_map: SourceMap = SourceMap()
 
         # internal registers
         self.mode: int = SUPERVISOR_MODE  # execution mode
@@ -98,7 +100,7 @@ class Emulator:
     def load_binary(self, file: str, addr: int = 0):
 
         # check if file exists
-        if not os.path.exists(file):
+        if not Path(file).exists():
             logger.error(f"file {file} does not exist.")
             return
 
@@ -109,6 +111,19 @@ class Emulator:
         # load 'er up
         self.bus.load_bytes(addr, binary)
         logger.info(f"loaded {len(binary)} bytes to 0x{addr:04X}.")
+
+        # attempt to load source map
+        source_map_file = Path(file).with_suffix('.map.json')
+        if not source_map_file.exists():
+            logger.error(f"file {source_map_file} does not exist.")
+            return
+
+        logger.verbose(f"loading source map from {source_map_file}...")
+        with source_map_file.open("rb") as f:
+            self.source_map.from_json(f.read())
+
+        self.breakpoints = set(word for word, source in enumerate(self.source_map.words) if source.breakpoint)
+        logger.debug(f"loaded {len(self.breakpoints)} breakpoint{'' if len(self.breakpoints) == 1 else 's'}, {len(self.source_map.words)} symbols from {source_map_file}.")
 
     # registers
     def reg_get(self, index: int) -> int:
@@ -176,6 +191,13 @@ class Emulator:
         old_f    = self.f.value
         old_mb   = self.mb.value
         old_mode = self.mode
+
+        if old_mode == SUPERVISOR_MODE and event == EVENT_FAULT:  # double fault
+            logger.error(f"double fault at 0x{target:04X}: press ENTER to reset the emulator, or press ^C to drop into the debugger.", "fatal!")
+            self.running = False
+            input()
+            print("\033[F", end="")
+            self.reset()
 
         # set execution mode to supervisor and disable interrupts
         self.mode = SUPERVISOR_MODE
@@ -253,6 +275,7 @@ class Emulator:
 
         self.running = True
         try:
+            self.step(pass_breakpoints=True)
             while True:
                 self.step()
                 time.sleep(0.0001)
@@ -273,12 +296,12 @@ class Emulator:
             self.running = False
 
 
-    def step(self) -> None:
+    def step(self, pass_breakpoints: bool = False) -> None:
 
         # hardware-level overrides
         if self.stopped:
             raise EmulatorException("halted")
-        if self.pc.value in self.breakpoints:
+        if not pass_breakpoints and self.pc.value in self.breakpoints:
             raise EmulatorException(f"hit breakpoint at {self.pc}")
 
         for device in self.devices:
@@ -316,7 +339,7 @@ class Emulator:
             # catch various non-fatal cpu faults.
             # these run here because they are not actual emulation faults,
             # and transfer control flow to supervisor mode to deal with the problem.
-            logger.error(f"permission fault: {e.message} (at 0x{instruction_address:04X}).")
+            logger.error(f"protection fault: {e.message} (at 0x{instruction_address:04X}).")
             self.enter_supervisor(EVENT_FAULT, FAULT_PROTECTION, instruction_address)
         except InvalidInstructionFault as e:
             # invalid instructions

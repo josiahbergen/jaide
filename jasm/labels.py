@@ -35,7 +35,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                 logger.fatal(f'label "{node.name.lower()}" already defined as a constant (line {node.line})', scope)
 
             # add the label to the context's labels dictionary.
-            logger.debug(f'labels: "{node.name}" defined at PC {pc}')
+            logger.verbose(f'labels: "{node.name}" defined at PC {pc}')
             context.labels[node.name] = pc
             continue
 
@@ -44,7 +44,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                 # search for constants (initially parsed as labels),
                 # and replace them with immediate operands.
                 if isinstance(operand, LabelOperand) and operand.short_name in context.constants:
-                    logger.debug(f"labels: constant operand {operand} -> {context.constants[operand.short_name]} (line {node.line})")
+                    logger.verbose(f"labels: constant operand {operand} -> {context.constants[operand.short_name]} (line {node.line})")
                     num = NumberTerminal(operand.line, operand.filename, str(context.constants[operand.short_name]))
                     node.operands[i] = ImmediateOperand(operand.line, operand.filename, num)
 
@@ -97,7 +97,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                     continue
 
                 abs_addr = context.labels[operand.name]
-                logger.debug(f"labels: '{operand.name}' -> absolute {abs_addr:#06x} (line {node.line})")
+                logger.verbose(f"labels: '{operand.name}' -> absolute {abs_addr:#06x} (line {node.line})")
 
                 # swap in the immediate operand
                 node.operands[i] = ImmediateOperand(

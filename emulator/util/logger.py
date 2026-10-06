@@ -52,9 +52,9 @@ class Logger:
         if self.level >= self.log_level.INFO:
             print(message)
 
-    def error(self, message: str):
+    def error(self, message: str, prefix: str = "err: "):
         """ Print non-fatal error message. """
-        formatted = f"{f.RED}err:{f.RESET} {message}"
+        formatted = f"{f.RED}{prefix} {f.RESET}{message}"
         print(formatted)
 
     def fatal(self, message: str, scope: str):
