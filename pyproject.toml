@@ -32,6 +32,7 @@ script = "poethepoet.scripts:rm('bin')"
 
 [tool.pytest]
 testpaths = ["test"]
+pythonpath = ["."]
 
 [tool.ruff]
 fix = true

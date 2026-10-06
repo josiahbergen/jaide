@@ -111,4 +111,3 @@ class ExpressionOperand(Operand):
 
     def __str__(self) -> str:
         return f"({self.expression})"
-

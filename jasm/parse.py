@@ -35,7 +35,7 @@ def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:
     logger.debug(f"parse: flattening {len(ir)} file{'s' if len(ir) > 1 else ''}...")
 
     first_file = list[str](ir.keys())[0] # root file, so the recursive parsing mimics the original file order
-    context: AssemblyContext = AssemblyContext(first_file)
+    context: AssemblyContext = AssemblyContext(first_file, options)
 
     # recursively generate context from all parsed files
     update_context_from_file(context, ir, first_file)

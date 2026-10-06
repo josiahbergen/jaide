@@ -36,13 +36,12 @@ def check_files(file: str, output: str):
     if output and not output.endswith(".bin"):
         logger.warning(f"output file {output} will not have a valid binary extension. are you sure you want to continue?", scope, choice=True)
 
-    # create output file if it doesn't exist
+    # create the output directory if needed
     if output and not os.path.exists(output):
         logger.debug(f"creating output file {output}...")
 
         # create directory if it doesn't exist
-        os.makedirs(os.path.dirname(output), exist_ok=True)
-        open(output, "w").close()
+        os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
 
 
 def main():
