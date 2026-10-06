@@ -205,6 +205,14 @@ class OrgDirectiveNode(IRNode):
         return 0  # parsed and removed
 
 
+class BreakDirectiveNode(IRNode):
+    def __str__(self) -> str:
+        return "breakpoint"
+
+    def get_size(self) -> int:
+        return 0  # parsed and removed
+
+
 class DefineDirectiveNode(IRNode):
     def __init__(self, line: int, filename: str, name: str, value: str):
         super().__init__(line, filename)
@@ -314,6 +322,9 @@ class MacroDefinitionNode(IRNode):
                     if isinstance(operand, MacroArgumentOperand):
                         logger.verbose(f"macro: replacing macro argument {operand.placeholder} with {placeholder_to_value[operand.placeholder]}")
                         element.operands[i] = placeholder_to_value[operand.placeholder]
+
+            elif isinstance(element, BreakDirectiveNode):
+                pass
             
             else:
                 logger.fatal(f"macros can only contain instructions: {self.name} (line {line_of_call})", scope)

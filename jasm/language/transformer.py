@@ -8,6 +8,7 @@ from lark import Token, Transformer, v_args
 from ..util.logger import logger
 from .ir.base import (
     AlignDirectiveNode,
+    BreakDirectiveNode,
     DataDirectiveNode,
     DefineDirectiveNode,
     ImportDirectiveNode,
@@ -127,6 +128,9 @@ class IRTransformer(Transformer):
     def align_directive(self, _align: Token, alignment: NumberTerminal):
         # "ALIGN" NUMBER
         return AlignDirectiveNode(line(alignment), self.filename, alignment.value)
+
+    def break_directive(self, keyword: Token):
+        return BreakDirectiveNode(line(keyword), self.filename)
 
     def data_directive(self, _data: Token, *values: NumberTerminal | StringTerminal | IdentifierTerminal) -> DataDirectiveNode:
         scope = "transformer.py:data_directive()"
