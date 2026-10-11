@@ -16,10 +16,7 @@ import "kernel/syscalls/system.jasm"
 
 import "kernel/lib/string.jasm"
 
-data "KERNEL"
-
 main:
-    break
     call tty__init
     call shell__draw_startup_message
     halt

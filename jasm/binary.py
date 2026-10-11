@@ -56,10 +56,8 @@ def generate_binary(context: AssemblyContext) -> bytearray:
 def encode_instruction(node: InstructionNode, context: AssemblyContext) -> bytearray:
     scope = "binary.py:encode_instruction()"
 
-    if not context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
+    if context.linkable and node.mnemonic == INSTRUCTIONS.JMP and node.operands[0].mode == MODES.IMM:
         # jump to absolute (non-label) address
-        print(node.operands[0])
-        print(context.linkable)
         logger.fatal(f"jump to absolute address on line {node.line}. use --nolink to enable low-level functionality.", scope)
 
     fmt = OPCODE_FORMATS[node.opcode]
