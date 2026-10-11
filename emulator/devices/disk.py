@@ -58,7 +58,7 @@ class Disk(Device):
         self._log_ready()
 
     def _log_ready(self) -> None:
-        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()} (using {self.disk_file})")
+        logger.debug(f"device ready! {self.__class__.__name__} on {self._get_mmio_list()}, using {self.disk_file}")
 
     def _read_status(self) -> int:
         self.interrupt_raised = False

@@ -22,10 +22,7 @@ the kernel supports a low-level interface of syscalls, mostly for system + drive
 
 ### register usage
 
-| caller-saved (clobbered) | callee-saved (preserved)      |
-| ------------------------ | ----------------------------- |
-| `a`, `b`, `c`, `d`, `e` | `x`, `y`, `z`, `f`, `sp`, `mb` |
-
+all registers are callee-saved, meaning that a system call will always preserve all registers.
 
 ## kernel tty
 
