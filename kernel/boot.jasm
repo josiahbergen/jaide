@@ -8,7 +8,7 @@ start:
     mov sp, 0xfdff
     
     ; todo: load kernel into ram with manual mmio writes
-    jmp kernel__main
+    jmp kernel__init
 
 align 0x100 ; fill entire rom
 

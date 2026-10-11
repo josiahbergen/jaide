@@ -16,10 +16,24 @@ import "kernel/syscalls/system.jasm"
 
 import "kernel/lib/string.jasm"
 
-main:
+hardware_entry:
+
+    ; this is the hardware-specified kernel entry point.
+    ; interrupts, faults, and syscalls will all jump to here (0x0100).
+
+    ; jump to the main dispatch code to make sense of what's going on.
+    jmp event_dispatch
+    
+    ; ensure that the kernel initialization code is aligned to a 
+    ; 16-word boundary (0x0110, in this case). purely for aesthetics!
+    align 0x10
+
+init:
+
+    ; small one-time initialization.
+    ; the bootloader jumps to this code directly.
     call tty__init
     call shell__draw_startup_message
-    halt
 
     mov x, 0
     mov y, 0
@@ -27,12 +41,17 @@ main:
 
 loop:
     ; poll keyboard and dispatch keystrokes to the shell
-    mmio_in a, mmio_keyboard_status
-    cmp a, 0
-    jz loop
-    mmio_in a, mmio_keyboard_data
-    call shell__key_pressed
+    wait
     jmp loop
+
+; hardware event dispatch
+; called via:  hardware interrupt, fault, or syscall
+; returns:     nothing
+;
+; event_dispatch is given a stack frame with this information:
+; 
+
+event_dispatch:
 
 ; system call interface
 ; called via:  call kernel__dispatch_syscall  (a = syscall number, args in b, c, d, e)

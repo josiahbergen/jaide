@@ -53,7 +53,7 @@ all transfers between execution scopes use this seven-word frame:
 | `+5`   | event kind  |
 | `+6`   | detail      |
 
-event kind is `0` for a fault, `2` for a hardware interrupt, and `2` for a syscall. 
+event kind is `0` for a fault, `1` for a hardware interrupt, and `2` for a syscall. 
 detail is the fault code, interrupt number, or syscall number respectively.
 
 the frame does not contain general-purpose registers. a hardware-interrupt stub
