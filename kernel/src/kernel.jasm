@@ -1,7 +1,24 @@
 ; this code lives at 0x100, and will eventually be in a separate file,
 ; and loaded into memory by the bootloader. for now, the emulator loads it to ram manually.
 
-jmp main
+hardware_entry:
+
+    ; this is the hardware-specified kernel entry point.
+    ; interrupts, faults, and syscalls will all jump to here (0x0100).
+
+    ; jump to the main dispatch code to make sense of what's going on.
+    jmp event_dispatch
+    
+    ; ensure that the kernel initialization code below is aligned to a 
+    ; 16-word boundary (0x0110, in this case). purely for aesthetics!
+    align 0x10
+
+boot_entry:
+
+    ; bootloader jumps here (0x0110). forward down to real kernel entry below,
+    ; because we need to load all the defs and other stuff first.
+    ; the actual kernel code is much further down in the binary.
+    jmp init
 
 import "kernel/src/defs.jasm"
 import "kernel/src/macros.jasm"
@@ -16,22 +33,9 @@ import "kernel/syscalls/system.jasm"
 
 import "kernel/lib/string.jasm"
 
-hardware_entry:
-
-    ; this is the hardware-specified kernel entry point.
-    ; interrupts, faults, and syscalls will all jump to here (0x0100).
-
-    ; jump to the main dispatch code to make sense of what's going on.
-    jmp event_dispatch
-    
-    ; ensure that the kernel initialization code is aligned to a 
-    ; 16-word boundary (0x0110, in this case). purely for aesthetics!
-    align 0x10
-
+; small one-time initialization.
+; the bootloader jumps to this code directly on startup.
 init:
-
-    ; small one-time initialization.
-    ; the bootloader jumps to this code directly.
     call tty__init
     call shell__draw_startup_message
 
@@ -40,7 +44,6 @@ init:
     call shell__draw_prompt_no_scroll
 
 loop:
-    ; poll keyboard and dispatch keystrokes to the shell
     wait
     jmp loop
 
@@ -48,20 +51,52 @@ loop:
 ; called via:  hardware interrupt, fault, or syscall
 ; returns:     nothing
 ;
-; event_dispatch is given a stack frame with this information:
+; event_dispatch is passed a stack frame with this information:
 ; 
+;    | offset | field      |
+;    | ------ | ---------- |
+;    | 0      | event kind |
+;    | 1      | detail     |
+;    | 2      | mode       |
+;    | 3      | mb         |
+;    | 4      | flags      |
+;    | 5      | target sp  |
+;    | 6      | target pc  |
 
 event_dispatch:
+
+    pop a ; event kind
+    pop b ; event detail
+
+    ; parse what event we are dealing with and
+    ; jump to the appropriate handler
+    add a, event_dispatch_table
+    get y, [a]
+    call y
+
+event_dispatch_table:
+    data dispatch_fault
+    data dispatch_interrupt
+    data dispatch_syscall
+
+dispatch_fault:
+    ; todo: kill process, drop into kernel shell
+    ; for now, just kill everything because we don't have a proper
+    ; error handling mechanism yet.
+    halt 
+
+dispatch_interrupt:
+    ; 
 
 ; system call interface
 ; called via:  call kernel__dispatch_syscall  (a = syscall number, args in b, c, d, e)
 ; returns:     a = result (zero if success, nonzero if error)
-
 dispatch_syscall:
+    debug "at syscall handler: {b}"
     push y
     push z
 
-    ; we have a number in a, which should map to an entry in the function table
+    ; we have a number in b, which should map to an entry in the function table
     ; move to the start of the function table
     mov z, sc_function_table
 
@@ -72,7 +107,7 @@ syscall_search_loop:
 
     ; repeatedly search for our entry in the table
     get y, [z]
-    cmp y, a             ; did we find a match?
+    cmp y, b             ; did we find a match?
     jz syscall_found     ; yes!
 
     cmp y, 0xFFFF        ; end of table?
