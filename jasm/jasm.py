@@ -39,7 +39,7 @@ def assemble(file: str, output: str, options: dict[str, bool] = {}):
         _ = f.write(binary)
         logger.info(f"wrote {len(binary)} bytes to {output}.")
 
-    if ctx.source_mapping:
+    if ctx.write_source:
         ctx.source_map.write(output)
         logger.debug(f"wrote source map to {output}.map.json.")
 

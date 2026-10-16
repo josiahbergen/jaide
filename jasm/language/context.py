@@ -21,13 +21,13 @@ class AssemblyContext:
         self.files = set[str]() # all files that contributed to the binary
         self.files.add(self.root)
 
-        # source mapping toggle and handler
-        self.source_mapping: bool = True
-        self.source_map = SourceMap()
-
         # optional behavior changes (more to co me, hopefully)
+        self.write_source: bool = options.get("write_source", True) if options else True  # source mapping toggle
         self.linkable: bool = options.get("linkable", True) if options else True  # linkable mode
         self.write: bool = options.get("write", True) if options else True  # write mode
+
+        # source mapping toggle and handler
+        self.source_map = SourceMap(self.write_source)
 
     def add_label(self, label: str, pc: int) -> None:
         scope = "context.py:AssemblyContext.add_label()"

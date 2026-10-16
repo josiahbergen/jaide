@@ -53,7 +53,7 @@ all transfers between execution scopes use this seven-word frame:
 | `+5`   | event kind  |
 | `+6`   | detail      |
 
-event kind is `0` for a fault, `1` for a hardware interrupt, and `2` for a syscall. 
+event kind is `0` for a fault, `1` for a hardware interrupt, and `2` for a syscall.
 detail is the fault code, interrupt number, or syscall number respectively.
 
 the frame does not contain general-purpose registers. a hardware-interrupt stub
@@ -111,12 +111,12 @@ invalid-instruction fault; kernel code calls kernel functions directly.
 
 the initial syscall abi is:
 
-| registers  | contract                             |
-| ---------- | ------------------------------------ |
-| `a`        | syscall number, then primary result |
-| `b`-`e`    | arguments or secondary results       |
-| `x`-`z`    | preserved across a syscall           |
-| `f`, `sp`, `mb` | restored by the protected transition |
+| registers       | contract                                  |
+| --------------- | ----------------------------------------- |
+| `a`             | syscall number, then primary result       |
+| `b`-`e`         | arguments or secondary results            |
+| `x`-`z`         | preserved across a syscall                |
+| `f`, `sp`, `mb` | restored by the protected transition      |
 
 user pointers include explicit lengths. the kernel rejects wrapping ranges and
 ranges not completely inside `0x7000..0xafff` in the current user bank.

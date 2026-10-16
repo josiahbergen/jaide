@@ -51,7 +51,8 @@ def generate_context(file: str, options: dict[str, bool]) -> AssemblyContext:
     logger.debug(f"context: used data from {len(context.files)} file{'' if len(context.files) == 1 else 's'}.")
     logger.debug(f"context: origin: {context.origin if context.origin != -1 else 'not set'}")
     logger.debug(f"context: linkable: {context.linkable}")
-    logger.debug(f"context: write: {context.write}")
+    logger.debug(f"context: writing binary: {context.write}")
+    logger.debug(f"context: writing source map: {context.write_source}")
 
     return context
 

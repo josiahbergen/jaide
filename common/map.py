@@ -19,7 +19,8 @@ class SourceWord:
 
 
 class SourceMap:
-    def __init__(self):
+    def __init__(self, enabled: bool = True):
+        self.enabled = enabled
         self.words: list[SourceWord] = []
 
     def reset(self) -> None:
@@ -29,6 +30,9 @@ class SourceMap:
         self.words = [SourceWord(**word) for word in json.loads(raw)]
 
     def add_node(self, node: DirectiveNode | InstructionNode, bytes: bytearray, breakpoint: bool = False) -> None:
+        if not self.enabled:
+            return
+
         for i in range(0, len(bytes), 2):
             # some instructions are more than one word, so we just need to add multiple entries
             # of the source node for every word that the instruction takes up in memory
