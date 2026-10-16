@@ -23,9 +23,7 @@ from .constants import (
     FLAG_Z,
     MMIO_SYSTEM,
     REGISTERS,
-    EVENT_FAULT,
-    EVENT_INTERRUPT,
-    EVENT_SYSCALL,
+    EVENT,
     FAULT_INSTRUCTION,
     FAULT_PROTECTION,
     FAULT_ZERO_DIVISION,
@@ -36,7 +34,7 @@ from .devices.graphics import Graphics
 from .devices.keyboard import Keyboard
 from .devices.pit import PIT
 from .devices.rtc import RTC
-from .exceptions import EmulatorException, ProtectionFault, InvalidInstructionFault, DivisionByZeroFault
+from .exceptions import EmulatorException, ProtectionFault, InvalidInstructionFault, DivisionByZeroFault, BreakpointException
 from .register import Register
 from .util.disasm import disassemble
 from .util.logger import logger
@@ -192,14 +190,16 @@ class Emulator:
         old_mb   = self.mb.value
         old_mode = self.mode
 
-        if old_mode == SUPERVISOR_MODE and event == EVENT_FAULT:  # double fault
-            logger.error(f"double fault at 0x{target:04X}: press ENTER to reset the emulator, or press ^C to drop into the debugger.", "fatal!")
-            self.running = False
+        if old_mode == SUPERVISOR_MODE and event == EVENT.FAULT:  # double fault
+            logger.error(f"double fault at 0x{target:04X}: press ENTER to enter the debugger.", "fatal!")
             input()
             print("\033[F", end="")
-            self.reset()
+            # force execution to stop, we
+            # may be deep in nested calls here
+            raise KeyboardInterrupt  
 
         # set execution mode to supervisor and disable interrupts
+        logger.info(f"entering supervisor via event {EVENT(event).name} at 0x{target:04X}...")
         self.mode = SUPERVISOR_MODE
         self.ie = False
 
@@ -207,13 +207,18 @@ class Emulator:
         self.sp.set(self.ssp.value if old_mode == USER_MODE else self.sp.value)
 
         # push context frame onto the stack
+        self._push_core(target)    # target pc address
+        self._push_core(old_sp)    # ... stack pointer
+        self._push_core(old_f)     # ... flags
+        self._push_core(old_mb)    # ... and memory bank
+        self._push_core(old_mode)  # old execution mode
         self._push_core(detail)    # event detail 
         self._push_core(event)     # event type
-        self._push_core(old_mode)  # old execution mode
-        self._push_core(old_mb)    # ... memory bank
-        self._push_core(old_f)     # ... flags
-        self._push_core(old_sp)    # ... and stack pointer
-        self._push_core(target)    # target pc address
+
+        logger.info("created supervisor stack frame:")
+        frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
+        for i in range(7):
+            logger.info(f"{frame_indices[i]:<19} {self.bus.peek16(self.sp.value + i):<6} 0x{self.bus.peek16(self.sp.value + i):04X}")
 
         # finally, move execution to the kernel's entry point
         self.pc.set(0x0100)
@@ -278,7 +283,10 @@ class Emulator:
             self.step(pass_breakpoints=True)
             while True:
                 self.step()
-                time.sleep(0.0001)
+        except BreakpointException as e:
+            # special case for breakpoints
+            # we want to give a kinder error message :)
+            logger.warning(f"hit breakpoint at 0x{self.pc.value:04X}!", prefix="break:")
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program
@@ -302,7 +310,7 @@ class Emulator:
         if self.stopped:
             raise EmulatorException("halted")
         if not pass_breakpoints and self.pc.value in self.breakpoints:
-            raise EmulatorException(f"hit breakpoint at {self.pc}")
+            raise BreakpointException(f"hit breakpoint at {self.pc}")
 
         for device in self.devices:
             # tick all devices, no matter what
@@ -313,7 +321,7 @@ class Emulator:
             # wake the cpu if applicable and enter supervisor mode to handle it
             self.waiting = False
             interrupt_number = pending_interrupts.pop(0)
-            self.enter_supervisor(EVENT_INTERRUPT, interrupt_number, self.pc.value)
+            self.enter_supervisor(EVENT.INTERRUPT, interrupt_number, self.pc.value)
             return
 
         if self.waiting:
@@ -340,15 +348,15 @@ class Emulator:
             # these run here because they are not actual emulation faults,
             # and transfer control flow to supervisor mode to deal with the problem.
             logger.error(f"protection fault: {e.message} (at 0x{instruction_address:04X}).")
-            self.enter_supervisor(EVENT_FAULT, FAULT_PROTECTION, instruction_address)
+            self.enter_supervisor(EVENT.FAULT, FAULT_PROTECTION, instruction_address)
         except InvalidInstructionFault as e:
             # invalid instructions
             logger.error(f"invalid instruction fault: {e.message} (at 0x{instruction_address:04X}).")
-            self.enter_supervisor(EVENT_FAULT, FAULT_INSTRUCTION, instruction_address)
+            self.enter_supervisor(EVENT.FAULT, FAULT_INSTRUCTION, instruction_address)
         except DivisionByZeroFault as e:
             # division by zero
             logger.error(f"division by zero fault: {e.message} (at 0x{instruction_address:04X}).")
-            self.enter_supervisor(EVENT_FAULT, FAULT_ZERO_DIVISION, instruction_address)
+            self.enter_supervisor(EVENT.FAULT, FAULT_ZERO_DIVISION, instruction_address)
 
     # core helpers
 

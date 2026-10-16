@@ -2,11 +2,10 @@ from typing import Callable
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, REGISTERS
 
-from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MODE, EVENT_SYSCALL
+from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MODE, EVENT
 from .emulator import Emulator, mask16
-from .exceptions import InvalidInstructionFault, EmulatorException, ProtectionFault, DivisionByZeroFault
+from .exceptions import InvalidInstructionFault, EmulatorException, ProtectionFault, DivisionByZeroFault, BreakpointException
 from .util.logger import logger
-
 
 def _cond_jump(emu: Emulator, condition: bool, decoded: tuple[int, ...]) -> None:
     if condition:
@@ -396,7 +395,7 @@ def handle_syscall(emu, decoded: tuple[int, ...]) -> None:
         raise InvalidInstructionFault("attempted to syscall while already in supervisor mode")
 
     # enter supervisor mode, using the contents of register a as the event detail
-    emu.enter_supervisor(EVENT_SYSCALL, emu.reg_get(REGISTERS.A), emu.pc.value)
+    emu.enter_supervisor(EVENT.SYSCALL, emu.reg_get(REGISTERS.A), emu.pc.value)
 
 
 def handle_transfer(emu, decoded: tuple[int, ...]) -> None:

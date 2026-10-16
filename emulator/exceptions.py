@@ -22,3 +22,6 @@ class ProtectionFault(EmulatorException):
 
 class DivisionByZeroFault(EmulatorException):
     pass
+
+class BreakpointException(EmulatorException):
+    pass

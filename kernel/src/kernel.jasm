@@ -65,106 +65,93 @@ loop:
 
 event_dispatch:
 
-    pop a ; event kind
-    pop b ; event detail
+    break
+    pop x ; event kind
 
     ; parse what event we are dealing with and
     ; jump to the appropriate handler
-    add a, event_dispatch_table
-    get y, [a]
-    call y
+    add x, ev_jump_table
+    get z, [x]
+    pop x ; prepare event detail in x before calling handler
+    call z
 
-event_dispatch_table:
-    data dispatch_fault
-    data dispatch_interrupt
-    data dispatch_syscall
+    push 0x00  ; add a blank kind and detail
+    push 0x00  ; not used by transfer, but required by the stack frame
+    transfer
 
 dispatch_fault:
     ; todo: kill process, drop into kernel shell
     ; for now, just kill everything because we don't have a proper
     ; error handling mechanism yet.
-    halt 
+    ret 
 
 dispatch_interrupt:
-    ; 
+    ; todo: handle interrupt or something (run a driver subroutine?)
+    ret
 
-; system call interface
-; called via:  call kernel__dispatch_syscall  (a = syscall number, args in b, c, d, e)
-; returns:     a = result (zero if success, nonzero if error)
 dispatch_syscall:
-    debug "at syscall handler: {b}"
-    push y
-    push z
+    ; event detail (syscall number) is in x already
+    mov z, sc_jump_table
+    add z, x 
 
-    ; we have a number in b, which should map to an entry in the function table
-    ; move to the start of the function table
-    mov z, sc_function_table
+    get z, [z]            
+    cmp z, 0x0000 ; invalid syscall addresses are zeroes in memory
+    jz syscall_not_found 
 
-syscall_search_loop:
-
-    ; TODO: once a stable abi gets defined, just use an
-    ;       actual jump table to avoid the loop here
-
-    ; repeatedly search for our entry in the table
-    get y, [z]
-    cmp y, b             ; did we find a match?
-    jz syscall_found     ; yes!
-
-    cmp y, 0xFFFF        ; end of table?
-    jz syscall_not_found ; yes, exit with error
-
-    ; move to the next entry
-    add z, 2
-    jmp syscall_search_loop
+    call z ; execute!
+    ret ; we trust that the handler has set a value in a for us
 
 syscall_not_found:
     mov a, 0x01
-    jmp syscall_done
+    ret ; exit with error
 
-syscall_found:
-    inc z ; move to the function pointer
-    get y, [z]
-    call y ; execute handler
+ev_jump_table:
+    data dispatch_fault
+    data dispatch_interrupt
+    data dispatch_syscall
 
-syscall_done:
-    pop z
-    pop y
-    ret ; we trust that the handler has set a value in a for us
-
-
-sc_function_table:
+sc_jump_table:
 
     ; process
-    data 0x00, process__sc_exit
-    data 0x01, process__sc_exec
+    data process__sc_exit        ; 0x00
+    data process__sc_exec        ; 0x01
+    align 0x10
+
     ; tty output
-    data 0x10, output__sc_write_str
-    data 0x11, output__sc_write_char
-    data 0x12, output__sc_clear
-    data 0x13, output__sc_set_cursor
-    data 0x14, output__sc_get_cursor
-    data 0x15, output__sc_put_char_at
-    data 0x16, output__sc_set_attr
+    data output__sc_write_str    ; 0x10
+    data output__sc_write_char   ; 0x11
+    data output__sc_clear        ; 0x12
+    data output__sc_set_cursor   ; 0x13
+    data output__sc_get_cursor   ; 0x14
+    data output__sc_put_char_at  ; 0x15
+    data output__sc_set_attr     ; 0x16
+    align 0x10
+
     ; tty input (blocking)
-    data 0x20, input__sc_read_char
-    data 0x21, input__sc_read_line
+    data input__sc_read_char     ; 0x20
+    data input__sc_read_line     ; 0x21
+    align 0x10
+
     ; filesystem
-    data 0x30, fs__sc_mount
-    data 0x31, fs__sc_list
-    data 0x32, fs__sc_open
-    data 0x33, fs__sc_read
-    data 0x34, fs__sc_write
-    data 0x35, fs__sc_seek
-    data 0x36, fs__sc_close
-    data 0x37, fs__sc_stat
+    data fs__sc_mount            ; 0x30
+    data fs__sc_list             ; 0x31
+    data fs__sc_open             ; 0x32
+    data fs__sc_read             ; 0x33
+    data fs__sc_write            ; 0x34
+    data fs__sc_seek             ; 0x35
+    data fs__sc_close            ; 0x36
+    data fs__sc_stat             ; 0x37
+    align 0x10
+
     ; time
-    data 0x40, time__sc_get_ticks
-    data 0x41, time__sc_get_date
-    data 0x41, time__sc_get_time
+    data time__sc_get_ticks      ; 0x40
+    data time__sc_get_date       ; 0x41
+    data time__sc_get_time       ; 0x42
+    align 0x10
+
     ; system
-    data 0x50, system__sc_shutdown
-    data 0x51, system__sc_reset
-    data 0xFFFF  ; end of table
+    data system__sc_shutdown     ; 0x50
+    data system__sc_reset        ; 0x51
 
 ; all the shell interface code lives here.
 import "kernel/src/shell.jasm"

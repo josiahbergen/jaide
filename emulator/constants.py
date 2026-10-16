@@ -3,6 +3,7 @@
 # josiah bergen, january 2026
 
 from common.isa import OPCODE_FORMATS, REGISTERS
+from common.isa import ZeroIndexedEnum
 
 MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
 BANK_SIZE   = 0x4000 * 2   # bytes per bank (0x4000 = 16384 words, 2¹⁴)
@@ -40,9 +41,10 @@ FLAG_STRINGS: dict[int, str] = {
 SUPERVISOR_MODE = 0
 USER_MODE = 1
 
-EVENT_FAULT     = 0
-EVENT_INTERRUPT = 1
-EVENT_SYSCALL   = 2
+class EVENT(ZeroIndexedEnum):
+    FAULT     = 0
+    INTERRUPT = 1
+    SYSCALL   = 2
 
 FAULT_INSTRUCTION   = 0
 FAULT_PROTECTION    = 1

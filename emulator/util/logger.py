@@ -95,16 +95,13 @@ class Logger:
             print(formatted)
 
 
-    def warning(self, message: str, scope: str | None = None, choice: bool = False) -> None:
+    def warning(self, message: str, scope: str | None = None, choice: bool = False, prefix: str = "warn: ") -> None:
         """ Print a warning message. Only prints if level is INFO or higher. """
         if not self.warnings:
             return
         scope = (scope + ": ") if scope else ""
-        # formatted = f"{b.YELLOW} {b.RESET} {f.YELLOW}warn:{f.RESET}{f.BLACK} {scope}: {f.YELLOW}{message}{f.RESET}"
-        # formatted = f"{b.YELLOW} {b.RESET} {f.YELLOW}warn: {message}{f.BLACK} at {scope}{f.RESET}"
-        formatted = f"{f.YELLOW}warn: {f.RESET}{scope}{message}"
-        end_char = '' if choice else '\n'
-        print(formatted, end=end_char)
+        formatted = f"{f.YELLOW}{prefix} {f.RESET}{scope}{message}"
+        print(formatted, end='' if choice else '\n')
         if choice and not self.yesno():
             self.kill("abort", scope)
 

@@ -154,6 +154,13 @@ def memory(emulator: Emulator, args: list[str]) -> None:
     display_memory(emulator, addr, length)
 
 
+def stack(emulator: Emulator, args: list[str]) -> None:
+    """stack <n>                display the top n stack contents"""
+    n, = arguments(args, hex16)
+    logger.info(f"stack pointer: 0x{emulator.sp.value:04X}")
+    for i in range(n):
+        logger.info(f"{i:02X} (0x{emulator.sp.value + i:04X}): 0x{emulator.bus.peek16(emulator.sp.value + i):04X}")
+
 def disasm(emulator: Emulator, args: list[str]) -> None:
     """disasm [<addr>]          disassemble at an address or the PC"""
     if len(args) > 1:
@@ -197,6 +204,7 @@ COMMANDS = {
     "set": set_register,
     "mset": set_memory,
     "mem": memory,
+    "stack": stack,
     "disasm": disasm,
     "src": src,
     "reset": reset,
