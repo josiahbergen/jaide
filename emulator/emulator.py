@@ -385,20 +385,19 @@ class Emulator:
 
 
     def _lsh_core(self, a: int, b: int) -> int:
-        # TODO: test
         full = a << b
         result = mask16(full)
-        carry = 1 if a & (1 << (16 - b)) else 0
+        # Carry is the last bit shifted out; zero and oversized counts clear it.
+        carry = 1 if 1 <= b <= 16 and a & (1 << (16 - b)) else 0
         overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
         self.set_all_flags(result == 0, carry, result < 0, overflow)
         return result
 
 
     def _rsh_core(self, a: int, b: int) -> int:
-        # TODO: test
         full = a >> b
         result = mask16(full)
-        carry = 1 if a & (1 << (b - 1)) else 0
+        carry = 1 if 1 <= b <= 16 and a & (1 << (b - 1)) else 0
         overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
         self.set_all_flags(result == 0, carry, result < 0, overflow)
         return result
