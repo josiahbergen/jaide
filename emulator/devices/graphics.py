@@ -2,7 +2,6 @@
 # graphics controller device for the jaide emulator.
 # josiah bergen, april 2026
 
-import time
 from collections import deque
 from pathlib import Path
 from typing import Callable
@@ -22,8 +21,6 @@ VRAM_CELLS      = GRAPHICS_COLS * GRAPHICS_ROWS    # 2000
 SCALE           = 1.5
 SCALED_WIDTH    = GRAPHICS_WIDTH * SCALE
 SCALED_HEIGHT   = GRAPHICS_HEIGHT * SCALE
-
-FRAME_INTERVAL  = 1 / 30  # seconds between renders, smoooth 30fps
 
 COLORS: list[tuple[int, int, int]] = [
     (0,   0,   0  ),  # 0:  black
@@ -46,7 +43,7 @@ COLORS: list[tuple[int, int, int]] = [
 
 
 class Graphics(Device):
-    def __init__(self, key_queue: deque, vram: memoryview, is_running: Callable[[], bool], shutdown: Callable[[], None]):
+    def __init__(self, key_queue: deque, vram: memoryview, is_running: Callable[[], bool]):
         """Graphics controller. Renders VRAM to a pygame window.
 
         vram      -- read-only view of bus VRAM (mapped at 0x4000-0x4FFF)
@@ -59,8 +56,6 @@ class Graphics(Device):
         self.enabled: bool       = True
         self.key_queue: deque    = key_queue
         self.is_running: Callable[[], bool] = is_running
-        self.shutdown: Callable[[], None] = shutdown
-        self._last_render: float = 0.0  # seconds
 
         self._glyphs: list[bytes]   = _load_glyphs()
         self._framebuf: bytearray   = bytearray(GRAPHICS_WIDTH * GRAPHICS_HEIGHT * 3)
@@ -88,33 +83,18 @@ class Graphics(Device):
         super().reset()
         self.enabled = True
         self.key_queue.clear()
-        self._last_render = 0.0
         self._blink_timer = 0
         self._last_hash = None
         self._inactive_drawn = False
         self._was_running = self.is_running()
 
-    def tick(self) -> None:
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.KEYDOWN:
+            scancode = _translate_key(event)
+            if scancode:
+                self.key_queue.append(scancode)
 
-        now = time.monotonic()
-        if now - self._last_render < FRAME_INTERVAL:
-            # still within frame interval, do nothing
-            return
-        self._last_render = now
-
-        # drain pygame events; push key events to shared queue for KeyboardDevice
-        for event in pygame.event.get():
-
-            if event.type == pygame.QUIT:
-                # closed button pressed, shut down emulator
-                self.shutdown()
-                return
-
-            if event.type == pygame.KEYDOWN:
-                scancode = _translate_key(event)
-                if scancode:
-                    self.key_queue.append(scancode)
-
+    def draw(self) -> None:
         running = self.is_running()
         if running != self._was_running:
             self._was_running = running

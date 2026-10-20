@@ -3,14 +3,13 @@ from dataclasses import dataclass, field
 from queue import Empty, Queue
 from threading import Event, Thread
 
-import pygame
 from colorama import Fore as f
 
 from common.isa import OPCODE_FORMATS
 from emulator.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, REGISTERS
-from emulator.devices.graphics import FRAME_INTERVAL, Graphics
 from emulator.emulator import Emulator
 from emulator.exceptions import EmulatorException
+from emulator.ui import FRAME_INTERVAL
 from emulator.util.disasm import disassemble
 from emulator.util.logger import logger
 
@@ -238,12 +237,10 @@ def run_interactive(emulator: Emulator) -> None:
     """Read terminal input off-thread while the main thread services Pygame."""
     requests: Queue[CommandRequest] = Queue()
     Thread(target=read_commands, args=(requests,), name="jaide-repl", daemon=True).start()
-    graphics = next((device for device in emulator.devices if isinstance(device, Graphics)), None)
-
     try:
         while True:
-            if graphics is not None:
-                graphics.tick()
+            if emulator.ui is not None:
+                emulator.ui.tick()
 
             try:
                 request = requests.get(timeout=FRAME_INTERVAL / 2)
@@ -259,5 +256,5 @@ def run_interactive(emulator: Emulator) -> None:
             finally:
                 request.completed.set()
     finally:
-        if graphics is not None:
-            pygame.quit()
+        if emulator.ui is not None:
+            emulator.ui.close()

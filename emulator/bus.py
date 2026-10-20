@@ -86,13 +86,13 @@ class MemoryBus:
         storage[offset + 1] = value >> 8
 
     def peek16(self, address: int, *, bank: int | None = None) -> int:
-        # DEBUG FUNCTION:read 16-bit word WITHOUT triggering mmio side effects.
-        # not implemented in hardware, used only for debugging.
+        """Inspect a word without CPU protection checks or MMIO side effects."""
+        address &= 0xFFFF
         if MMIO_BASE <= address <= MMIO_END:
-            return 0 # reading from mmio, exit early
+            return 0
 
-        # not reading from mmio, so read as normal.
-        return self.read16(address, bank=bank)
+        storage, offset = self.resolve_storage(address, bank)
+        return storage[offset] | (storage[offset + 1] << 8)
 
     def load_bytes(self, address: int, data: bytes, *, bank: int | None = None) -> None:
         # DEBUG FUNCTION: directly load words to memory, bypassing rom protection and mmio dispatching.

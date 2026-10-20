@@ -16,6 +16,7 @@ class EmulatorArgumentParser(Tap):
     binary: str = ""  # a binary file to load
     run: bool = False  # run the binary file immediately
     verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
+    memory: bool = False  # open a live 32-row by 16-word memory viewer with ASCII
 
     # devices
     pit: bool = False
@@ -64,7 +65,7 @@ def main():
         "disk": args.disk,
     }
 
-    emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices, image_file=args.image)
+    emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices, image_file=args.image, memory_view=args.memory)
 
     # load binary file if provided
     if args.binary:

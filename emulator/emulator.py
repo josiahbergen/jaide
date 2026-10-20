@@ -36,6 +36,7 @@ from .devices.pit import PIT
 from .devices.rtc import RTC
 from .exceptions import EmulatorException, ProtectionFault, InvalidInstructionFault, DivisionByZeroFault, BreakpointException
 from .register import Register
+from .ui import EmulatorUI
 from .util.disasm import disassemble
 from .util.logger import logger
 
@@ -46,7 +47,7 @@ def mask16(value: int) -> int:
 
 
 class Emulator:
-    def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = ""):
+    def __init__(self, verbosity: int = logger.log_level.INFO, enabled_devices: dict[str, bool] = {}, image_file: str = "", memory_view: bool = False):
         logger.set_level(verbosity)
 
         # debugging and processor state
@@ -86,10 +87,13 @@ class Emulator:
         if enabled_devices.get("disk", False): self.devices.append(Disk(image_file, self.bus))
 
         # graphics and keyboard device (two-in-one via pygame)
+        graphics = None
         if enabled_devices.get("graphics", False):
             _key_queue = deque()
-            self.devices.append(Graphics(_key_queue, self.bus.vram_view, lambda: self.running, self.shutdown))
+            graphics = Graphics(_key_queue, self.bus.vram_view, lambda: self.running)
+            self.devices.append(graphics)
             self.devices.append(Keyboard(_key_queue))
+        self.ui = EmulatorUI(self.bus, graphics, memory_view, self.shutdown) if graphics is not None or memory_view else None
 
         # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
         from .handlers import handler_map
@@ -216,10 +220,10 @@ class Emulator:
         self._push_core(detail)    # event detail 
         self._push_core(event)     # event type
 
-        logger.info("created supervisor stack frame:")
-        frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
-        for i in range(7):
-            logger.info(f"{frame_indices[i]:<19} {self.bus.peek16(self.sp.value + i):<6} 0x{self.bus.peek16(self.sp.value + i):04X}")
+        # logger.info("created supervisor stack frame:")
+        # frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
+        # for i in range(7):
+        #     logger.info(f"{frame_indices[i]:<19} {self.bus.peek16(self.sp.value + i):<6} 0x{self.bus.peek16(self.sp.value + i):04X}")
 
         # finally, move execution to the kernel's entry point
         self.pc.set(0x0100)
@@ -248,6 +252,8 @@ class Emulator:
 
     def shutdown(self) -> None:
         print("shutting down...")
+        if self.ui is not None:
+            self.ui.close()
         sys.exit(0)
 
     # main fetch/decode
@@ -306,6 +312,9 @@ class Emulator:
 
 
     def step(self, pass_breakpoints: bool = False) -> None:
+
+        if self.ui is not None:
+            self.ui.tick()
 
         # hardware-level overrides
         if self.stopped:

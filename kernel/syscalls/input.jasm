@@ -56,7 +56,7 @@ push_key:
 
     ; add the key to the end of the queue.
     inc x     ; get new head index,
-    mod x, 4 ; ... wrapping around if necessary.
+    mod x, 32 ; ... wrapping around if necessary.
 
     cmp x, y 
     ; if head == tail after increment, the queue is already full.
@@ -93,7 +93,7 @@ pop_key:
 
     ; update tail index.
     inc y                      
-    mod y, 4 ; don't forget to wrap around!
+    mod y, 32 ; don't forget to wrap around!
     save_to key_queue_tail, y
     ret
 
@@ -105,7 +105,7 @@ pop_key__empty:
 ; holds up to 32 keys.
 data "KEYS"
 key_queue: 
-    times 4, 0x00
+    times 32, 0x00
 key_queue_head: 
     data 0x00
 key_queue_tail: 
