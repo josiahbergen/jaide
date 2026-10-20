@@ -46,7 +46,6 @@ class MemoryBus:
 
         in_user_boundary = USER_MEMORY_START <= address <= USER_MEMORY_END
         if self.current_mode() == USER_MODE and not in_user_boundary:
-            logger.warning(self.get_source(address), "MemoryBus.read16")
             raise ProtectionFault(f"unauthorized read from protected memory at 0x{address:04X}.")
 
         if MMIO_BASE <= address <= MMIO_END:
