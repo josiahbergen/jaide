@@ -103,7 +103,6 @@ pop_key__empty:
 
 ; circular buffer for key input.
 ; holds up to 32 keys.
-data "KEYS"
 key_queue: 
     times 32, 0x00
 key_queue_head: 
