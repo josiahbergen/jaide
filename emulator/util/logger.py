@@ -95,7 +95,7 @@ class Logger:
             print(formatted)
 
 
-    def warning(self, message: str, scope: str | None = None, choice: bool = False, prefix: str = "warn: ") -> None:
+    def warning(self, message: str, scope: str | None = None, choice: bool = False, prefix: str = "warn:") -> None:
         """ Print a warning message. Only prints if level is INFO or higher. """
         if not self.warnings:
             return

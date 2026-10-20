@@ -24,11 +24,12 @@ USER_MEMORY_END = 0xAFFF
 
 class MemoryBus:
     
-    def __init__(self, current_bank: Callable[[], int], current_mode: Callable[[], int], mmio_read: Callable[[int], int], mmio_write: Callable[[int, int], None]):
+    def __init__(self, current_bank: Callable[[], int], current_mode: Callable[[], int], mmio_read: Callable[[int], int], mmio_write: Callable[[int, int], None], get_current_source: Callable[[], str]):
         self.current_bank = current_bank
         self.current_mode = current_mode
         self.mmio_read = mmio_read
         self.mmio_write = mmio_write
+        self.get_current_source = get_current_source
         # initialize bytearrays for main memory, vram, and banks
         self.memory = bytearray(MEMORY_SIZE)
         self.vram = bytearray(VRAM_SIZE)
@@ -45,10 +46,12 @@ class MemoryBus:
 
         in_user_boundary = USER_MEMORY_START <= address <= USER_MEMORY_END
         if self.current_mode() == USER_MODE and not in_user_boundary:
+            logger.warning(self.get_source(address), "MemoryBus.read16")
             raise ProtectionFault(f"unauthorized read from protected memory at 0x{address:04X}.")
 
         if MMIO_BASE <= address <= MMIO_END:
             # if read is from mmio, dispatch to mmio_read
+            logger.debug(f"read from MMIO at 0x{address:04X}...")
             return self.mmio_read(address) & 0xFFFF
 
         # resolve storage and contstruct word
@@ -67,12 +70,14 @@ class MemoryBus:
 
         if MMIO_BASE <= address <= MMIO_END:
             # if write is to mmio, dispatch to mmio_write
+            logger.debug(f"write to MMIO at 0x{address:04X} with 0x{value:04X}...")
             self.mmio_write(address, value)
             return  # mmio_write does not return a value
 
         if address <= ROM_END:
             # attempting to write to rom... oh no!
-            logger.warning(f"write to ROM at 0x{address:04X}.", "MemoryBus.write16")
+            logger.warning(f"write to ROM at 0x{address:04X}. oh no!", "MemoryBus.write16")
+            logger.warning(f"caller is around {self.get_current_source()}.", "MemoryBus.write16")
             return
 
         # write word to storage and return

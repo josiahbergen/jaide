@@ -11,13 +11,102 @@
 ;    | 0x22   | read_line   | b = buff, c = max len | a = len (includes null terminator) | collect input with echo and backspace until enter pressed.     |
 
 sc_read_char:
-    mov a, 0x01
+    ; wait_for_key returns a key in a, guranteed to be non-zero.
+    call wait_for_key
     ret
 
 sc_poll_key:
-    mov a, 0x01
+    ; pop_key returns a key in a or 0 if the queue is empty.
+    call pop_key
     ret
 
 sc_read_line:
+    ; TODO: implement
     mov a, 0x01
     ret
+
+
+keyboard_interrupt:
+    ; tiny keyboard interrupt handler.
+    ; called by the kernel when interrupt 0x04 is triggered.
+
+    mmio_in a, mmio_keyboard_data ; read the scancode via mmio,
+    call push_key                 ; and push it into the key queue.
+    ret
+
+wait_for_key:
+    ; blocking, non-polling subrountine that waits for a key to be pressed.
+    ; first, we check if there is already a key waiting in the queue.
+    call pop_key
+
+    cmp a, 0x00
+    ; if there was a key, return it.
+    jnz wait_for_key__end
+    ; otherwise, wait for the next hardware interrupt and try again.
+    wait
+
+wait_for_key__end:
+    ret
+
+; push a key into the key queue. 
+; expects a key in a.
+push_key:
+    dereference_into x, key_queue_head
+    dereference_into y, key_queue_tail
+
+    ; add the key to the end of the queue.
+    inc x     ; get new head index,
+    mod x, 4 ; ... wrapping around if necessary.
+
+    cmp x, y 
+    ; if head == tail after increment, the queue is already full.
+    ; abort, and do not save the new head index.
+    jz push_key__full
+
+    save_to key_queue_head, x ; save the new head index,
+    add x, key_queue          ; ... compute the head's logical address,
+    put [x], a                ; ... and save the key.
+
+    ; return success!
+    mov a, 0x00  
+    ret 
+
+push_key__full:
+    mov a, 0x01
+    ret
+
+; pop a key from the key queue.
+; returns a key in a, or 0 if the queue is empty.
+pop_key:
+    dereference_into x, key_queue_head
+    dereference_into y, key_queue_tail
+    dereference_into z, key_queue
+
+    cmp x, y
+    ; if head == tail, the queue is empty.
+    ; abort, and do not read any key.
+    jz pop_key__empty
+
+    ; get key from tail and put it in a.
+    add z, y   ; compute the logical address of tail
+    get a, [z] ; ... and get the stored key.
+
+    ; update tail index.
+    inc y                      
+    mod y, 4 ; don't forget to wrap around!
+    save_to key_queue_tail, y
+    ret
+
+pop_key__empty:
+    mov a, 0x00
+    ret
+
+; circular buffer for key input.
+; holds up to 32 keys.
+data "KEYS"
+key_queue: 
+    times 4, 0x00
+key_queue_head: 
+    data 0x00
+key_queue_tail: 
+    data 0x00

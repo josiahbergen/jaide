@@ -78,6 +78,7 @@ class Emulator:
             current_mode=lambda: self.mode,
             mmio_read=self.mmio_read,
             mmio_write=self.mmio_write,
+            get_current_source=lambda: self.source_map.get_source(self.pc.value),
         )
         self.devices: list[Device] = []
         if enabled_devices.get("pit", False): self.devices.append(PIT())
@@ -286,7 +287,7 @@ class Emulator:
         except BreakpointException as e:
             # special case for breakpoints
             # we want to give a kinder error message :)
-            logger.warning(f"hit breakpoint at 0x{self.pc.value:04X}!", prefix="break:")
+            logger.warning(f"hit breakpoint at 0x{self.pc.value:04X}, emulator paused.", prefix="debug:")
         except EmulatorException as e:
             # we enter exceptional control flow either if something went wrong,
             # or if the user interrupts the program

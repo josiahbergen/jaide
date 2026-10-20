@@ -214,7 +214,7 @@ COMMANDS = {
 
 
 def read_commands(requests: Queue[CommandRequest]) -> None:
-    logger.info("welcome to the emulator. type 'help' for a list of commands.")
+    logger.info("welcome to the emulator! type 'help' for a list of commands.")
 
     while True:
         try:

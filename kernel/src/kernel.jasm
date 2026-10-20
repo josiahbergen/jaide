@@ -55,17 +55,16 @@ loop:
 ; 
 ;    | offset | field      |
 ;    | ------ | ---------- |
-;    | 0      | event kind |
-;    | 1      | detail     |
-;    | 2      | mode       |
-;    | 3      | mb         |
-;    | 4      | flags      |
-;    | 5      | target sp  |
-;    | 6      | target pc  |
+;    | sp + 0 | event kind |
+;    | .. + 1 | detail     |
+;    | .. + 2 | mode       |
+;    | .. + 3 | mb         |
+;    | .. + 4 | flags      |
+;    | .. + 5 | target sp  |
+;    | .. + 6 | target pc  |
 
 event_dispatch:
 
-    break
     pop x ; event kind
 
     ; parse what event we are dealing with and
@@ -83,11 +82,24 @@ dispatch_fault:
     ; todo: kill process, drop into kernel shell
     ; for now, just kill everything because we don't have a proper
     ; error handling mechanism yet.
+    break
     ret 
 
 dispatch_interrupt:
-    ; todo: handle interrupt or something (run a driver subroutine?)
+    ; event detail (interrupt number) is in x already
+    mov z, int_jump_table
+    add z, x ; compute the address of the interrupt handler
+
+    get z, [z]
+    cmp z, 0x0000 ; invalid interrupt addresses are zeroes in memory
+    jz interrupt_not_found
+
+    call z ; execute!
     ret
+
+interrupt_not_found:
+    mov a, 0x01
+    ret ; return with error
 
 dispatch_syscall:
     ; event detail (syscall number) is in x already
@@ -109,6 +121,13 @@ ev_jump_table:
     data dispatch_fault
     data dispatch_interrupt
     data dispatch_syscall
+
+int_jump_table:
+    data 0x00
+    data 0x00
+    data 0x00
+    data 0x00
+    data input__keyboard_interrupt  ; 0x04
 
 sc_jump_table:
 
