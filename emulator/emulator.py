@@ -56,6 +56,9 @@ class Emulator:
         self.waiting: bool = False  # waiting for an interrupt
         self.stopped: bool = False  # hardware halt
         self.source_map: SourceMap = SourceMap()
+        self.call_stack: list[tuple[int, str]] = []  # tuples of (caller address, label name)
+        self._wait_time: float = 0.0
+        self._last_print: float = 0.0
 
         # internal registers
         self.mode: int = SUPERVISOR_MODE  # execution mode
@@ -196,7 +199,8 @@ class Emulator:
         old_mode = self.mode
 
         if old_mode == SUPERVISOR_MODE and event == EVENT.FAULT:  # double fault
-            logger.error(f"double fault at 0x{target:04X}: press ENTER to enter the debugger.", "fatal!")
+            logger.error(f"double fault at 0x{target:04X} near {self.source_map.get_source(target)}.", "fatal!")
+            logger.error(f"press ENTER to enter the debugger.", "fatal!")
             input()
             print("\033[F", end="")
             # force execution to stop, we
@@ -302,11 +306,11 @@ class Emulator:
             # prevent ctrl+c from bubbling up to the __main__() function,
             # allowing easy program interruption, etc. while allowing the repl to persist
             print("\r\033[2K", end="", flush=True)  # clear the terminal's "^C" echo
-            logger.warning("execution stopped! (user interrupt)")
+            logger.warning("execution stopped (user interrupt)", prefix="debug:")
         except Exception as e:
             # general exception. this is an emulation issue, 
             # not a real cpu fault. allow the repl to persist.
-            logger.error(f"fatal! while running instruction at 0x{(self.pc.value)}:\n{traceback.format_exc()}")
+            logger.error(f"emulator error while running instruction at 0x{(self.pc.value)}:\n{traceback.format_exc()}", prefix="fatal!")
         finally:
             self.running = False
 
@@ -336,6 +340,13 @@ class Emulator:
 
         if self.waiting:
             time.sleep(0.001)  # yield to avoid killing the cpu
+            elapsed = time.perf_counter() - self._wait_time            
+            if elapsed - self._last_print > 0.2 and elapsed > 2:
+                if elapsed < 2.1:
+                    print()  # newline to avoid clobbering most recent output
+                print("\033[1A\r\033[2K", end="", flush=True)  # move a line up, and clear it
+                print(f"waiting for interrupt... ({round(elapsed, 1)}s)", flush=True)
+                self._last_print = elapsed
             return
 
         # finally, save the instruction address (for error reporting)

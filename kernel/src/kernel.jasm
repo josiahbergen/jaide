@@ -13,13 +13,12 @@ hardware_entry:
     ; 16-word boundary (0x0110, in this case). purely for aesthetics!
     align 0x10
 
-boot_entry:
-
-    ; bootloader jumps here (0x0110). forward down to real kernel entry below,
-    ; because we need to load all the defs and other stuff first.
-    ; the actual kernel code is much further down in the binary.
-    jmp init
-
+init:
+    ; bootloader jumps here (0x0110). perform a few small 
+    ; initialization tasks and then jump to the shell.
+    call tty__init
+    jmp shell__run
+    
 import "kernel/src/defs.jasm"
 import "kernel/src/macros.jasm"
 import "kernel/src/tty.jasm"
@@ -32,20 +31,6 @@ import "kernel/syscalls/time.jasm"
 import "kernel/syscalls/system.jasm"
 
 import "kernel/lib/string.jasm"
-
-; small one-time initialization.
-; the bootloader jumps to this code directly on startup.
-init:
-    call tty__init
-    call shell__draw_startup_message
-
-    mov x, 0
-    mov y, 0
-    call shell__draw_prompt_no_scroll
-
-loop:
-    wait
-    jmp loop
 
 ; hardware event dispatch
 ; called via:  hardware interrupt, fault, or syscall
@@ -74,8 +59,8 @@ event_dispatch:
     pop x ; prepare event detail in x before calling handler
     call z
 
-    push 0x00  ; add a blank kind and detail
-    push 0x00  ; not used by transfer, but required by the stack frame
+    push 0xFFFF  ; add a blank kind and detail
+    push 0xFFFF  ; not used by transfer, but required by the stack frame
     transfer
 
 dispatch_fault:

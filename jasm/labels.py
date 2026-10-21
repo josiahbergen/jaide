@@ -46,7 +46,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                 if isinstance(operand, LabelOperand) and operand.short_name in context.constants:
                     logger.verbose(f"labels: constant operand {operand} -> {context.constants[operand.short_name]} (line {node.line})")
                     num = NumberTerminal(operand.line, operand.filename, str(context.constants[operand.short_name]))
-                    node.operands[i] = ImmediateOperand(operand.line, operand.filename, num)
+                    node.operands[i] = ImmediateOperand(operand.line, operand.filename, num, label_name=operand.short_name)
 
         if isinstance(node, AlignDirectiveNode):
             # calculate the size of the alignment directive.
@@ -104,6 +104,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                     operand.line,
                     operand.filename,
                     NumberTerminal(operand.line, operand.filename, str(abs_addr)),
+                    label_name=operand.short_name
                 )
 
             # assign addressing mode (encoded via opcode map)

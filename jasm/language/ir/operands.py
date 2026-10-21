@@ -24,14 +24,14 @@ class RegisterOperand(Operand):
 
 
 class ImmediateOperand(Operand):
-    def __init__(self, line: int, filename: str, number: NumberTerminal):
+    def __init__(self, line: int, filename: str, number: NumberTerminal, label_name: str | None = None):
         super().__init__(line, filename, MODES.IMM)
-        self.string: str = number.value # string representation
+        self.string: str = number.value  # string representation
         self.value: int = int(self.string, 0)
+        self.label_name: str | None = label_name # optional, used to keep track of the label name for source mapping
         
     def __str__(self) -> str:
-        return f"{self.string}"
-
+        return self.label_name if self.label_name else self.string
 
     def get_value(self) -> int:
         if self.value > 0xFFFF:

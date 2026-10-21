@@ -67,7 +67,7 @@ class InstructionNode(IRNode):
         self.size: int = 0
  
     def __str__(self) -> str:
-        return f"{self.mnemonic.name} {', '.join([str(op) for op in self.operands])}"
+        return f"{self.mnemonic.name}{' ' if self.operands else ''}{', '.join([str(op) for op in self.operands])}"
 
     def get_opcode(self) -> int:
         try:

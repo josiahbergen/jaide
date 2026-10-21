@@ -58,4 +58,4 @@ class SourceMap:
         if addr < 0 or addr >= len(self.words):
             return "unknown"
         source = self.words[addr]
-        return f"{source.instruction}, word {source.index} (from {source.source})"
+        return f"{source.instruction} (from {source.source}, word {source.index})"

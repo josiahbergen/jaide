@@ -29,7 +29,6 @@ sc_read_line:
 keyboard_interrupt:
     ; tiny keyboard interrupt handler.
     ; called by the kernel when interrupt 0x04 is triggered.
-
     mmio_in a, mmio_keyboard_data ; read the scancode via mmio,
     call push_key                 ; and push it into the key queue.
     ret
@@ -80,21 +79,21 @@ push_key__full:
 pop_key:
     dereference_into x, key_queue_head
     dereference_into y, key_queue_tail
-    dereference_into z, key_queue
 
     cmp x, y
     ; if head == tail, the queue is empty.
     ; abort, and do not read any key.
     jz pop_key__empty
 
-    ; get key from tail and put it in a.
-    add z, y   ; compute the logical address of tail
-    get a, [z] ; ... and get the stored key.
-
-    ; update tail index.
-    inc y                      
+    ; push_key stores at the slot after head,
+    ; so the oldest key is in the slot after tail.
+    inc y
     mod y, 32 ; don't forget to wrap around!
     save_to key_queue_tail, y
+
+    mov z, key_queue ; compute the logical address of the new tail
+    add z, y
+    get a, [z]       ; ... and get the stored key.
     ret
 
 pop_key__empty:

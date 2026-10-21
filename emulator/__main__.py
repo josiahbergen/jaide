@@ -65,6 +65,7 @@ def main():
         "disk": args.disk,
     }
 
+    logger.info(f"jaide emulator v0.0.2 (copyright 2026 Josiah Bergen)")
     emulator = Emulator(verbosity=args.verbosity, enabled_devices=devices, image_file=args.image, memory_view=args.memory)
 
     # load binary file if provided

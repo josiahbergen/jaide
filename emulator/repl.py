@@ -175,6 +175,13 @@ def src(emulator: Emulator, args: list[str]) -> None:
     logger.info(emulator.source_map.get_source(addr))
 
 
+def trace(emulator: Emulator, args: list[str]) -> None:
+    """trace                    display the call stack and source code"""
+    arguments(args)
+    for addr, label in emulator.call_stack:
+        logger.info(f"0x{addr:04X}: {emulator.source_map.get_source(addr)}")
+        
+
 def reset(emulator: Emulator, args: list[str]) -> None:
     """reset                    reset the emulator"""
     arguments(args)
@@ -204,6 +211,7 @@ COMMANDS = {
     "mset": set_memory,
     "mem": memory,
     "stack": stack,
+    "trace": trace,
     "disasm": disasm,
     "src": src,
     "reset": reset,

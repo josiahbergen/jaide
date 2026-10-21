@@ -12,7 +12,7 @@
 sc_exit:
     ; this subroutine purges the entire call stack,
     ; re-enables interrupts, and transfers control back
-    ; to the kernel's main loop (i.e. the shell).
+    ; to the shell.
 
     pop z 
     cmp sp, stack_top
@@ -24,14 +24,11 @@ sc_exit:
     ; save requested exit code
     push b
 
-    ; clear the screen + redraw shell prompt.
+    ; clear the screen, recover the exit code into a,
+    ; and transfer control back to the shell.
     call tty__clear
-    call shell__draw_prompt_no_scroll
-
-    ; recover exit code into a and transfer control back
-    ; to the kernel's main loop
     pop a
-    jmp kernel__loop
+    jmp shell__run
 
 
 sc_exec:

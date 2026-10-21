@@ -14,7 +14,7 @@ from jasm.util.logger import logger
 def assemble(file: str, output: str, options: dict[str, bool] = {}):
     """Assemble a JASM file and return the binary."""
 
-    logger.info("JASM assembler v0.0.5 (copyright 2026 Josiah Bergen)")
+    logger.info("jasm assembler v0.0.5 (copyright 2026 Josiah Bergen)")
 
     # generate the IR using a recursive parser + transformer
     # includes macros, labels, constants, and directives

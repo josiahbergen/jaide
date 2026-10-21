@@ -1,3 +1,4 @@
+import time
 from typing import Callable
 
 from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, REGISTERS
@@ -6,6 +7,7 @@ from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MOD
 from .emulator import Emulator, mask16
 from .exceptions import InvalidInstructionFault, EmulatorException, ProtectionFault, DivisionByZeroFault, BreakpointException
 from .util.logger import logger
+
 
 def _cond_jump(emu: Emulator, condition: bool, decoded: tuple[int, ...]) -> None:
     if condition:
@@ -356,16 +358,21 @@ def handle_jle(emu, decoded: tuple[int, ...]) -> None:
 def handle_call(emu, decoded: tuple[int, ...]) -> None:
     opcode, reg_a, reg_b, imm16 = decoded
     modes = OPCODE_FORMATS[opcode].modes
-    emu._push_core(emu.pc.value)
+
     if modes == (MODES.REG,):
-        emu.pc.set(emu.reg_get(reg_a))
+        target, size = emu.reg_get(reg_a), 1
     elif modes == (MODES.IMM,):
-        emu.pc.set(imm16)
+        target, size = imm16, 2
     else:
         raise InvalidInstructionFault(f"unexpected CALL variant at 0x{emu.pc.value:04x}.")
 
+    emu._push_core(emu.pc.value)
+    emu.call_stack.append((mask16(emu.pc.value - size), emu.source_map.get_source(mask16(emu.pc.value - size)).split(" ")[0]))
+    emu.pc.set(target)
+
 
 def handle_ret(emu, _decoded: tuple[int, ...]) -> None:
+    emu.call_stack.pop()
     emu.pc.set(emu._pop_core())
 
 
@@ -405,7 +412,12 @@ def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
     # Read and validate the complete frame before changing any CPU state.
     frame_sp = emu.sp.value
     frame = [emu.bus.read16(frame_sp + offset) for offset in range(7)]
-    target_pc, target_sp, target_flags, target_mb, target_mode, _kind, _detail = frame
+    _kind, _detail, target_mode, target_mb, target_flags, target_sp, target_pc = frame
+
+    # logger.debug(f"transfer called at 0x{emu.pc.value:04X}. stack frame:")
+    # frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
+    # for i in range(7):
+    #     logger.debug(f"{frame_indices[i]:<19} {frame[i]:<6} 0x{frame[i]:04X}")
 
     if target_mode not in (SUPERVISOR_MODE, USER_MODE):
         raise ProtectionFault("attempted to transfer to an invalid mode")
@@ -442,6 +454,8 @@ def handle_wait(emu, _decoded: tuple[int, ...]) -> None:
     # enable interrupts and begin waiting
     emu.ie = True
     emu.waiting = True
+    emu._wait_time = time.perf_counter()
+    emu._last_print = 0
 
 handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
     INSTRUCTIONS.HALT : handle_halt,
