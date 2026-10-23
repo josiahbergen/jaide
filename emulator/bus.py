@@ -59,7 +59,7 @@ class MemoryBus:
 
         if MMIO_BASE <= address <= MMIO_END:
             # if read is from mmio, dispatch to mmio_read
-            logger.debug(f"read from MMIO at 0x{address:04X}...")
+            logger.verbose(f"read from MMIO at 0x{address:04X}...")
             value = self.mmio_read(address) & 0xFFFF
             self._record_mmio(address, value, written=False)
             return value

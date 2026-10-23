@@ -86,31 +86,28 @@ handle_key_abort:
     ret
 
 dispatch_command:
-    mov a, var_command_buffer
+    mov a, shell_line_buffer
     ; x = command_list cursor
     ; string_compare trashes x/y, so save x around the call.
-    mov x, command_list
+    mov d, command_list
 
 dispatch_command__loop:
-    get b, [x] ; string pointer of the command we are checking
+    get b, [d] ; string pointer of the command we are checking
     cmp b, 0
     jz dispatch_command__not_found ; end of list, no match found
 
-    push x
     call string__string_compare ; result in c (0 = equal); clobbers x, y
     cmp c, 0
     jz dispatch_command__found
 
-    pop x
-    add x, 2 ; next entry (two words)
+    add d, 2 ; next entry (two words)
     jmp dispatch_command__loop
 
 dispatch_command__found:
     ; match found! c has the string pointer of the matching command,
     ; so the next word is the function pointer
-    pop x
-    inc x
-    get b, [x] ; now b has the function pointer
+    inc d
+    get b, [d] ; now b has the function pointer
     call b ; finally, call!
     ret 
 
@@ -119,7 +116,29 @@ dispatch_command__not_found:
     call tty__write
     ret
 
-    
+handler_exec:
+    ; construct a stack frame to user mode, and transfer
+    ; control to the user program.
+    push 0x7000   ; target pc
+    push 0xAFFF   ; target sp
+    push 0x0000   ; target flags
+    push 0x0000   ; target mb
+    push 0x0001   ; target mode
+    push 0x0000   ; event kind
+    push 0x0000   ; event detail
+    transfer
+
+handler_clear:
+    call tty__clear
+    ret
+
+handler_help:
+    mov b, s_help_message
+    call tty__write
+    ret
+
+handler_exit:
+    ret
 
 s_prompt:           data "$ ",                                         0
 s_help_message:     data "exec:   execute the loaded program",   0xA
@@ -137,7 +156,7 @@ s_startup_message:  data "ready.",                               0xA
 s_cmd_exec:         data "exec",                                       0
 s_cmd_clear:        data "clear",                                      0
 s_cmd_help:         data "help",                                       0
-s_cmd_shutdown:     data "exit",                                       0
+s_cmd_exit:         data "exit",                                       0
 
 command_list:
     ; maps string pointers to function pointers

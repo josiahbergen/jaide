@@ -208,7 +208,7 @@ class Emulator:
             raise KeyboardInterrupt  
 
         # set execution mode to supervisor and disable interrupts
-        logger.info(f"entering supervisor via event {EVENT(event).name} at 0x{target:04X}...")
+        logger.info(f"entering supervisor via event {EVENT(event).name} ({detail:04X}) at 0x{target:04X}...")
         self.mode = SUPERVISOR_MODE
         self.ie = False
 
@@ -231,7 +231,6 @@ class Emulator:
 
         # finally, move execution to the kernel's entry point
         self.pc.set(0x0100)
-
 
     def reset(self) -> None:
         # reset protection state

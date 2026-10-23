@@ -415,24 +415,24 @@ def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
     _kind, _detail, target_mode, target_mb, target_flags, target_sp, target_pc = frame
 
     # logger.debug(f"transfer called at 0x{emu.pc.value:04X}. stack frame:")
-    # frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
+    # frame_indices = ["event type", "event detail", "execution mode", "memory bank", "flags", "stack pointer", "pc address"]
     # for i in range(7):
     #     logger.debug(f"{frame_indices[i]:<19} {frame[i]:<6} 0x{frame[i]:04X}")
 
     if target_mode not in (SUPERVISOR_MODE, USER_MODE):
-        raise ProtectionFault("attempted to transfer to an invalid mode")
+        raise ProtectionFault(f"attempted to transfer to an invalid mode: {target_mode}")
     if target_flags & ~0x000F:
-        raise ProtectionFault("attempted to transfer with invalid flags")
+        raise ProtectionFault(f"attempted to transfer with invalid flags: {target_flags}")
     if target_mb > 31:
-        raise ProtectionFault("attempted to transfer to an invalid memory bank")
+        raise ProtectionFault(f"attempted to transfer to an invalid memory bank {target_mb}")
 
     if target_mode == USER_MODE:
         if not 0x7000 <= target_pc <= 0xAFFF:
-            raise ProtectionFault("attempted to transfer to an invalid user address")
+            raise ProtectionFault(f"attempted to transfer to an invalid user address: {target_pc}")
         if not 0x7000 <= target_sp <= 0xAFFF:
-            raise ProtectionFault("attempted to transfer to an invalid user stack pointer")
-        if target_mb == 0:
-            raise ProtectionFault("attempted to transfer to an invalid user bank")
+            raise ProtectionFault(f"attempted to transfer to an invalid user stack pointer: {target_sp}")
+        if target_mb != 0:
+            raise ProtectionFault(f"attempted to transfer to an invalid user bank: {target_mb}")
 
     if target_mode == USER_MODE:
         # Save the supervisor stack pointer after consuming this frame.

@@ -22,6 +22,7 @@ init:
 import "kernel/src/defs.jasm"
 import "kernel/src/macros.jasm"
 import "kernel/src/tty.jasm"
+import "kernel/src/shell.jasm"
 
 import "kernel/syscalls/process.jasm"
 import "kernel/syscalls/output.jasm"
@@ -49,7 +50,6 @@ import "kernel/lib/string.jasm"
 ;    | .. + 6 | target pc  |
 
 event_dispatch:
-
     pop x ; event kind
 
     ; parse what event we are dealing with and
@@ -88,10 +88,11 @@ interrupt_not_found:
 
 dispatch_syscall:
     ; event detail (syscall number) is in x already
+
     mov z, sc_jump_table
     add z, x 
 
-    get z, [z]            
+    get z, [z]
     cmp z, 0x0000 ; invalid syscall addresses are zeroes in memory
     jz syscall_not_found 
 
@@ -114,6 +115,7 @@ int_jump_table:
     data 0x00
     data input__keyboard_interrupt  ; 0x04
 
+    align 0x10
 sc_jump_table:
 
     ; process
@@ -157,5 +159,19 @@ sc_jump_table:
     data system__sc_shutdown     ; 0x50
     data system__sc_reset        ; 0x51
 
-; all the shell interface code lives here.
-import "kernel/src/shell.jasm"
+align 0x7000
+
+user_main:
+    mov a, 0x010   ; sc_write_str
+    mov b, user_s_demo  ; string pointer
+    syscall 
+
+    ; wait for a key press
+    mov a, 0x20   ; sc_read_char
+    syscall
+
+    mov a, 0x200
+    put [a], 0x10
+
+user_s_demo:
+data "hello, world!", 0xA, 0
