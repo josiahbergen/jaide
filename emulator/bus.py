@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, NamedTuple
 
 from .constants import (
     USER_MODE,
@@ -22,6 +22,12 @@ from .exceptions import ProtectionFault
 USER_MEMORY_START = 0x7000
 USER_MEMORY_END = 0xAFFF
 
+
+class MmioAccess(NamedTuple):
+    value: int
+    written: bool
+    serial: int  # increases on every access, so repeated identical accesses are distinguishable
+
 class MemoryBus:
     
     def __init__(self, current_bank: Callable[[], int], current_mode: Callable[[], int], mmio_read: Callable[[int], int], mmio_write: Callable[[int, int], None], get_current_source: Callable[[], str]):
@@ -34,6 +40,9 @@ class MemoryBus:
         self.memory = bytearray(MEMORY_SIZE)
         self.vram = bytearray(VRAM_SIZE)
         self.banks = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
+        # most recent access to each mmio word, for observation by debugging tools
+        self.mmio_accesses: list[MmioAccess | None] = [None] * (MMIO_END - MMIO_BASE + 1)
+        self._mmio_serial = 0
 
     @property
     def vram_view(self) -> memoryview:
@@ -51,7 +60,9 @@ class MemoryBus:
         if MMIO_BASE <= address <= MMIO_END:
             # if read is from mmio, dispatch to mmio_read
             logger.debug(f"read from MMIO at 0x{address:04X}...")
-            return self.mmio_read(address) & 0xFFFF
+            value = self.mmio_read(address) & 0xFFFF
+            self._record_mmio(address, value, written=False)
+            return value
 
         # resolve storage and contstruct word
         storage, offset = self.resolve_storage(address, bank)
@@ -71,6 +82,7 @@ class MemoryBus:
             # if write is to mmio, dispatch to mmio_write
             logger.debug(f"write to MMIO at 0x{address:04X} with 0x{value:04X}...")
             self.mmio_write(address, value)
+            self._record_mmio(address, value, written=True)
             return  # mmio_write does not return a value
 
         if address <= ROM_END:
@@ -83,6 +95,10 @@ class MemoryBus:
         storage, offset = self.resolve_storage(address, bank)
         storage[offset] = value & 0xFF
         storage[offset + 1] = value >> 8
+
+    def _record_mmio(self, address: int, value: int, *, written: bool) -> None:
+        self._mmio_serial += 1
+        self.mmio_accesses[address - MMIO_BASE] = MmioAccess(value, written, self._mmio_serial)
 
     def peek16(self, address: int, *, bank: int | None = None) -> int:
         """Inspect a word without CPU protection checks or MMIO side effects."""
@@ -119,6 +135,7 @@ class MemoryBus:
         self.memory[ROM_SIZE:] = bytes(MEMORY_SIZE - ROM_SIZE)
         self.vram[:] = bytes(VRAM_SIZE)
         self.banks = [bytearray(BANK_SIZE) for _ in range(NUM_BANKS)]
+        self.mmio_accesses = [None] * len(self.mmio_accesses)
 
     def resolve_storage(self, address: int, bank: int | None) -> tuple[bytearray, int]:
         # gets the storage (bytearray) and the byte offset (int) for the

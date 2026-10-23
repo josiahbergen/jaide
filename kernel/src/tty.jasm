@@ -3,229 +3,276 @@
 ;
 ;    public interface:
 ;
-;    | name        | args                   | returns      |
-;    | ----------- | ---------------------- | ------------ |
-;    | init        | -                      | -            |
-;    | write       | b = string pointer     | -            |
-;    | putc        | b = character          | -            |
-;    | clear       | -                      | -            |
-;    | set_cursor  | b = column, c = row    | a = status   |
+;    | name        | args                   | returns                      |
+;    | ----------- | ---------------------- | ---------------------------- |
+;    | init        | -                      | -                            |
+;    | write       | b = string pointer     | -                            |
+;    | putc        | b = character          | -                            |
+;    | clear       | -                      | -                            |
+;    | set_cursor  | b = column, c = row    | a = status                   |
 ;    | get_cursor  | -                      | b = col, c = row, a = status |
-;    | put_char_at | b = char, c = x, d = y | a = status   |
-;    | set_attr    | b = attribute          | a = status   |
+;    | put_char_at | b = char, c = x, d = y | a = status                   |
+;    | set_attr    | b = attribute          | a = status                   |
+;    | show_cursor | -                      | a = status                   |
+;    | hide_cursor | -                      | a = status                   |
+;
+;    NOTE: at the current time, ALL subroutines should be assumed to clobber ALL registers. 
+;    this file contains internals of kernel syscalls, and it is the kernel's (not the tty's) 
+;    responsibility to preserve the user's registers.
 
 define tty_width         80
 define tty_height        25
 define tty_last_row      24
 define tty_default_attr  0x0001
 define tty_scroll_words  0x0f00
+define tty_cursor_attr   0x8001
 
-; Initialise state stored in kernel RAM, whose contents are undefined at reset.
+; tty__reset / tty__init
+; subroutine pair to reset and/or initialize the graphics state,
+; and set up everything needed for tty mode.
+;
+;   no arguments
+;   no return value
+
+reset:
+    ; the reset subroutine should be called after user process exit,
+    ; or in any situation where we need a clean slate in vram.
+    ; otherwise, the init routine is much faster.
+    call clear
 init:
-    push e
+    ; initialize state in kernel variables.
     save_to kvar_cursor_col, 0
     save_to kvar_cursor_row, 0
     save_to kvar_tty_attr, tty_default_attr
-    pop e
     ret
 
-; Write a null-terminated string at the current cursor position.
+; tty__write
+; write a null-terminated string at the current cursor position. scrolls.
+; does not offer protection against malformed strings.
+;
 ;   b = string pointer
+;
+;   no return value
+
 write:
-    push x
-    mov x, b
-
-write_loop:
-    get b, [x]
-    cmp b, 0
-    jz write_done
-    call putc
-    inc x
-    jmp write_loop
-
+    push b         ; save the string pointer to use later
+    get b, [b]     ; get char from string
+    
+    cmp b, 0       ; check for null terminator.
+    jz write_done  ; found, exit.
+    
+    call putc      ; echo,
+    pop b          ; restore the string pointer,
+    inc b          ; advance,
+    jmp write      ; repeat.
 write_done:
-    pop x
-    ret
+    pop b          ; don't corrupt the stack!
+    ret            ; finally, get me out of here.
 
-; Write one character and advance the cursor. Line feed moves to column zero
-; on the next row. Writing beyond the final column wraps in the same way.
+; tty__putc
+; write one character and advance the cursor. line feed moves to column zero
+; on the next row. writing beyond the final column wraps in the same way.
+;
 ;   b = character
-putc:
-    push e
-    push x
-    push y
-    push z
+;   no return value
 
-    cmp b, 0x0a
-    jz putc_newline
+putc:
+    cmp b, 0x0a       ; check if we're printing a newline,
+    jz putc_newline   ; and delegate to newline handler if so.
 
     dereference_into x, kvar_cursor_col
     dereference_into y, kvar_cursor_row
-    xy_to_vram z, x, y
 
-    put [z], b
+    xy_to_vram z, x, y                 ; cursor position in vram
+    dereference_into y, kvar_tty_attr  ; current attribute value
+
+    put [z], b      ; write the character word...
     inc z
-    dereference_into x, kvar_tty_attr
-    put [z], x
+    put [z], y      ; ... and the attribute word.
 
-    dereference_into x, kvar_cursor_col
+    ; x still contains the original column index, so we can
+    ; use it to increment the tty's working column.
     inc x
     cmp x, tty_width
-    jae putc_newline
+    jae putc_newline ; check if we need to wrap around to next row
 
+    ; save column and return
     save_to kvar_cursor_col, x
-    jmp putc_done
+    ret
 
 putc_newline:
     call newline
-
-putc_done:
-    pop z
-    pop y
-    pop x
-    pop e
     ret
+    
 
-; Blank the screen and home the cursor. The first blank row is copied over
+; tty__clear
+; blank the screen and home the cursor. the first blank row is copied over
 ; every remaining row to avoid a full-screen store loop.
-clear:
-    push e
-    push x
-    push y
-    push z
+;
+;   no arguments
+;   no return value
 
-    mov x, vram_start
-    mov y, vram_start
-    add y, vram_row_length
+clear:
+    mov x, vram_start       ; set x to start of vram
+    mov y, x
+    add y, vram_row_length  ; set y to end of first row
 
 clear_first_row:
+    ; write zeros to the entire first row
     put [x], 0
     inc x
     cmp x, y
     jnz clear_first_row
 
-    mov x, vram_start
-    mov y, vram_start
-    add y, vram_row_length
-    mov z, vram_start
-    add z, vram_length
+    mov x, vram_start       ; set x to start of vram
+    mov y, x
+    mov z, x
+    add y, vram_row_length  ; set y to end of first row
+    add z, vram_length      ; set z to end of vram
 
 clear_remaining_rows:
+    ; copy the newly zeroed first row to the remaining rows
     bcp y, x, vram_row_length
     add y, vram_row_length
     cmp y, z
     jnz clear_remaining_rows
 
-    save_to kvar_cursor_col, 0
-    save_to kvar_cursor_row, 0
-
-    pop z
-    pop y
-    pop x
-    pop e
+    ; reset cursor position and attribute
+    call init
     ret
 
-; Set the cursor if the coordinates are on-screen.
-;   b = column, c = row
-;   a = 0 on success, 1 on invalid coordinates
-set_cursor:
-    cmp b, tty_width
-    jae set_cursor__error
-    cmp c, tty_height
-    jae set_cursor__error
+; tty__set_cursor
+; set the cursor position if the coordinates are within the screen bounds.
+;
+;   b = column
+;   c = row
+;
+;   returns a = status code (0 = success, 1 = error)
 
-    push e
+set_cursor:
+    jmp_if_exceeds_bounds b, c, tty_width, tty_height, set_cursor__error
+    call hide_cursor
     save_to kvar_cursor_col, b
     save_to kvar_cursor_row, c
-    pop e
+    call show_cursor
     mov a, 0
     ret
-
 set_cursor__error:
     mov a, 1
     ret
 
+; tty__get_cursor
 ; Read the current cursor coordinates.
-;   returns b = column, c = row, a = 0
+;
+;   no arguments
+; 
+;   returns b = column
+;   returns c = row
+;   returns a = status code (0 = success, 1 = error)
+
 get_cursor:
-    push e
     dereference_into b, kvar_cursor_col
     dereference_into c, kvar_cursor_row
-    pop e
-    mov a, 0
+    mov a, 0  ; always success. hopefully this is actually the case!
     ret
 
-; Write one character directly without changing the cursor.
-;   b = character, c = column, d = row
-;   a = 0 on success, 1 on invalid coordinates
+; tty__put_char_at
+; write one character directly without changing the cursor.
+;
+;   b = character
+;   c = column
+;   d = row
+;
+;   returns a = status code (0 = success, 1 = error)
 put_char_at:
-    cmp c, tty_width
-    jae put_char_at__error
-    cmp d, tty_height
-    jae put_char_at__error
-
-    push e
-    push x
-    push y
-    push z
-
-    mov x, c
-    mov y, d
-    xy_to_vram z, x, y
+    jmp_if_exceeds_bounds c, d, tty_width, tty_height, put_char_at__error
+    xy_to_vram z, c, d
+    dereference_into c, kvar_tty_attr
+put_char_at_vram:
     put [z], b
     inc z
-    dereference_into x, kvar_tty_attr
-    put [z], x
+    put [z], c
 
-    pop z
-    pop y
-    pop x
-    pop e
     mov a, 0
     ret
-
 put_char_at__error:
     mov a, 1
     ret
 
-; Set the attribute used by subsequent writes.
+; tty__set_attr
+; set the attribute used by subsequent writes.
+;
 ;   b = text-mode attribute
+;
+;   returns a = status code (0 = success, 1 = error)
+
 set_attr:
-    push e
     save_to kvar_tty_attr, b
-    pop e
     mov a, 0
     ret
 
-; Move to column zero on the next row, scrolling at the bottom.
+; tty__show_cursor / tty__hide_cursor
+; draw (or erase) a blinking block at the cursor without moving it.
+;
+;   no arguments
+;
+;   returns a = status code (always 0)
+
+show_cursor:
+    ; prepare the cursor cell attribute in c
+    mov c, tty_cursor_attr
+    jmp cursor_cell
+hide_cursor:
+    ; prepare the default cell attribute in c
+    dereference_into c, kvar_tty_attr
+cursor_cell:
+    ; write the char/attr pair at the cursor position
+    dereference_into x, kvar_cursor_col
+    dereference_into y, kvar_cursor_row
+    xy_to_vram z, x, y
+    mov b, 0x20
+    jmp put_char_at_vram
+
+; PRIVATE SUBROUTINES BELOW
+; these are not part of the public interface, and do not have a stable abi.
+
+; tty__newline
+; move to column zero on the next row, scrolling at the bottom.
+;
+;   no arguments
+;   no return value
+
 newline:
-    save_to kvar_cursor_col, 0
+    save_to kvar_cursor_col, 0  ; reset column
+    
+    ; if we're already on the last row, scroll instead
     dereference_into y, kvar_cursor_row
     cmp y, tty_last_row
-    jz newline_scroll
+    jz scroll
 
-    inc y
+    inc y  ; otherwise, increment row and save
     save_to kvar_cursor_row, y
     ret
 
-newline_scroll:
-    call scroll
-    ret
+; tty__scroll
+; copy rows 1-24 over rows 0-23, then clear the final row. keeps the cursor on the last row.
+;
+;   no arguments
+;   no return value
 
-; Copy rows 1-24 over rows 0-23, then blank the final row. The cursor stays
-; on the final row.
 scroll:
-    mov x, vram_start
-    mov y, vram_start
-    add y, vram_row_length
-    bcp x, y, tty_scroll_words
+    mov x, vram_start           ; set x to start of vram
+    mov y, x
+    add y, vram_row_length      ; set y to end of first row
+    bcp x, y, tty_scroll_words  ; the "scroll". shift all rows up by one, except the first.
 
     mov x, vram_start
-    add x, tty_scroll_words
-    mov z, vram_start
-    add z, vram_length
+    add x, tty_scroll_words     ; set x to start of last row
+    mov z, x
+    add z, vram_length          ; set z to end of vram
 
 scroll_clear_last_row:
+    ; clear each word in the last row of vram
     put [x], 0
     inc x
     cmp x, z

@@ -3,7 +3,7 @@
 import pygame
 from pygame._sdl2 import Renderer, Texture, Window
 
-from .bus import MemoryBus
+from .bus import MemoryBus, MmioAccess
 from .constants import MMIO_BASE, MMIO_END, NUM_BANKS
 
 ROWS = 32
@@ -17,6 +17,8 @@ FOREGROUND = (222, 227, 234)
 MUTED = (121, 132, 147)
 ACCENT = (111, 190, 255)
 CHANGED = (255, 207, 105)
+MMIO_READ = (126, 214, 160)
+MMIO_WRITTEN = (232, 140, 206)
 
 
 class MemoryView:
@@ -40,7 +42,7 @@ class MemoryView:
         self.texture = Texture(self.renderer, size, streaming=True)
         self.input_rect = pygame.Rect(PADDING + 7 * self.char_width, 12, 9 * self.char_width, self.row_height + 10)
         self._last_draw = 0.0
-        self._previous: tuple[int, ...] | None = None
+        self._previous: tuple[int | MmioAccess | None, ...] | None = None
         self._context: tuple[int, int] | None = None
         self._changed_until = [0.0] * PAGE_WORDS
         self._scroll_remainder = 0.0
@@ -103,7 +105,11 @@ class MemoryView:
         self._last_draw = now
         bank = self.bus.current_bank() % (NUM_BANKS + 1)
         context = (self.start, bank)
-        words = tuple(self.bus.peek16(self.start + offset, bank=bank) for offset in range(PAGE_WORDS))
+        # mmio cells hold the most recent access instead of a word, since reading mmio has side effects
+        words = tuple(
+            self.bus.mmio_accesses[address - MMIO_BASE] if MMIO_BASE <= address <= MMIO_END else self.bus.peek16(address, bank=bank)
+            for address in range(self.start, self.start + PAGE_WORDS)
+        )
         if context != self._context:
             self._previous = None
             self._changed_until = [0.0] * PAGE_WORDS
@@ -131,13 +137,33 @@ class MemoryView:
             self._text(f"{address:04X}:", PADDING, y, ACCENT)
             for col in range(COLS):
                 offset = row * COLS + col
-                mmio = MMIO_BASE <= address + col <= MMIO_END
-                color = MUTED if mmio else CHANGED if self._changed_until[offset] > now else FOREGROUND
-                self._text("----" if mmio else f"{words[offset]:04X}", self.grid_x + col * self.cell_width, y, color)
-                character = "-" if mmio else chr(words[offset]) if 0x20 <= words[offset] <= 0x7E else "."
-                self._text(character, self.ascii_x + col * self.char_width, y, color)
+                word = words[offset]
+                if word is None:
+                    self._text("----", self.grid_x + col * self.cell_width, y, MUTED)
+                    self._text("-", self.ascii_x + col * self.char_width, y, MUTED)
+                    continue
+                if isinstance(word, MmioAccess):
+                    color = MMIO_WRITTEN if word.written else MMIO_READ
+                    word = word.value
+                else:
+                    color = FOREGROUND
+                if self._changed_until[offset] > now:
+                    color = CHANGED
+                self._text(f"{word:04X}", self.grid_x + col * self.cell_width, y, color)
+                self._text(chr(word) if 0x20 <= word <= 0x7E else ".", self.ascii_x + col * self.char_width, y, color)
         pygame.draw.line(self.surface, MUTED, (self.ascii_x - PADDING, self.grid_y - self.row_height), (self.ascii_x - PADDING, self.grid_y + ROWS * self.row_height))
-        self._text("Gray ----: MMIO (not read) · Amber: changed · Follows current bank", PADDING, self.surface.get_height() - 27, MUTED)
+        legend_y = self.surface.get_height() - 27
+        legend = [
+            ("Amber: changed · MMIO ", MUTED),
+            ("green: last read", MMIO_READ),
+            (" · ", MUTED),
+            ("pink: last written", MMIO_WRITTEN),
+            (" · ----: untouched · Follows current bank", MUTED),
+        ]
+        x = PADDING
+        for text, color in legend:
+            self._text(text, x, legend_y, color)
+            x += self.font.size(text)[0]
         self.texture.update(self.surface)
         self.renderer.clear()
         self.texture.draw()

@@ -31,6 +31,13 @@ macro put_value_at %ptr_label, %value
     put [e], %value
 end macro
 
+macro jmp_if_exceeds_bounds %reg1, %reg2, %imm1, %imm2, %label
+    cmp %reg1, %imm1
+    jae %label
+    cmp %reg2, %imm2
+    jae %label
+end macro
+
 macro xy_to_vram %dest, %reg_x, %reg_y
     mov %dest, vram_start
     push %reg_y

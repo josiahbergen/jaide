@@ -2,23 +2,11 @@
 
 _Updated October 10, 2026._
 
-## Current state
-
-The protected CPU foundation is mostly implemented in the emulator:
-
-- supervisor and user modes, a protected supervisor stack, and user memory isolation;
-- `syscall`, `transfer`, and `wait` in the ISA, assembler, and emulator;
-- seven-word context frames and validated transfers;
-- reset of protected CPU state;
-- persistent keyboard, PIT, and disk IRQ lines with MMIO acknowledgement;
-- lowest-numbered IRQ selection; and
-- disk completion interrupts and write-back.
-
-The existing kernel still uses the old execution model. It does not yet provide
-the common syscall/fault/IRQ entry path or run user programs. Its current build
-is also blocked by an inverted linkability check in the assembler.
-
 ## Remaining work
+
+### TODO
+
+- perserve registers during all hardware entries
 
 ### 1. Finish emulator correctness
 

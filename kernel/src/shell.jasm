@@ -8,31 +8,28 @@
 ;    | run  | -    | does not return |
 
 run:
+    ; prepare the tty for use
+    call tty__init
     ; draw the initial prompt
     call prompt
 
 run_loop:
-    call input__sc_poll_key
-    cmp a, 0
-    jz run_wait
-    call handle_key
-    jmp run_loop
-
-run_wait:
-    ; sleep until the next interrupt (e.g. a key press) arrives.
-    wait
-    jmp run_loop
+    ; main shell loop.
+    call input__sc_read_char  ; wait for a key press (returned in a)
+    call handle_keystroke     ; handle
+    jmp run_loop              ; repeat
 
 prompt:
     ; empty the line buffer and draw the prompt at the cursor.
     save_to shell_line_length, 0
     mov b, s_prompt
     call tty__write
+    call tty__show_cursor
     ret
 
-; handle one key.
+; handle one keystroke.
 ;   a = key code
-handle_key:
+handle_keystroke:
     ; enter and backspace get special cases
     cmp a, 0x0d 
     jz handle_key_enter
@@ -42,13 +39,13 @@ handle_key:
     ; ignore control characters and non-ascii keys
     ; (i.e. < 0x20 or >= 0x7f)
     cmp a, 0x20
-    jb handle_key_done
+    jb handle_key_abort
     cmp a, 0x7f
-    jae handle_key_done
+    jae handle_key_abort
 
     dereference_into c, shell_line_length
     cmp c, shell_line_capacity
-    jae handle_key_done ; buffer is full, abort
+    jae handle_key_abort ; buffer is full, abort
 
     ; append the character to the buffer
     mov x, shell_line_buffer
@@ -57,34 +54,95 @@ handle_key:
     inc c
     save_to shell_line_length, c
 
-    ; echo the character
     mov b, a
-    call tty__putc
+    call tty__putc         ; echo the character,
+    call tty__show_cursor  ; and redraw the new cursor position
     ret
 
 handle_key_backspace:
     dereference_into c, shell_line_length
     cmp c, 0
-    jz handle_key_done ; buffer is empty
+    jz handle_key_abort ; buffer is empty
     dec c
     save_to shell_line_length, c
 
     ; the prompt and a full buffer fit on one row, so the previous
     ; character is always directly left of the cursor.
+    ; erase the cursor, step back, and draw it over the deleted character.
+    call tty__hide_cursor
     call tty__get_cursor ; b = column, c = row
     dec b
     call tty__set_cursor
-    mov d, c
-    mov c, b
-    mov b, 0x20
-    call tty__put_char_at
+    call tty__show_cursor
     ret
 
 handle_key_enter:
+    call tty__hide_cursor
     call tty__newline
+    call dispatch_command
     call prompt
 
-handle_key_done:
+handle_key_abort:
     ret
 
-s_prompt: data "$ ", 0
+dispatch_command:
+    mov a, var_command_buffer
+    ; x = command_list cursor
+    ; string_compare trashes x/y, so save x around the call.
+    mov x, command_list
+
+dispatch_command__loop:
+    get b, [x] ; string pointer of the command we are checking
+    cmp b, 0
+    jz dispatch_command__not_found ; end of list, no match found
+
+    push x
+    call string__string_compare ; result in c (0 = equal); clobbers x, y
+    cmp c, 0
+    jz dispatch_command__found
+
+    pop x
+    add x, 2 ; next entry (two words)
+    jmp dispatch_command__loop
+
+dispatch_command__found:
+    ; match found! c has the string pointer of the matching command,
+    ; so the next word is the function pointer
+    pop x
+    inc x
+    get b, [x] ; now b has the function pointer
+    call b ; finally, call!
+    ret 
+
+dispatch_command__not_found:
+    mov a, s_invalid_command
+    call tty__write
+    ret
+
+    
+
+s_prompt:           data "$ ",                                         0
+s_help_message:     data "exec:   execute the loaded program",   0xA
+                    data "clear:  clear the screen",             0xA
+                    data "help:   show this message",            0xA
+                    data "exit:   shutdown the system",          0xA,  0
+
+s_invalid_command:  data "invalid command",                            0
+s_success:          data "ok",                                   0xA,  0
+s_error:            data "command returned with error status",         0
+s_startup_message:  data "ready.",                               0xA
+                    data "kernel shell v0.0.2",                  0xA
+                    data "type 'help' for a list of commands.",  0xA,  0
+
+s_cmd_exec:         data "exec",                                       0
+s_cmd_clear:        data "clear",                                      0
+s_cmd_help:         data "help",                                       0
+s_cmd_shutdown:     data "exit",                                       0
+
+command_list:
+    ; maps string pointers to function pointers
+    data s_cmd_exec,      handler_exec
+    data s_cmd_clear,     handler_clear
+    data s_cmd_help,      handler_help
+    data s_cmd_exit,      handler_exit
+    data 0,               0 ; end of list
