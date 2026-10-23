@@ -41,7 +41,7 @@ class Device:
         write_handler(value)
 
     def _get_mmio_list(self) -> str:
-        """ return a string of format "0xFE01 (r/w), 0xFE02 (r), ..."""
+        """ return a string of format "0xFF01 (r/w), 0xFF02 (r), ..."""
         return ", ".join(
             f"0x{addr:04X} ({'r/w' if r and w else 'r' if r else 'w'})"
             for addr in sorted(set(self.read_dispatch) | set(self.write_dispatch))

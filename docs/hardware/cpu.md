@@ -29,7 +29,7 @@ in the jaide emulator, type help to view a list of commands.
 ## reset state
 
 on reset, general-purpose registers, flags, `mb`, and `pc` are `0x0000`.
-`sp` and the protected supervisor stack pointer are `0xfdff`. the cpu starts in
+`sp` and the protected supervisor stack pointer are `0xfeff`. the cpu starts in
 supervisor mode with no active kernel event. the contents of ram are undefined
 and rom is not modified.
 
@@ -85,9 +85,8 @@ jaide supports up to 128 Kib of memory.
 
 | Range             | Size      | Purpose                                      |
 | ----------------- | --------- | -------------------------------------------- |
-| `0xFF00...0xFFFF` | 512 bytes | reserved                                     |
-| `0xFE00...0xFEFF` | 512 bytes | memory-mapped I/O                            |
-| `0xFD00...0xFDFF` | 512 bytes | stack (recommended)                          |
+| `0xFF00...0xFFFF` | 512 bytes | memory-mapped I/O                            |
+| `0xFD00...0xFEFF` | 1 KiB     | stack (recommended)                          |
 | `0xB000...0xFCFF` | ~39 KiB   | reserved (future kernel heap / expansion)    |
 | `0x7000...0xAFFF` | 32 KiB    | user processes RAM (banked)                  |
 | `0x6000...0x6FFF` | 8 KiB     | filesystem block cache                       |
@@ -96,7 +95,7 @@ jaide supports up to 128 Kib of memory.
 | `0x0100...0x3FFF` | ~16 KiB   | kernel code                                  |
 | `0x0000...0x00FF` | 512 bytes | BIOS ROM                                     |
 
-_the stack grows downwards. reset initializes SP to 0xFDFF._
+_the stack grows downwards. reset initializes SP to 0xFEFF._
 
 _banked memory can be swapped using the MB register._
 

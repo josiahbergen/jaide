@@ -72,9 +72,9 @@ class Emulator:
         self.mb = self.reg["MB"]  # memory bank
         self.f  = self.reg["F"]   # flags
 
-        # set stack pointers to 0xfdff as recommended by the spec
-        self.sp.set(0xfdff)
-        self.ssp.set(0xfdff)
+        # set stack pointers to 0xfeff as recommended by the spec
+        self.sp.set(0xfeff)
+        self.ssp.set(0xfeff)
 
         # memory bus and devices
         self.bus = MemoryBus(
@@ -164,7 +164,7 @@ class Emulator:
         self.flag_set(FLAG_N, bool(n))
         self.flag_set(FLAG_O, bool(o))
 
-    # MMIO helpers (0xFE00–0xFEFF, bank-independent)
+    # MMIO helpers (0xFF00–0xFFFF, bank-independent)
 
     def mmio_read(self, addr: int) -> int:
         for device in self.devices:
@@ -241,8 +241,8 @@ class Emulator:
         # reset registers
         for register in self.reg.values():
             register.set(0)  # conveniently, this puts us in supervisor mode
-        self.sp.set(0xFDFF)
-        self.ssp.set(0xFDFF)
+        self.sp.set(0xFEFF)
+        self.ssp.set(0xFEFF)
 
         # reset bus and devices
         self.bus.reset()

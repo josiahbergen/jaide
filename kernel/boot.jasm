@@ -5,7 +5,7 @@ org 0x0000
 
 start:
     ; bootloader entry point. lives at 0x0000.
-    mov sp, 0xfdff
+    mov sp, 0xfeff
     
     ; todo: load kernel into ram with manual mmio writes
     jmp kernel__init

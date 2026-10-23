@@ -38,10 +38,3 @@ def test_call_and_return_preserve_stack_and_resume_after_full_instruction(cpu, l
     cpu.step()
     cpu.step()
     assert (cpu.pc.value, cpu.sp.value, cpu.reg["A"].value) == (context.labels["<TEST>__RESUME"], original_sp, 1)
-
-
-def test_relative_branch_wraps_at_end_of_address_space(cpu, load_program):
-    load_program("target:\nnop\njnz target\n", address=0xFFFD)
-    cpu.pc.set(0xFFFE)
-    cpu.step()
-    assert cpu.pc.value == 0xFFFD

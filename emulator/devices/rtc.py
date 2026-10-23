@@ -12,10 +12,10 @@ class RTC(Device):
         """Real-time clock."""
         super().__init__()
 
-        self.read_dispatch[0xFE30] = lambda: time.localtime().tm_sec
-        self.read_dispatch[0xFE31] = lambda: time.localtime().tm_min
-        self.read_dispatch[0xFE32] = lambda: time.localtime().tm_hour
-        self.read_dispatch[0xFE33] = lambda: time.localtime().tm_yday
+        self.read_dispatch[0xFF30] = lambda: time.localtime().tm_sec
+        self.read_dispatch[0xFF31] = lambda: time.localtime().tm_min
+        self.read_dispatch[0xFF32] = lambda: time.localtime().tm_hour
+        self.read_dispatch[0xFF33] = lambda: time.localtime().tm_yday
 
         self._log_ready()
 

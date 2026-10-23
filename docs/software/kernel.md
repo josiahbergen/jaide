@@ -77,8 +77,8 @@ the terminal output syscalls in `kernel/syscalls/output.jasm` are thin wrappers 
 | #      | name        | args | returns                      | notes                                                          |
 | ------ | ----------- | ---- | ---------------------------- | -------------------------------------------------------------- |
 | `0x40` | `get_ticks` |      | a = low word, b = high word  | 32-bit kernel tick counter, incremented by pit interrupt `0x05`. |
-| `0x41` | `get_date`  |      | a = year, b = month, c = day | read rtc (mmio `0xfe30–0xfe33`).                               |
-| `0x41` | `get_time`  |      | a = hours, b = minutes,      | read rtc (mmio `0xfe30–0xfe33`).                               |
+| `0x41` | `get_date`  |      | a = year, b = month, c = day | read rtc (mmio `0xff30–0xff33`).                               |
+| `0x41` | `get_time`  |      | a = hours, b = minutes,      | read rtc (mmio `0xff30–0xff33`).                               |
 
 ### system
 
@@ -100,9 +100,8 @@ the jaide kernel requires a specific memory layout:
 | `0x6000`–`0x6fff` | filesystem block cache                       |
 | `0x7000`–`0xafff` | user program space (banked)                  |
 | `0xb000`–`0xfcff` | reserved                                     |
-| `0xfd00`–`0xfdff` | stack                                        |
-| `0xfe00`–`0xfeff` | mmio                                         |
-| `0xff00`–`0xffff` | reserved                                     |
+| `0xfd00`–`0xfeff` | stack                                        |
+| `0xff00`–`0xffff` | mmio                                         |
 
 ### kernel data layout
 

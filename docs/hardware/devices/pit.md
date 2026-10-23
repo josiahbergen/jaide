@@ -10,7 +10,7 @@ when on, the pit continuously counts down from its `reset` value. when the count
 
 ## interrupt acknowledgement
 
-reading the flags register at `0xFE11` returns the current enabled and one-shot flags and lowers irq line `0x05`. acknowledgement does not change the flags or counter. reading the reset value at `0xFE10` leaves the line unchanged.
+reading the flags register at `0xFF11` returns the current enabled and one-shot flags and lowers irq line `0x05`. acknowledgement does not change the flags or counter. reading the reset value at `0xFF10` leaves the line unchanged.
 
 writes to either register do not acknowledge an event. disabling the timer leaves an already asserted line pending until acknowledged or reset. a one-shot expiration also remains pending after the timer disables itself.
 
@@ -22,10 +22,10 @@ the pit supports read/write communication on two registers:
 
 | operation | address  | action                            |
 | --------- | -------- | --------------------------------- |
-| read      | `0xFE10` | get reset value; irq unchanged    |
-| read      | `0xFE11` | get flags and acknowledge event   |
-| write     | `0xFE10` | set reset value                   |
-| write     | `0xFE11` | set flags                         |
+| read      | `0xFF10` | get reset value; irq unchanged    |
+| read      | `0xFF11` | get flags and acknowledge event   |
+| write     | `0xFF10` | set reset value                   |
+| write     | `0xFF11` | set flags                         |
 
 ## flags
 

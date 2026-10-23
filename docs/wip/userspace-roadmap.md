@@ -45,7 +45,7 @@ in user mode, instruction fetches, reads, writes, and stack accesses are limited
 - the kernel stack; or
 - another process's bank.
 
-`mb` is supervisor-controlled while a user process is running. the initial userspace stack grows downward from `0xafff`; the stack at `0xfdff` is reserved for the kernel.
+`mb` is supervisor-controlled while a user process is running. the initial userspace stack grows downward from `0xafff`; the stack at `0xfeff` is reserved for the kernel.
 
 the syscall and fault entry path must switch stacks before executing ordinary kernel code. the kernel must never trust a user-supplied stack pointer as its own stack.
 

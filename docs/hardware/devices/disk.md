@@ -10,7 +10,7 @@ the disk controller utilizes dma-style data transfer to and from a hard disk. ea
 
 ### interrupt acknowledgement
 
-reading the status register at `0xFE23` returns the current status and lowers irq line `0x06`. the read does not change the status or cancel an active transfer. this acknowledgement applies to every status read, including polling reads while busy. the eventual completion of an active transfer asserts the line again.
+reading the status register at `0xFF23` returns the current status and lowers irq line `0x06`. the read does not change the status or cancel an active transfer. this acknowledgement applies to every status read, including polling reads while busy. the eventual completion of an active transfer asserts the line again.
 
 successful reads and writes both report idle status on completion; failures report error status. software must track which command it issued and record the returned status before starting another command.
 
@@ -22,10 +22,10 @@ the disk controller exposes three write registers and one read register:
 
 | operation | address  | action                           |
 | --------- | -------- | -------------------------------- |
-| write     | `0xFE20` | command                          |
-| write     | `0xFE21` | sector number                    |
-| write     | `0xFE22` | memory address                   |
-| read      | `0xFE23` | get status and acknowledge event |
+| write     | `0xFF20` | command                          |
+| write     | `0xFF21` | sector number                    |
+| write     | `0xFF22` | memory address                   |
+| read      | `0xFF23` | get status and acknowledge event |
 
 ### commands
 

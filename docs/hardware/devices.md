@@ -11,7 +11,7 @@ jaide supports a few devices:
 
 ## memory-mapped i/o
 
-device registers live in the 256-word region from `0xFE00` to `0xFEFF`. access them with `GET` and `PUT`.
+device registers live in the 256-word region from `0xFF00` to `0xFFFF`. access them with `GET` and `PUT`.
 
 device mmio is word-addressed and bank-independent. reads and writes are dispatched by the emulator's memory bus.
 
@@ -41,7 +41,7 @@ the emulator scans devices in registration order and is destructive when assigni
 
 ## system interface
 
-mmio address `0xFEFF` controls the physical hardware.
+mmio address `0xFFFF` controls the physical hardware.
 
 | value  | command      | emulator behavior          | hardware behavior  |
 | ------ | ------------ | -------------------------- | ------------------ |

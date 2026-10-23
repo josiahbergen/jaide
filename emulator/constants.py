@@ -19,9 +19,9 @@ VRAM_START = 0x4000
 VRAM_END   = 0x4FFF
 VRAM_SIZE  = 0x1000 * 2  # 4096 words (8 KiB)
 
-MMIO_BASE = 0xFE00
-MMIO_END  = 0xFEFF
-MMIO_SYSTEM = 0xFEFF
+MMIO_BASE = 0xFF00
+MMIO_END  = 0xFFFF
+MMIO_SYSTEM = 0xFFFF
 
 # Register names in index order (matches REGISTERS enum in common.isa)
 REGISTERS = ["A", "B", "C", "D", "E", "X", "Y", "Z", "F", "MB", "SP", "PC", "MDE"]

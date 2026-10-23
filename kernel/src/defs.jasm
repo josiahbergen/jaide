@@ -46,29 +46,29 @@ define fs_cache_empty               0xffff
 define fs_cache_base                0x6000   ; filesystem block cache (16 sectors)
 define bank_window_start            0x7000   ; userspace start
 define bank_window_end              0xafff   ; userspace end
-define stack_top                    0xfdff
+define stack_top                    0xfeff
 
 ; mmio locations
 
-define mmio_base                    0xfe00
+define mmio_base                    0xff00
 
-define mmio_keyboard_data           0xfe01
-define mmio_keyboard_status         0xfe02
+define mmio_keyboard_data           0xff01
+define mmio_keyboard_status         0xff02
 
-define mmio_pit_reload              0xfe10
-define mmio_pit_flags               0xfe11
+define mmio_pit_reload              0xff10
+define mmio_pit_flags               0xff11
 
-define mmio_disk_command            0xfe20
-define mmio_disk_sector             0xfe21
-define mmio_disk_address            0xfe22
-define mmio_disk_status             0xfe23
+define mmio_disk_command            0xff20
+define mmio_disk_sector             0xff21
+define mmio_disk_address            0xff22
+define mmio_disk_status             0xff23
 
-define mmio_rtc_second              0xfe30
-define mmio_rtc_minute              0xfe31
-define mmio_rtc_hour                0xfe32
-define mmio_rtc_yday                0xfe33
+define mmio_rtc_second              0xff30
+define mmio_rtc_minute              0xff31
+define mmio_rtc_hour                0xff32
+define mmio_rtc_yday                0xff33
 
-define mmio_system                  0xfeff
+define mmio_system                  0xffff
 
 ; disk/filesystem constants 
 

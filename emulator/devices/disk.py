@@ -50,10 +50,10 @@ class Disk(Device):
         # counts words.
         self._cursor = 0
 
-        self.write_dispatch[0xFE20] = self.execute_command
-        self.write_dispatch[0xFE21] = lambda value: setattr(self, "sector_number", value)
-        self.write_dispatch[0xFE22] = lambda value: setattr(self, "memory_address", value)
-        self.read_dispatch[0xFE23] = self._read_status
+        self.write_dispatch[0xFF20] = self.execute_command
+        self.write_dispatch[0xFF21] = lambda value: setattr(self, "sector_number", value)
+        self.write_dispatch[0xFF22] = lambda value: setattr(self, "memory_address", value)
+        self.read_dispatch[0xFF23] = self._read_status
 
         self._log_ready()
 

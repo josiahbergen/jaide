@@ -68,8 +68,8 @@ class Graphics(Device):
         self.screen: pygame.Surface = pygame.display.set_mode((SCALED_WIDTH, SCALED_HEIGHT))
         pygame.display.set_caption("jaide graphics controller output")
 
-        self.write_dispatch[0xFE40] = self._set_control
-        self.read_dispatch[0xFE40]  = lambda: 0x01 if self.enabled else 0x00
+        self.write_dispatch[0xFF40] = self._set_control
+        self.read_dispatch[0xFF40]  = lambda: 0x01 if self.enabled else 0x00
 
         self._log_ready()
 

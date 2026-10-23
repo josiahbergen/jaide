@@ -22,7 +22,7 @@ def test_memory_outside_bank_window_is_shared(cpu, address):
     assert cpu.bus.read16(address) == 0xABCD
 
 
-@pytest.mark.parametrize("address", [0, 0xFF, 0x100, 0x4000, 0x6FFF, 0xB000, 0xFDFF, 0xFE00, 0xFEFF, 0xFFFF])
+@pytest.mark.parametrize("address", [0, 0xFF, 0x100, 0x4000, 0x6FFF, 0xB000, 0xFDFF, 0xFEFF, 0xFF00, 0xFFFF])
 @pytest.mark.parametrize("access", ["read", "write", "fetch"])
 def test_user_cannot_access_protected_memory_or_mmio(cpu, monkeypatch, address, access):
     def forbidden_mmio(*args):

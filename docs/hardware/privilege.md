@@ -11,7 +11,7 @@ the cpu has three internal values which normal instructions cannot access:
 - `ssp`: the saved supervisor stack pointer; and
 - `irq_allowed`: whether a device interrupt may be accepted.
 
-reset sets supervisor mode, `sp = ssp = 0xfdff`, and `irq_allowed = 0`.
+reset sets supervisor mode, `sp = ssp = 0xfeff`, and `irq_allowed = 0`.
 
 there is no programmable interrupt mask and there are no `sti` or `cli`
 instructions. user code cannot read or write `irq_allowed`. kernel entry clears
