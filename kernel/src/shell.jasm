@@ -166,7 +166,9 @@ handler_help:
     ret
 
 handler_exit:
-    ret
+    mov a, mmio_system  ; system mmio
+    put [a], 0x02       ; shutdown
+    jmp handler_exit    ; loop infinitely just in case
 
 s_prompt:           data "$ ",                                         0
 s_help_message:     data "exec:   execute the loaded program",   0xA
