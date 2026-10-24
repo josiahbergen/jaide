@@ -224,11 +224,6 @@ class Emulator:
         self._push_core(detail)    # event detail 
         self._push_core(event)     # event type
 
-        # logger.info("created supervisor stack frame:")
-        # frame_indices = ["event type", "event detail", "old execution mode", "old memory bank", "old flags", "old stack pointer", "target pc address"]
-        # for i in range(7):
-        #     logger.info(f"{frame_indices[i]:<19} {self.bus.peek16(self.sp.value + i):<6} 0x{self.bus.peek16(self.sp.value + i):04X}")
-
         # finally, move execution to the kernel's entry point
         self.pc.set(0x0100)
 

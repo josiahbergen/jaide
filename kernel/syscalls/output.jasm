@@ -14,7 +14,9 @@
 ;    | 0x16 | set_attr    | b = attribute          | a = status   |
 
 sc_write_str:
+    call tty__hide_cursor
     call tty__write
+    call tty__show_cursor
     mov a, 0
     ret
 

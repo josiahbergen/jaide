@@ -94,7 +94,7 @@ dispatch_syscall:
 
     get z, [z]
     cmp z, 0x0000 ; invalid syscall addresses are zeroes in memory
-    jz syscall_not_found 
+    jz syscall_not_found
 
     call z ; execute!
     ret ; we trust that the handler has set a value in a for us
@@ -162,16 +162,16 @@ sc_jump_table:
 align 0x7000
 
 user_main:
-    mov a, 0x010   ; sc_write_str
+    mov a, 0x010        ; sc_write_str
     mov b, user_s_demo  ; string pointer
     syscall 
 
-    ; wait for a key press
-    mov a, 0x20   ; sc_read_char
+    mov a, 0x20 ; sc_read_char
     syscall
 
-    mov a, 0x200
-    put [a], 0x10
+    mov a, 0x00 ; sc_exit
+    mov b, 0x00 ; status code
+    syscall             
 
 user_s_demo:
 data "hello, world!", 0xA, 0

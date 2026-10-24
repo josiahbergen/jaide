@@ -44,6 +44,10 @@ wait_for_key:
     ; otherwise, wait for the next hardware interrupt and try again.
     wait
 
+    ; the interrupt may have pushed a key onto the queue
+    ; and resumed program flow here. so, check again.
+    jmp wait_for_key
+
 wait_for_key__end:
     ret
 

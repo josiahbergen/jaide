@@ -21,14 +21,10 @@ sc_exit:
     ; to the very top.
     jnz sc_exit
 
-    ; save requested exit code
-    push b
-
-    ; clear the screen, recover the exit code into a,
+    ; move requested exit code into a,
     ; and transfer control back to the shell.
-    call tty__clear
-    pop a
-    jmp shell__run
+    mov a, b
+    jmp shell__process_exited
 
 
 sc_exec:

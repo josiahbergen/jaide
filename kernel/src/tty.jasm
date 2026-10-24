@@ -66,8 +66,8 @@ write:
     inc b          ; advance,
     jmp write      ; repeat.
 write_done:
-    pop b          ; don't corrupt the stack!
-    ret            ; finally, get me out of here.
+    pop b          ; finally, get me out of here.
+    ret            ; don't corrupt the stack!
 
 ; tty__putc
 ; write one character and advance the cursor. line feed moves to column zero
@@ -220,18 +220,23 @@ set_attr:
 
 show_cursor:
     ; prepare the cursor cell attribute in c
+    push c
     mov c, tty_cursor_attr
     jmp cursor_cell
 hide_cursor:
     ; prepare the default cell attribute in c
+    push c
     dereference_into c, kvar_tty_attr
 cursor_cell:
     ; write the char/attr pair at the cursor position
     dereference_into x, kvar_cursor_col
     dereference_into y, kvar_cursor_row
     xy_to_vram z, x, y
-    mov b, 0x20
-    jmp put_char_at_vram
+    put [z], 0x20
+    inc z
+    put [z], c
+    pop c
+    ret
 
 ; PRIVATE SUBROUTINES BELOW
 ; these are not part of the public interface, and do not have a stable abi.

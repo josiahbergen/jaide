@@ -8,11 +8,8 @@
 ;    | run  | -    | does not return |
 
 run:
-    ; prepare the tty for use
-    call tty__init
     ; draw the initial prompt
     call prompt
-
 run_loop:
     ; main shell loop.
     call input__sc_read_char  ; wait for a key press (returned in a)
@@ -26,6 +23,16 @@ prompt:
     call tty__write
     call tty__show_cursor
     ret
+
+process_exited:
+    call tty__reset
+    mov b, s_process_exited
+    call tty__write
+    mov b, a
+    add b, 0x30 ; convert single-digit number to ascii
+    call tty__putc
+    call tty__newline
+    jmp run
 
 ; handle one keystroke.
 ;   a = key code
@@ -77,6 +84,17 @@ handle_key_backspace:
     ret
 
 handle_key_enter:
+    dereference_into c, shell_line_length
+    cmp c, 0x00
+    jz dispatch_command__empty ; buffer is empty
+
+    ; we need to add a null terminator to wherever we are at the line buffer,
+    ; because the string functions expect a null terminator and might have stale
+    ; data still in there.
+    add c, shell_line_buffer
+    put [c], 0x00
+
+    ; proceed with normal command dispatch.
     call tty__hide_cursor
     call tty__newline
     call dispatch_command
@@ -87,8 +105,6 @@ handle_key_abort:
 
 dispatch_command:
     mov a, shell_line_buffer
-    ; x = command_list cursor
-    ; string_compare trashes x/y, so save x around the call.
     mov d, command_list
 
 dispatch_command__loop:
@@ -111,14 +127,21 @@ dispatch_command__found:
     call b ; finally, call!
     ret 
 
+dispatch_command__empty:
+    call tty__hide_cursor
+    call tty__newline
+    call prompt
+    ret
+
 dispatch_command__not_found:
-    mov a, s_invalid_command
+    mov b, s_invalid_command
     call tty__write
     ret
 
 handler_exec:
-    ; construct a stack frame to user mode, and transfer
-    ; control to the user program.
+    call tty__reset
+    ; construct a stack frame to user mode,
+    ; and transfer control to the user program.
     push 0x7000   ; target pc
     push 0xAFFF   ; target sp
     push 0x0000   ; target flags
@@ -146,9 +169,8 @@ s_help_message:     data "exec:   execute the loaded program",   0xA
                     data "help:   show this message",            0xA
                     data "exit:   shutdown the system",          0xA,  0
 
-s_invalid_command:  data "invalid command",                            0
-s_success:          data "ok",                                   0xA,  0
-s_error:            data "command returned with error status",         0
+s_invalid_command:  data "invalid command.",                     0xA,  0
+s_process_exited:   data "process exited with status ",                0
 s_startup_message:  data "ready.",                               0xA
                     data "kernel shell v0.0.2",                  0xA
                     data "type 'help' for a list of commands.",  0xA,  0

@@ -30,7 +30,7 @@ define kvar_tty_attr                0x510b   ; text attribute used for tty write
 
 define shell_line_length            0x51c0   ; number of characters in the line buffer
 define shell_line_buffer            0x51c1   ; line buffer, shell_line_capacity words long
-define shell_line_capacity          0x3f     ; fills the rest of the shell variable region
+define shell_line_capacity          0x3e     ; rest of the shell variable region - 1 (for null terminator)
 
 define fdt_base                     0x5140
 define fdt_entry_size               0x8
