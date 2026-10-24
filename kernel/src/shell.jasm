@@ -7,8 +7,10 @@
 ;    | ---- | ---- | --------------- |
 ;    | run  | -    | does not return |
 
-run:
-    ; draw the initial prompt
+init:
+    call tty__init
+    mov b, s_startup_message
+    call tty__write
     call prompt
 run_loop:
     ; main shell loop.
@@ -31,8 +33,11 @@ process_exited:
     mov b, a
     add b, 0x30 ; convert single-digit number to ascii
     call tty__putc
+    mov b, 0x2e ; period
+    call tty__putc
     call tty__newline
-    jmp run
+    call prompt
+    jmp run_loop
 
 ; handle one keystroke.
 ;   a = key code

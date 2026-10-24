@@ -16,8 +16,7 @@ hardware_entry:
 init:
     ; bootloader jumps here (0x0110). perform a few small 
     ; initialization tasks and then jump to the shell.
-    call tty__init
-    jmp shell__run
+    jmp shell__init
     
 import "kernel/src/defs.jasm"
 import "kernel/src/macros.jasm"
