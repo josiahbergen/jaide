@@ -1,18 +1,15 @@
-org 0x7000
-
 main:
     mov a, 0x010   ; sc_write_str
     mov b, s_demo  ; string pointer
     syscall 
 
     ; wait for a key press
-    mov a, 0x20   ; sc_read_char
+    mov a, 0x20 ; sc_read_char
     syscall
 
-    ; exit
-    mov a, 0x00   ; process__sc_exit
-    syscall
-
+    mov a, 0x00 ; sc_exit
+    mov b, 0x00 ; status code
+    syscall   
 
 s_demo:
 data ":3", 0xA, 0

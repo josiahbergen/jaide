@@ -35,7 +35,8 @@ process_exited:
     call tty__putc
     mov b, 0x2e ; period
     call tty__putc
-    call tty__newline
+    mov b, s_welcome_back
+    call tty__write
     call prompt
     jmp run_loop
 
@@ -175,12 +176,12 @@ s_help_message:     data "exec:   execute the loaded program",   0xA
                     data "clear:  clear the screen",             0xA
                     data "help:   show this message",            0xA
                     data "exit:   shutdown the system",          0xA,  0
-
-s_invalid_command:  data "invalid command.",                     0xA,  0
-s_process_exited:   data "process exited with status ",                0
 s_startup_message:  data "ready.",                               0xA
                     data "kernel shell v0.0.2",                  0xA
                     data "type 'help' for a list of commands.",  0xA,  0
+s_invalid_command:  data "invalid command.",                     0xA,  0
+s_process_exited:   data "process exited with status ",                0
+s_welcome_back:     data 0x0A, "welcome back!",                  0xA,  0
 
 s_cmd_exec:         data "exec",                                       0
 s_cmd_clear:        data "clear",                                      0

@@ -160,17 +160,4 @@ sc_jump_table:
 
 align 0x7000
 
-user_main:
-    mov a, 0x010        ; sc_write_str
-    mov b, user_s_demo  ; string pointer
-    syscall 
-
-    mov a, 0x20 ; sc_read_char
-    syscall
-
-    mov a, 0x00 ; sc_exit
-    mov b, 0x00 ; status code
-    syscall             
-
-user_s_demo:
-data "hello, world!", 0xA, 0
+import "kernel/programs/graphics.jasm"
