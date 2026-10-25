@@ -22,32 +22,34 @@ each glyph is defined by a 32-bit data structure:
 | --------- | ---------------- | ---------------- | -------- | -----  | ----- |
 | `0..15`   | `16..19`         | `20..23`         | `24..29` | `30`   | `31`  |
 
-in raw memory each word expressed in little-endian form, but the words themselves remain in order.
+the attribute passed in a register is cell bits 16..31, one 16-bit word. write it as a binary immediate with bit 15 on the left. spaces below only separate the fields; the literal is those bits with the spaces removed.
 
 ```txt
-lo       hi       ------ib fore back 
-xxxxxxxx xxxxxxxx xxxxxxxx xxxx xxxx
+b i ------ bbbb ffff
+0 0 000000 0110 0001
 ```
+
+`b` is blink, `i` is invert, and each `-` is reserved (write `0`). `bbbb` is the background color and `ffff` is the foreground color, both taken from the table below. the example is white (`0001`) on cyan (`0110`): `0b0000000001100001`.
 
 note that this controller only reads from the first 4,000 words in vram (addresses 0x0000 -  0x0FA0 inclusive).
 
 ## colors
 
-| color        | value |
-| ------------ | ----- |
-| black        | `0`   |
-| white        | `1`   |
-| red          | `2`   |
-| green        | `3`   |
-| blue         | `4`   |
-| yellow       | `5`   |
-| cyan         | `6`   |
-| purple       | `7`   |
-| gray         | `8`   |
-| light gray   | `9`   |
-| dark red     | `A`   |
-| dark green   | `B`   |
-| dark blue    | `C`   |
-| dark yellow  | `D`   |
-| dark cyan    | `E`   |
-| dark magenta | `F`   |
+| color        | value | binary |
+| ------------ | ----- | ------ |
+| black        | `0`   | `0000` |
+| white        | `1`   | `0001` |
+| red          | `2`   | `0010` |
+| green        | `3`   | `0011` |
+| blue         | `4`   | `0100` |
+| yellow       | `5`   | `0101` |
+| cyan         | `6`   | `0110` |
+| magenta      | `7`   | `0111` |
+| gray         | `8`   | `1000` |
+| light gray   | `9`   | `1001` |
+| dark red     | `A`   | `1010` |
+| dark green   | `B`   | `1011` |
+| dark blue    | `C`   | `1100` |
+| dark yellow  | `D`   | `1101` |
+| dark cyan    | `E`   | `1110` |
+| dark magenta | `F`   | `1111` |

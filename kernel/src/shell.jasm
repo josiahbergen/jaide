@@ -158,6 +158,7 @@ handler_exec:
     transfer
 
 handler_clear:
+    mov b, 0x00 ; black
     call tty__clear
     ret
 

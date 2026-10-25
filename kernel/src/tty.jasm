@@ -38,6 +38,7 @@ reset:
     ; the reset subroutine should be called after user process exit,
     ; or in any situation where we need a clean slate in vram.
     ; otherwise, the init routine is much faster.
+    mov b, 0x00
     call clear
 init:
     ; initialize state in kernel variables.
@@ -104,12 +105,11 @@ putc_newline:
     call newline
     ret
     
-
 ; tty__clear
 ; blank the screen and home the cursor. the first blank row is copied over
 ; every remaining row to avoid a full-screen store loop.
 ;
-;   no arguments
+;   b = attribute
 ;   no return value
 
 clear:
@@ -118,8 +118,10 @@ clear:
     add y, vram_row_length  ; set y to end of first row
 
 clear_first_row:
-    ; write zeros to the entire first row
-    put [x], 0
+    ; write zeroes and attribute to the entire first row
+    put [x], 0x00
+    inc x
+    put [x], b
     inc x
     cmp x, y
     jnz clear_first_row

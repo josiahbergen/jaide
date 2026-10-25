@@ -1,89 +1,29 @@
-macro generate_attrs %reg, %fore, %back
-    xor %reg, %reg
-    or %reg, %back
-    lsh %reg, 0x04
-    or %reg, %fore
-    lsh %reg, 0x08
-end macro
-
 start:
-    mov mb, 0x01 ; set the memory bank to vram
-    generate_attrs z, 0x00, 0x0E
-    call clear_screen
+    mov b, 0b0000000011100001  ; white on teal
+    mov a, 0x12                ; sc_clear
+    syscall
 
-    xor z, z
-    or z, 0x0F
-    lsh z, 0x04
-    or z, 0x07
-    lsh z, 0x08
+    mov a, 0x16                ; sc_set_attr
+    mov b, 0b0000000001111111  ; magenta on dark magenta
+    syscall
 
-    mov x, s_welcome
-    mov y, 0x833D 
-    call print_string
+    mov b, s_welcome
+    mov a, 0x10                ; sc_write_str
+    syscall
 
-    mov x, s_name
-    mov y, 0x83DC 
-    call print_string
+    mov b, s_name
+    mov a, 0x10                ; sc_write_str
+    syscall
 
-    call fun_colors
-    halt
-    
-print_string:
-    ; print the string at X to Y with attrs in Z
-    ; trashes A
-    get a, x
-    cmp a, 0
-    jz print_string_end
+    ; wait for a key press
+    mov a, 0x20 ; sc_read_char
+    syscall
 
-    and a, 0x00FF ; clear attribute bits
-    or a, z ; set attribute bits
-    put y, a ; put word to vram
-
-    inc x
-    inc y
-    jmp print_string
-print_string_end:
-    ret
-
-clear_screen:
-    ; fill the screen with the background color in z
-    mov y, 0x8000
-    and z, 0xFF00 ; clear glyph bits
-clear_screen_loop:
-    put y, z ; put word to vram
-    inc y
-    cmp y, 0x87D0 ; end of vram
-    jnz clear_screen_loop
-    ret
-
-fun_colors:
-    mov y, 0x8780
-    mov c, 0x00 ; colors
-fun_colors_loop:
-
-    xor z, z
-    or z, c ; but c into background color
-    lsh z, 0x08
-    lsh z, 0x04
-    put y, z
-    inc y
-
-    inc c
-    cmp c, 0x10
-    jnz skip_reset_color
-    mov c, 0x00
-skip_reset_color:
-
-    cmp y, 0x87D0 ; end of vram
-    jnz fun_colors_loop
-    ret
-
-
-
-
-
+    mov a, 0x00 ; sc_exit
+    mov b, 0x00 ; status code
+    syscall
 
 s_welcome: 
-data "jaide computing system", 0
+    data "jaide computing system",   0x0A,  0
 s_name:
-data "created by josiah bergen", 0
+    data "created by josiah bergen", 0x0A,  0

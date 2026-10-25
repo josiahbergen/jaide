@@ -9,7 +9,7 @@ main:
 
     mov a, 0x00 ; sc_exit
     mov b, 0x00 ; status code
-    syscall   
+    syscall
 
 s_demo:
 data ":3", 0xA, 0

@@ -7,7 +7,7 @@
 ;    | ---- | ----------- | ---------------------- | ------------ |
 ;    | 0x10 | write_str   | b = string pointer     | a = status   |
 ;    | 0x11 | write_char  | b = character          | a = status   |
-;    | 0x12 | clear       | -                      | a = status   |
+;    | 0x12 | clear       | b = attribute          | a = status   |
 ;    | 0x13 | set_cursor  | b = column, c = row    | a = status   |
 ;    | 0x14 | get_cursor  | -                      | b = col, c = row, a = status |
 ;    | 0x15 | put_char_at | b = char, c = x, d = y | a = status   |
