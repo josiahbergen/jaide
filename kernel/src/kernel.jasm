@@ -58,8 +58,8 @@ event_dispatch:
     pop x ; prepare event detail in x before calling handler
     call z
 
-    push 0xFFFF  ; add a blank kind and detail
-    push 0xFFFF  ; not used by transfer, but required by the stack frame
+    push 0x3A33  ; add a random kind and detail
+    push 0x3A33  ; not used by transfer, but required by the stack frame
     transfer
 
 dispatch_fault:

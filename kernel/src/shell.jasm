@@ -146,16 +146,7 @@ dispatch_command__not_found:
 
 handler_exec:
     call tty__reset
-    ; construct a stack frame to user mode,
-    ; and transfer control to the user program.
-    push 0x7000   ; target pc
-    push 0xAFFF   ; target sp
-    push 0x0000   ; target flags
-    push 0x0000   ; target mb
-    push 0x0001   ; target mode
-    push 0x0000   ; event kind
-    push 0x0000   ; event detail
-    transfer
+    call process__sc_exec
 
 handler_clear:
     mov b, 0x00 ; black

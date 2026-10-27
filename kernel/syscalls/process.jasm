@@ -30,8 +30,21 @@ sc_exit:
 sc_exec:
     ; TODO: depends on fs_* syscalls to work.
     ; this syscall will call fs_open -> fs_read -> fs_close,
-    ; then jump to 0x7000.
+    ; then construct stack frame and transfer.
 
-    ; for now, return an error
-    mov a, 0x01
-    ret
+    ; remove the current return address from the stack,
+    ; because this function does not return.
+    pop z
+
+    ; for now, just use a hard-coded stack frame, etc.
+    push 0x7000   ; target pc
+    push 0xAFFF   ; target sp
+    push 0x0000   ; target flags
+    push 0x0000   ; target mb
+    push 0x0001   ; target mode
+
+    ; event kind & detail
+    ; not used by transfer, but required by the stack frame
+    push 0xFFFF 
+    push 0xFFFF   
+    transfer
