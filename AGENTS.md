@@ -1,4 +1,4 @@
-# instructions for agents
+# Instructions for agents
 
 - Do not preserve backward compatibility. Remove obsolete paths instead of adding compatibility layers, fallbacks, or migrations.
 - Choose the simplest implementation that fully meets the current requirements. Avoid speculative abstractions, configuration, and indirection.
@@ -6,5 +6,5 @@
 - Keep components modular and concerns clearly separated.
 - Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason.
 - Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
-- Do not create any unit or integration tests of any kind. They are not planned, and they are not needed.
+- Do not create any unit or integration tests of any kind. This project intentionally has no tests directory. They are not planned, and they are not needed. You may create temporary tests with pytest for verifying changes.
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.

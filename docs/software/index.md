@@ -7,5 +7,4 @@ all documentation is written by hand (i find that ai-written documentation is ha
 [emulator](emulator.md): the emulator itself
 [jasm](jasm.md): the jasm programming language and compiler
 [kernel](kernel.md): the jaideos kernel interface
-[userspace](userspace/userspace.md): jaideos userspace
 [jfs](jfs.md): the jfs filesystem

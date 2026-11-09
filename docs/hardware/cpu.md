@@ -61,23 +61,25 @@ the format of the flags register is `C Z N O - - - - - - - - - - - -`.
 
 instructions are 16 bits long (two bytes, little endian), and may contain a 16-bit immediate located directly after them.
 
-a single 16-bit instruction word is defined as follows:
+a single 16-bit instruction word is defined as follows (most significant bit first):
 
-`CCCC DDDD` `AAAAAAAA` `EEEEEEEE` `EEEEEEEE`
+`OOOOOOOO` `BBBB` `AAAA`, optionally followed by `IIIIIIII IIIIIIII`
 
-`AAAAAAAA` defines the opcode of the instruction (bits 8-15 of the word). the opcode implies an addressing mode.
+`OOOOOOOO` is the opcode (bits 8-15). the opcode alone identifies both the mnemonic and the addressing mode of every operand.
 
-`CCCC` defines a source or address register (bits 0-3 of the word).
+`AAAA` is the register of the first register operand (bits 0-3).
 
-`DDDD` defines a destination register (bits 4-7 of the word).
+`BBBB` is the register of the second register operand (bits 4-7).
 
-`EEEEEEEE` `EEEEEEEE` defines an immediate, address, or offset.
+`IIIIIIII IIIIIIII` is an immediate word defining an immediate, address, or offset.
+
+register fields are filled left to right in operand order. `add a, b` puts `a` in `AAAA` and `b` in `BBBB`; `put [x], 5` puts `x` in `AAAA` and `5` in the immediate word.
 
 _all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as an immediate._
 
 ### instruction set
 
-see the [instruction set](lang/inst.txt) for a comprehensive list of instructions
+see the [instruction set](../software/inst.txt) for instruction semantics. the opcode map is generated from [common/isa.py](../../common/isa.py) with `python -m common.isa`.
 
 ## memory
 
