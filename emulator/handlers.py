@@ -1,403 +1,82 @@
+# handlers.py
+# instruction handlers for the jaide emulator.
+#
+# there is one handler per opcode, already specialized to its addressing modes.
+# handlers are registered against a row of the isa with @op, and build_dispatch()
+# lays them out into a 256-entry table indexed by opcode.
+#
+# every handler takes (emu, a, b, imm):
+#   a, b  the register fields of the instruction word: the registers of the first and second REG/PTR operands
+#   imm   the immediate word (0 if the opcode has none)
+
 import time
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-from common.isa import INSTRUCTIONS, MODES, OPCODE_FORMATS, REGISTERS
+from common.isa import IMM, ISA, PTR, REG, REGISTERS, Mode
 
-from .constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MODE, EVENT
-from .emulator import Emulator, mask16
-from .exceptions import InvalidInstructionFault, EmulatorException, ProtectionFault, DivisionByZeroFault, BreakpointException
-from .util.logger import logger
+from .constants import EVENT, FLAG_C, FLAG_N, FLAG_O, FLAG_Z, SUPERVISOR_MODE, USER_MODE
+from .exceptions import DivisionByZeroFault, EmulatorException, InvalidInstructionFault, ProtectionFault
 
+if TYPE_CHECKING:
+    from .emulator import Emulator
 
-def _cond_jump(emu: Emulator, condition: bool, decoded: tuple[int, ...]) -> None:
-    if condition:
-        _, _, _, imm16 = decoded
-        emu.pc.set(_jump_target(emu, imm16))
+type Handler = Callable[[Emulator, int, int, int], None]
 
+_handlers: dict[tuple[str, tuple[Mode, ...]], Handler] = {}
 
-def _jump_target(emu: Emulator, imm16: int) -> int:
-    """ Compute absolute jump target from a signed relative offset. """
-    return mask16(emu.pc.value + emu._signed16(imm16))
 
-# operation handlers
-# decoded is always (opcode, reg_a, reg_b, imm16) where
-# reg_a = ssss (high nibble), reg_b = dddd (low nibble)
-# see OPCODE_FORMATS for which operand each field represents per opcode.
+def op(mnemonic: str, *modes: Mode) -> Callable[[Handler], Handler]:
+    """ Register a handler for the opcode with this mnemonic and these operand modes. """
+    def register(handler: Handler) -> Handler:
+        assert (mnemonic, modes) not in _handlers, f"duplicate handler for {mnemonic} {modes}"
+        _handlers[mnemonic, modes] = handler
+        return handler
+    return register
 
 
-def handle_halt(emu, _decoded: tuple[int, ...]) -> None:
-    emu.halted = True
-    raise EmulatorException("halted")
+def build_dispatch() -> list[Handler]:
+    """ Build the opcode -> handler table, checking that the handlers cover the isa exactly. """
+    remaining = dict(_handlers)
+    table: list[Handler] = [invalid_opcode] * 256
+    for spec in ISA:
+        handler = remaining.pop((spec.mnemonic, spec.modes), None)
+        assert handler is not None, f"no handler for '{spec.signature}' (opcode 0x{spec.opcode:02x})"
+        table[spec.opcode] = handler
+    assert not remaining, f"handlers that match no opcode: {list(remaining)}"
+    return table
 
 
-def handle_get(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # reg_a = ssss = src ptr register, reg_b = dddd = dest register
-    if modes == (MODES.REG, MODES.REG_POINTER):
-        # dest <- [src_ptr]
-        emu.reg_set(reg_b, emu.bus.read16(emu.reg_get(reg_a)))
-    elif modes == (MODES.REG, MODES.REL_POINTER):
-        # dest <- [pc + offset]  (imm16 is signed offset to label)
-        addr = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.reg_set(reg_b, emu.bus.read16(addr))
-    elif modes == (MODES.REG, MODES.OFF_POINTER):
-        # dest <- [label + ptr_reg]  (imm16 is signed offset to base label)
-        base = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.reg_set(reg_b, emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
-    else:
-        raise InvalidInstructionFault(f"unexpected GET variant at 0x{emu.pc.value:04x}.")
+def invalid_opcode(emu: "Emulator", a: int, b: int, imm: int) -> None:
+    raise InvalidInstructionFault(f"invalid opcode at 0x{emu.instruction_address:04x}.")
 
 
-def handle_put(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # reg_a = ssss = src register, reg_b = dddd = dest ptr register
-    if modes == (MODES.REG_POINTER, MODES.REG):
-        # [dest_ptr] <- src
-        emu.bus.write16(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    elif modes == (MODES.OFF_POINTER, MODES.REG):
-        # [label + dest_ptr] <- src
-        base = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.bus.write16(mask16(base + emu.reg_get(reg_b)), emu.reg_get(reg_a))
-    elif modes == (MODES.REL_POINTER, MODES.REG):
-        # [pc + imm] <- src  (position-independent store to label)
-        addr = mask16(emu.pc.value + emu._signed16(imm16))
-        emu.bus.write16(addr, emu.reg_get(reg_a))
-    elif modes == (MODES.REG_POINTER, MODES.IMM):
-        # [dest_ptr] <- imm  (dddd = dest ptr reg, imm = value)
-        emu.bus.write16(emu.reg_get(reg_b), imm16)
-    else:
-        raise InvalidInstructionFault(f"unexpected PUT variant at 0x{emu.pc.value:04x}.")
+# system
 
-
-def handle_mov(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        # dest(reg_b) <- src(reg_a)
-        emu.reg_set(reg_b, emu.reg_get(reg_a))
-    elif modes == (MODES.REG, MODES.IMM):
-        # dest(reg_a) <- imm  [dest is in ssss slot for imm variants]
-        emu.reg_set(reg_a, imm16)
-    elif modes == (MODES.REG, MODES.RELATIVE):
-        # dest(reg_a) <- address of label
-        emu.reg_set(reg_a, mask16(emu.pc.value + emu._signed16(imm16)))
-    else:
-        raise InvalidInstructionFault(f"unexpected MOV variant at 0x{emu.pc.value:04x}.")
-
-
-def handle_push(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG,):
-        emu._push_core(emu.reg_get(reg_a))
-    elif modes == (MODES.IMM,):
-        emu._push_core(imm16)
-    else:
-        raise InvalidInstructionFault(f"unexpected PUSH variant at 0x{emu.pc.value:04x}.")
-
-
-def handle_pop(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, _ = decoded
-    # dest is in dddd slot (reg_b)
-    emu.reg_set(reg_b, emu._pop_core())
-
-
-def handle_add(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # dest = reg_b (dddd), src = reg_a (ssss) or imm
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._add_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        result = emu._add_core(emu.reg_get(reg_b), imm16)
-    emu.reg_set(reg_b, result)
-
-
-def handle_adc(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    carry = int(emu.flag_get(FLAG_C))
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._add_core(emu.reg_get(reg_b), emu.reg_get(reg_a), carry)
-    else:
-        result = emu._add_core(emu.reg_get(reg_b), imm16, carry)
-    emu.reg_set(reg_b, result)
-
-
-def handle_sub(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._sub_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        result = emu._sub_core(emu.reg_get(reg_b), imm16)
-    emu.reg_set(reg_b, result)
-
-
-def handle_sbc(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    borrow = int(emu.flag_get(FLAG_C))
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._sub_core(emu.reg_get(reg_b), emu.reg_get(reg_a), borrow)
-    else:
-        result = emu._sub_core(emu.reg_get(reg_b), imm16, borrow)
-    emu.reg_set(reg_b, result)
-
-
-def handle_mul(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    dest = emu.reg_get(reg_b)
-    src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
-    full = dest * src
-    result = mask16(full)
-    carry = 1 if full > 0xFFFF else 0
-    emu.set_all_flags(result == 0, carry, result & 0x8000 != 0, 0)
-    emu.reg_set(reg_b, result)
-
-
-def handle_mod(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    dest = emu.reg_get(reg_b)
-    src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
-    if src == 0:
-        raise DivisionByZeroFault(f"division by zero at 0x{emu.pc.value:04x}.")
-    result = mask16(dest % src)
-    emu.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
-    emu.reg_set(reg_b, result)
-
-
-def handle_div(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    dest = emu.reg_get(reg_b)
-    src = emu.reg_get(reg_a) if modes == (MODES.REG, MODES.REG) else imm16
-
-    if src == 0:
-        raise DivisionByZeroFault(f"division by zero at 0x{emu.pc.value:04x}.")
-    result = mask16(dest // src)
-    remainder = dest % src
-
-    emu.set_all_flags(result == 0, remainder != 0, result & 0x8000 != 0, 0)
-    emu.reg_set(reg_b, result)
-
-
-def handle_inc(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, _ = decoded
-    # dest is in dddd slot (reg_b)
-    result = emu._add_core(emu.reg_get(reg_b), 1)
-    emu.reg_set(reg_b, result)
-
-
-def handle_dec(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, _ = decoded
-    # dest is in dddd slot (reg_b)
-    result = emu._sub_core(emu.reg_get(reg_b), 1)
-    emu.reg_set(reg_b, result)
-
-
-def handle_lsh(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._lsh_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        result = emu._lsh_core(emu.reg_get(reg_b), imm16)
-    emu.reg_set(reg_b, result)
-
-
-def handle_rsh(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._rsh_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        result = emu._rsh_core(emu.reg_get(reg_b), imm16)
-    emu.reg_set(reg_b, result)
-
-
-def handle_asr(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu._asr_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        result = emu._asr_core(emu.reg_get(reg_b), imm16)
-    emu.reg_set(reg_b, result)
-
-
-def handle_and(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu.reg_get(reg_b) & emu.reg_get(reg_a)
-    else:
-        result = emu.reg_get(reg_b) & imm16
-    emu.reg_set(reg_b, result)
-    emu.flag_set(FLAG_Z, result == 0)
-
-
-def handle_or(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu.reg_get(reg_b) | emu.reg_get(reg_a)
-    else:
-        result = emu.reg_get(reg_b) | imm16
-    emu.reg_set(reg_b, result)
-    emu.flag_set(FLAG_Z, result == 0)
-
-
-def handle_not(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, _ = decoded
-    # dest is in dddd slot (reg_b)
-    result = mask16(~emu.reg_get(reg_b))
-    emu.reg_set(reg_b, result)
-    emu.flag_set(FLAG_Z, result == 0)
-
-
-def handle_xor(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG, MODES.REG):
-        result = emu.reg_get(reg_b) ^ emu.reg_get(reg_a)
-    else:
-        result = emu.reg_get(reg_b) ^ imm16
-    emu.reg_set(reg_b, result)
-    emu.flag_set(FLAG_Z, result == 0)
-
-
-def handle_swp(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, _ = decoded
-    # reg_a = ssss = op0, reg_b = dddd = op1
-    a, b = emu.reg_get(reg_a), emu.reg_get(reg_b)
-    emu.reg_set(reg_a, b)
-    emu.reg_set(reg_b, a)
-
-
-def handle_cmp(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    # spec: flags <- dest - src
-    # reg+reg: src=reg_a(ssss), dest=reg_b(dddd)
-    # reg+imm: src=imm,  dest=reg_a(ssss) [dest in ssss anomaly]
-    if modes == (MODES.REG, MODES.REG):
-        emu._sub_core(emu.reg_get(reg_b), emu.reg_get(reg_a))
-    else:
-        emu._sub_core(emu.reg_get(reg_a), imm16)
-
-
-def handle_jmp(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-    if modes == (MODES.REG,):
-        emu.pc.set(emu.reg_get(reg_a))
-    elif modes == (MODES.IMM,):
-        emu.pc.set(imm16)
-    elif modes == (MODES.RELATIVE,):
-        emu.pc.set(_jump_target(emu, imm16))
-    elif modes == (MODES.OFF_POINTER,):
-        base = _jump_target(emu, imm16)
-        emu.pc.set(emu.bus.read16(mask16(base + emu.reg_get(reg_a))))
-    else:
-        raise InvalidInstructionFault(f"unexpected JMP variant at 0x{emu.pc.value:04x}.")
-
-
-def handle_jz(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_Z), decoded)
-
-
-def handle_jnz(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, not emu.flag_get(FLAG_Z), decoded)
-
-
-def handle_jc(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_C), decoded)
-
-
-def handle_jnc(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, not emu.flag_get(FLAG_C), decoded)
-
-
-def handle_ja(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_C) and not emu.flag_get(FLAG_Z), decoded)
-
-
-def handle_jae(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_C) or emu.flag_get(FLAG_Z), decoded)
-
-
-def handle_jb(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, not emu.flag_get(FLAG_C), decoded)
-
-
-def handle_jbe(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, not emu.flag_get(FLAG_C) or emu.flag_get(FLAG_Z), decoded)
-
-
-def handle_jg(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, not emu.flag_get(FLAG_Z) and (emu.flag_get(FLAG_N) == emu.flag_get(FLAG_O)), decoded)
-
-
-def handle_jge(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_N) == emu.flag_get(FLAG_O), decoded)
-
-
-def handle_jl(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_N) != emu.flag_get(FLAG_O), decoded)
-
-
-def handle_jle(emu, decoded: tuple[int, ...]) -> None:
-    _cond_jump(emu, emu.flag_get(FLAG_Z) or (emu.flag_get(FLAG_N) != emu.flag_get(FLAG_O)), decoded)
-
-
-def handle_call(emu, decoded: tuple[int, ...]) -> None:
-    opcode, reg_a, reg_b, imm16 = decoded
-    modes = OPCODE_FORMATS[opcode].modes
-
-    if modes == (MODES.REG,):
-        target, size = emu.reg_get(reg_a), 1
-    elif modes == (MODES.IMM,):
-        target, size = imm16, 2
-    else:
-        raise InvalidInstructionFault(f"unexpected CALL variant at 0x{emu.pc.value:04x}.")
-
-    emu._push_core(emu.pc.value)
-    emu.call_stack.append((mask16(emu.pc.value - size), emu.source_map.get_source(mask16(emu.pc.value - size)).split(" ")[0]))
-    emu.pc.set(target)
-
-
-def handle_ret(emu, _decoded: tuple[int, ...]) -> None:
-    emu.call_stack.pop()
-    emu.pc.set(emu._pop_core())
-
-
-def handle_nop(_emu, _decoded: tuple[int, ...]) -> None:
+@op("nop")
+def nop(emu, a, b, imm):
     pass
 
 
-def handle_stc(emu, _decoded: tuple[int, ...]) -> None:
-    emu.flag_set(FLAG_C, True)
+@op("halt")
+def halt(emu, a, b, imm):
+    emu.stopped = True  # stays halted until reset
+    raise EmulatorException("halted")
 
 
-def handle_clc(emu, _decoded: tuple[int, ...]) -> None:
-    emu.flag_set(FLAG_C, False)
+@op("wait")
+def wait(emu, a, b, imm):
+    if emu.mode == USER_MODE:
+        raise ProtectionFault("attempted to wait while in an unprivileged mode")
+
+    # enable interrupts and begin waiting
+    emu.ie = True
+    emu.waiting = True
+    emu._wait_time = time.perf_counter()
+    emu._last_print = 0
 
 
-def handle_bcp(emu, decoded: tuple[int, ...]) -> None:
-    _, reg_a, reg_b, count = decoded
-    dst = emu.reg_get(reg_b)   # dddd = dst address
-    src = emu.reg_get(reg_a)   # ssss = src address
-    for i in range(count):
-        value = emu.bus.read16(src + i)
-        emu.bus.write16(dst + i, value)
-
-
-def handle_syscall(emu, decoded: tuple[int, ...]) -> None:
+@op("syscall")
+def syscall(emu, a, b, imm):
     if emu.mode == SUPERVISOR_MODE:
         raise InvalidInstructionFault("attempted to syscall while already in supervisor mode")
 
@@ -405,7 +84,8 @@ def handle_syscall(emu, decoded: tuple[int, ...]) -> None:
     emu.enter_supervisor(EVENT.SYSCALL, emu.reg_get(REGISTERS.A), emu.pc.value)
 
 
-def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
+@op("transfer")
+def transfer(emu, a, b, imm):
     if emu.mode == USER_MODE:
         raise ProtectionFault("attempted to transfer while in an unprivileged mode")
 
@@ -413,11 +93,6 @@ def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
     frame_sp = emu.sp.value
     frame = [emu.bus.read16(frame_sp + offset) for offset in range(7)]
     _kind, _detail, target_mode, target_mb, target_flags, target_sp, target_pc = frame
-
-    # logger.debug(f"transfer called at 0x{emu.pc.value:04X}. stack frame:")
-    # frame_indices = ["event type", "event detail", "execution mode", "memory bank", "flags", "stack pointer", "pc address"]
-    # for i in range(7):
-    #     logger.debug(f"{frame_indices[i]:<19} {frame[i]:<6} 0x{frame[i]:04X}")
 
     if target_mode not in (SUPERVISOR_MODE, USER_MODE):
         raise ProtectionFault(f"attempted to transfer to an invalid mode: {target_mode}")
@@ -447,61 +122,218 @@ def handle_transfer(emu, decoded: tuple[int, ...]) -> None:
     emu.ie = target_mode == USER_MODE
     emu.mode = target_mode
 
-def handle_wait(emu, _decoded: tuple[int, ...]) -> None:
-    if emu.mode == USER_MODE:
-        raise ProtectionFault("attempted to wait while in an unprivileged mode")
-    
-    # enable interrupts and begin waiting
-    emu.ie = True
-    emu.waiting = True
-    emu._wait_time = time.perf_counter()
-    emu._last_print = 0
 
-handler_map: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = {
-    INSTRUCTIONS.HALT : handle_halt,
-    INSTRUCTIONS.GET  : handle_get,
-    INSTRUCTIONS.PUT  : handle_put,
-    INSTRUCTIONS.MOV  : handle_mov,
-    INSTRUCTIONS.PUSH : handle_push,
-    INSTRUCTIONS.POP  : handle_pop,
-    INSTRUCTIONS.ADD  : handle_add,
-    INSTRUCTIONS.ADC  : handle_adc,
-    INSTRUCTIONS.SUB  : handle_sub,
-    INSTRUCTIONS.SBC  : handle_sbc,
-    INSTRUCTIONS.MUL  : handle_mul,
-    INSTRUCTIONS.MOD  : handle_mod,
-    INSTRUCTIONS.DIV  : handle_div,
-    INSTRUCTIONS.INC  : handle_inc,
-    INSTRUCTIONS.DEC  : handle_dec,
-    INSTRUCTIONS.LSH  : handle_lsh,
-    INSTRUCTIONS.RSH  : handle_rsh,
-    INSTRUCTIONS.ASR  : handle_asr,
-    INSTRUCTIONS.AND  : handle_and,
-    INSTRUCTIONS.OR   : handle_or,
-    INSTRUCTIONS.NOT  : handle_not,
-    INSTRUCTIONS.XOR  : handle_xor,
-    INSTRUCTIONS.SWP  : handle_swp,
-    INSTRUCTIONS.STC  : handle_stc,
-    INSTRUCTIONS.CLC  : handle_clc,
-    INSTRUCTIONS.CMP  : handle_cmp,
-    INSTRUCTIONS.JMP  : handle_jmp,
-    INSTRUCTIONS.JZ   : handle_jz,
-    INSTRUCTIONS.JNZ  : handle_jnz,
-    INSTRUCTIONS.JC   : handle_jc,
-    INSTRUCTIONS.JNC  : handle_jnc,
-    INSTRUCTIONS.JA   : handle_ja,
-    INSTRUCTIONS.JAE  : handle_jae,
-    INSTRUCTIONS.JB   : handle_jb,
-    INSTRUCTIONS.JBE  : handle_jbe,
-    INSTRUCTIONS.JG   : handle_jg,
-    INSTRUCTIONS.JGE  : handle_jge,
-    INSTRUCTIONS.JL   : handle_jl,
-    INSTRUCTIONS.JLE  : handle_jle,
-    INSTRUCTIONS.CALL : handle_call,
-    INSTRUCTIONS.RET  : handle_ret,
-    INSTRUCTIONS.NOP  : handle_nop,
-    INSTRUCTIONS.BCP  : handle_bcp,
-    INSTRUCTIONS.SYSCALL  : handle_syscall,
-    INSTRUCTIONS.TRANSFER : handle_transfer,
-    INSTRUCTIONS.WAIT     : handle_wait,
-}
+@op("stc")
+def stc(emu, a, b, imm):
+    emu.flag_set(FLAG_C, True)
+
+
+@op("clc")
+def clc(emu, a, b, imm):
+    emu.flag_set(FLAG_C, False)
+
+
+# registers and the stack
+
+@op("mov", REG, REG)
+def mov_reg(emu, a, b, imm):
+    emu.reg_set(a, emu.reg_get(b))
+
+
+@op("mov", REG, IMM)
+def mov_imm(emu, a, b, imm):
+    emu.reg_set(a, imm)
+
+
+@op("swp", REG, REG)
+def swp(emu, a, b, imm):
+    first, second = emu.reg_get(a), emu.reg_get(b)
+    emu.reg_set(a, second)
+    emu.reg_set(b, first)
+
+
+@op("push", REG)
+def push_reg(emu, a, b, imm):
+    emu._push_core(emu.reg_get(a))
+
+
+@op("push", IMM)
+def push_imm(emu, a, b, imm):
+    emu._push_core(imm)
+
+
+@op("pop", REG)
+def pop(emu, a, b, imm):
+    emu.reg_set(a, emu._pop_core())
+
+
+# memory
+
+@op("get", REG, PTR)
+def get(emu, a, b, imm):
+    # dest <- [pointer]
+    emu.reg_set(a, emu.bus.read16(emu.reg_get(b)))
+
+
+@op("put", PTR, REG)
+def put_reg(emu, a, b, imm):
+    # [pointer] <- src
+    emu.bus.write16(emu.reg_get(a), emu.reg_get(b))
+
+
+@op("put", PTR, IMM)
+def put_imm(emu, a, b, imm):
+    # [pointer] <- imm
+    emu.bus.write16(emu.reg_get(a), imm)
+
+
+@op("bcp", REG, REG, IMM)
+def bcp(emu, a, b, imm):
+    # copy imm words from the address in the second register to the address in the first
+    dst, src = emu.reg_get(a), emu.reg_get(b)
+    for i in range(imm):
+        emu.bus.write16(dst + i, emu.bus.read16(src + i))
+
+
+# arithmetic and logic
+# these all compute dest <- f(dest, src), where src is either a register or an immediate.
+
+def binary(mnemonic: str, compute: Callable[["Emulator", int, int], int]) -> None:
+    """ Register the 'reg, reg' and 'reg, imm' forms of a two-operand instruction. """
+
+    @op(mnemonic, REG, REG)
+    def with_reg(emu, a, b, imm):
+        emu.reg_set(a, compute(emu, emu.reg_get(a), emu.reg_get(b)))
+
+    @op(mnemonic, REG, IMM)
+    def with_imm(emu, a, b, imm):
+        emu.reg_set(a, compute(emu, emu.reg_get(a), imm))
+
+
+def mul(emu: "Emulator", dest: int, src: int) -> int:
+    full = dest * src
+    result = full & 0xFFFF
+    emu.set_all_flags(result == 0, full > 0xFFFF, result & 0x8000 != 0, 0)
+    return result
+
+
+def div(emu: "Emulator", dest: int, src: int) -> int:
+    if src == 0:
+        raise DivisionByZeroFault(f"division by zero at 0x{emu.instruction_address:04x}.")
+    result = (dest // src) & 0xFFFF
+    emu.set_all_flags(result == 0, dest % src != 0, result & 0x8000 != 0, 0)
+    return result
+
+
+def mod(emu: "Emulator", dest: int, src: int) -> int:
+    if src == 0:
+        raise DivisionByZeroFault(f"division by zero at 0x{emu.instruction_address:04x}.")
+    result = (dest % src) & 0xFFFF
+    emu.set_all_flags(result == 0, 0, result & 0x8000 != 0, 0)
+    return result
+
+
+def logic(emu: "Emulator", result: int) -> int:
+    # bitwise operations only touch the zero flag
+    emu.flag_set(FLAG_Z, result == 0)
+    return result
+
+
+binary("add", lambda emu, dest, src: emu._add_core(dest, src))
+binary("adc", lambda emu, dest, src: emu._add_core(dest, src, int(emu.flag_get(FLAG_C))))
+binary("sub", lambda emu, dest, src: emu._sub_core(dest, src))
+binary("sbc", lambda emu, dest, src: emu._sub_core(dest, src, int(emu.flag_get(FLAG_C))))
+binary("mul", mul)
+binary("div", div)
+binary("mod", mod)
+binary("and", lambda emu, dest, src: logic(emu, dest & src))
+binary("or",  lambda emu, dest, src: logic(emu, dest | src))
+binary("xor", lambda emu, dest, src: logic(emu, dest ^ src))
+binary("lsh", lambda emu, dest, src: emu._lsh_core(dest, src))
+binary("rsh", lambda emu, dest, src: emu._rsh_core(dest, src))
+binary("asr", lambda emu, dest, src: emu._asr_core(dest, src))
+
+
+@op("inc", REG)
+def inc(emu, a, b, imm):
+    emu.reg_set(a, emu._add_core(emu.reg_get(a), 1))
+
+
+@op("dec", REG)
+def dec(emu, a, b, imm):
+    emu.reg_set(a, emu._sub_core(emu.reg_get(a), 1))
+
+
+@op("not", REG)
+def not_(emu, a, b, imm):
+    emu.reg_set(a, logic(emu, ~emu.reg_get(a) & 0xFFFF))
+
+
+@op("cmp", REG, REG)
+def cmp_reg(emu, a, b, imm):
+    # flags <- first - second
+    emu._sub_core(emu.reg_get(a), emu.reg_get(b))
+
+
+@op("cmp", REG, IMM)
+def cmp_imm(emu, a, b, imm):
+    emu._sub_core(emu.reg_get(a), imm)
+
+
+# jumps and calls
+
+def call_to(emu: "Emulator", target: int) -> None:
+    emu._push_core(emu.pc.value)  # return address: the instruction after the call
+    emu.call_stack.append((emu.instruction_address, emu.source_map.get_source(emu.instruction_address).split(" ")[0]))
+    emu.pc.set(target)
+
+
+@op("jmp", REG)
+def jmp_reg(emu, a, b, imm):
+    emu.pc.set(emu.reg_get(a))
+
+
+@op("jmp", IMM)
+def jmp_imm(emu, a, b, imm):
+    emu.pc.set(imm)
+
+
+@op("call", REG)
+def call_reg(emu, a, b, imm):
+    call_to(emu, emu.reg_get(a))
+
+
+@op("call", IMM)
+def call_imm(emu, a, b, imm):
+    call_to(emu, imm)
+
+
+@op("ret")
+def ret(emu, a, b, imm):
+    emu.call_stack.pop()
+    emu.pc.set(emu._pop_core())
+
+
+# conditional branches
+
+def branch(mnemonic: str, taken: Callable[["Emulator"], bool]) -> None:
+    """ Register a branch that jumps to its immediate address when the condition holds. """
+
+    @op(mnemonic, IMM)
+    def jump(emu, a, b, imm):
+        if taken(emu):
+            emu.pc.set(imm)
+
+
+branch("jz",  lambda emu: emu.flag_get(FLAG_Z))
+branch("jnz", lambda emu: not emu.flag_get(FLAG_Z))
+branch("jc",  lambda emu: emu.flag_get(FLAG_C))
+branch("jnc", lambda emu: not emu.flag_get(FLAG_C))
+branch("ja",  lambda emu: emu.flag_get(FLAG_C) and not emu.flag_get(FLAG_Z))
+branch("jae", lambda emu: emu.flag_get(FLAG_C) or emu.flag_get(FLAG_Z))
+branch("jb",  lambda emu: not emu.flag_get(FLAG_C))
+branch("jbe", lambda emu: not emu.flag_get(FLAG_C) or emu.flag_get(FLAG_Z))
+branch("jg",  lambda emu: not emu.flag_get(FLAG_Z) and emu.flag_get(FLAG_N) == emu.flag_get(FLAG_O))
+branch("jge", lambda emu: emu.flag_get(FLAG_N) == emu.flag_get(FLAG_O))
+branch("jl",  lambda emu: emu.flag_get(FLAG_N) != emu.flag_get(FLAG_O))
+branch("jle", lambda emu: emu.flag_get(FLAG_Z) or emu.flag_get(FLAG_N) != emu.flag_get(FLAG_O))

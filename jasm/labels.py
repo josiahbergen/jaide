@@ -8,7 +8,6 @@ from .language.context import AssemblyContext
 from .language.ir.base import AlignDirectiveNode, DataDirectiveNode, InstructionNode, LabelNode
 from .language.ir.operands import ImmediateOperand, LabelOperand
 from .language.ir.terminals import NumberTerminal
-from .language.isa import MODES, OPCODE_MAP
 from .util.logger import logger
 
 
@@ -23,6 +22,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
     #
     # walk the ir and assign pcs to labels and instructions
     # substitute constants with immediate operands
+    # pick the opcode for each instruction (this is what decides its size)
     # parse and fill alignment directives
     # calculate the size of instructions and data directives
     for node in context.ir:
@@ -48,6 +48,9 @@ def prepare_instructions(context: AssemblyContext) -> None:
                     num = NumberTerminal(operand.line, operand.filename, str(context.constants[operand.short_name]))
                     node.operands[i] = ImmediateOperand(operand.line, operand.filename, num, label_name=operand.short_name)
 
+            # a label operand is an immediate, so the opcode is already fully determined.
+            node.resolve()
+
         if isinstance(node, AlignDirectiveNode):
             # calculate the size of the alignment directive.
             node.size = (node.alignment - (pc % node.alignment)) % node.alignment
@@ -55,28 +58,18 @@ def prepare_instructions(context: AssemblyContext) -> None:
         # get the size of the node
         size = node.get_size()
 
-        if isinstance(node, InstructionNode):
-            # saves a call to get_size() if we do it here.
-            node.size = size
-
         logger.verbose(f"labels: pc {pc} -> {pc + size}")
         pc += size
 
     logger.debug(f"labels: pass 1 done ({len(context.labels)} labels).")
-    logger.debug("labels: pass 2 (label refs, data words, opcodes)...")
+    logger.debug("labels: pass 2 (label refs, data words)...")
 
     # pass 2
     # every symbol now has an address from pass 1. finish anything that needed that.
     #
-    # operands that are still a label are references to code/data labels.
-    # if the instruction has an immediate form, swap in the absolute 16-bit address. 
-    # branches have no absolute form, leave the operand as label and binary.py will encode it as a pc-relative offset from the next word.
+    # operands that are still a label are references to code/data labels,
+    # swap in the label's absolute 16-bit address as an immediate.
     # identifiers in data directives become 16-bit words.
-
-    # NOTE: this is where PIC would diverge.
-    # PIC would need to resolve the labels to their absolute addresses,
-    # and then encode the instructions as pc-relative offsets.
-    # we don't support PIC yet, so we leave the labels as is.
 
     for node in context.ir:
         if isinstance(node, InstructionNode):
@@ -89,13 +82,6 @@ def prepare_instructions(context: AssemblyContext) -> None:
                 if operand.name not in context.labels:
                     logger.fatal(f'undefined label "{operand.name.lower()}" on line {node.line}', scope)
 
-                # try IMM encoding: same mnemonic but with immediate operand instead of label operand
-                # there's probably a better way to do this.
-                candidate_modes = tuple(MODES.IMM if j == i else op.mode for j, op in enumerate[Operand](node.operands))
-                if (node.mnemonic, candidate_modes) not in OPCODE_MAP:
-                    logger.verbose(f"labels: no IMM variant for {node.mnemonic.name} (line {node.line}), keeping RELATIVE")
-                    continue
-
                 abs_addr = context.labels[operand.name]
                 logger.verbose(f"labels: '{operand.name}' -> absolute {abs_addr:#06x} (line {node.line})")
 
@@ -107,10 +93,7 @@ def prepare_instructions(context: AssemblyContext) -> None:
                     label_name=operand.short_name
                 )
 
-            # assign addressing mode (encoded via opcode map)
-            node.opcode = node.get_opcode()
-
         elif isinstance(node, DataDirectiveNode):
-            # resolve the words in the data directive, 
+            # resolve the words in the data directive,
             # now that we have data for all labels.
             node.data = node.resolve_words(context.labels, context.constants)

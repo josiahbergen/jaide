@@ -1,11 +1,10 @@
 # isa.py
-# shared isa definitions for the jaide project.
+# the jaide instruction set: the single definition shared by the assembler and the emulator.
 # josiah bergen, march 2026
 
 from dataclasses import dataclass
-from enum import IntEnum, auto
-
-from tap import Tap
+from enum import Enum, IntEnum, auto
+from typing import Sequence
 
 
 class ZeroIndexedEnum(IntEnum):
@@ -15,59 +14,9 @@ class ZeroIndexedEnum(IntEnum):
     def _generate_next_value_(name, start, count, last_values):
         return count # ensure 0-indexing
 
-class INSTRUCTIONS(ZeroIndexedEnum):
-    """all supported instructions"""
-
-    NOP  = auto()
-    HALT = auto()
-    GET  = auto()
-    PUT  = auto()
-    MOV  = auto()
-    PUSH = auto()
-    POP  = auto()
-    ADD  = auto()
-    ADC  = auto()
-    SUB  = auto()
-    SBC  = auto()
-    MUL  = auto()
-    MOD  = auto()
-    DIV  = auto()
-    INC  = auto()
-    DEC  = auto()
-    LSH  = auto()
-    RSH  = auto()
-    ASR  = auto()
-    AND  = auto()
-    OR   = auto()
-    NOT  = auto()
-    XOR  = auto()
-    SWP  = auto()
-    STC  = auto()
-    CLC  = auto()
-    CMP  = auto()
-    JMP  = auto()
-    JZ   = auto()
-    JNZ  = auto()
-    JC   = auto()
-    JNC  = auto()
-    JA   = auto()
-    JAE  = auto()
-    JB   = auto()
-    JBE  = auto()
-    JG   = auto()
-    JGE  = auto()
-    JL   = auto()
-    JLE  = auto()
-    CALL = auto()
-    RET  = auto()
-    BCP  = auto()
-    SYSCALL   = auto()
-    TRANSFER  = auto()
-    WAIT      = auto()
-
 
 class REGISTERS(ZeroIndexedEnum):
-    """all the registers"""
+    """all the registers, in encoding order"""
 
     A  = auto()
     B  = auto()
@@ -82,324 +31,184 @@ class REGISTERS(ZeroIndexedEnum):
     SP = auto()
     PC = auto()
 
-class MODES(ZeroIndexedEnum):
-    """addressing modes for instructions"""
 
-                          # syntax       parsed         where does the value come from?
-    REG         = auto()  # a            reg            register value
-    IMM         = auto()  # 0x0000       imm16          immediate value
-    RELATIVE    = auto()  # label        imm16          immediate value
-    REG_POINTER = auto()  # [a]          [reg]          memory at register
-    OFF_POINTER = auto()  # [label + a]  [imm16 + reg]  memory at immediate + register
-    REL_POINTER = auto()  # [label]      [pc + imm16]   memory at pc + imm16
-    NULL        = auto()  # placeholder, used during parsing
+class Mode(Enum):
+    """addressing mode of a single operand"""
+
+    REG = "reg"    # a         the value of a register
+    IMM = "imm"    # 0x1234    the word following the instruction (numbers, constants, and labels)
+    PTR = "[reg]"  # [a]       the memory word a register points to
 
 
-
-INSTRUCTION_MODES: dict[INSTRUCTIONS, list[tuple[MODES, ...]]] = {
-
-    INSTRUCTIONS.HALT: [ () ],
-    INSTRUCTIONS.GET:  [ (MODES.REG, MODES.REG_POINTER), ],
-    # PIC: (MODES.REG, MODES.REL_POINTER), (MODES.REG, MODES.OFF_POINTER)
- 
-    INSTRUCTIONS.PUT:  [ (MODES.REG_POINTER, MODES.REG), (MODES.REG_POINTER, MODES.IMM)],
-    # PIC: (MODES.OFF_POINTER, MODES.REG), (MODES.REL_POINTER, MODES.REG)
-
-    INSTRUCTIONS.MOV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM)],
-    # PIC: (MODES.REG, MODES.RELATIVE)
-
-    INSTRUCTIONS.PUSH: [ (MODES.REG, ), (MODES.IMM, ) ],
-    INSTRUCTIONS.POP:  [ (MODES.REG, ) ],
-    INSTRUCTIONS.ADD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.ADC:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SUB:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SBC:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.MUL:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.DIV:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.MOD:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.INC:  [ (MODES.REG, ) ],
-    INSTRUCTIONS.DEC:  [ (MODES.REG, ) ],
-    INSTRUCTIONS.LSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.RSH:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.ASR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.AND:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.OR:   [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.NOT:  [ (MODES.REG, ) ],
-    INSTRUCTIONS.XOR:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SWP:  [ (MODES.REG, MODES.REG) ],
-    INSTRUCTIONS.STC:  [ () ],
-    INSTRUCTIONS.CLC:  [ () ],
-    INSTRUCTIONS.CMP:  [ (MODES.REG, MODES.REG), (MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.JMP:  [ (MODES.REG, ), (MODES.IMM, ) ],
-    # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
-
-    INSTRUCTIONS.JZ:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JNZ:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JC:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JNC:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JA:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JAE:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JB:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JBE:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JG:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JGE:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JL:   [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.JLE:  [ (MODES.RELATIVE, ) ],
-    INSTRUCTIONS.CALL: [ (MODES.REG, ), (MODES.IMM, ) ],
-    # PIC: (MODES.RELATIVE,), (MODES.OFF_POINTER)
-
-    INSTRUCTIONS.RET:  [ () ],
-    INSTRUCTIONS.NOP:  [ () ],
-
-    INSTRUCTIONS.BCP:      [ (MODES.REG, MODES.REG, MODES.IMM) ],
-    INSTRUCTIONS.SYSCALL:  [ () ],
-    INSTRUCTIONS.TRANSFER: [ () ],
-    INSTRUCTIONS.WAIT:     [ () ],
-}
+REG, IMM, PTR = Mode.REG, Mode.IMM, Mode.PTR
 
 
-OPCODE_MAP_KEYS: list[tuple[INSTRUCTIONS, tuple[MODES, ...]]] = [
-    (instr, modes)
-    for instr, mode_list in INSTRUCTION_MODES.items()
-    for modes in mode_list
-]
+@dataclass(frozen=True, slots=True)
+class Op:
+    """
+    One opcode: a mnemonic specialized to the addressing mode of each operand.
 
+    Every instruction is one 16-bit word, optionally followed by an immediate word:
 
-OPCODE_MAP: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], int] = {
-    (instr, modes): i
-    for i, (instr, modes) in enumerate[tuple[INSTRUCTIONS, tuple[MODES, ...]]](OPCODE_MAP_KEYS)
-}
+        oooooooo bbbb aaaa   [iiiiiiii iiiiiiii]
 
-
-@dataclass(frozen=True)
-class InstructionFormat:
-    mnemonic:     INSTRUCTIONS
-    modes:        tuple[MODES, ...] # modes of the operands that this opcode uses, looks like (MODES.REG, MODES.IMM)
-    src_operand:  int | None        # operand index of ssss
-    dest_operand: int | None        # operand index of dddd
-    imm_operand:  int | None        # operand index of immediate word
-
-
-# (mnemonic, modes) → (src_operand, dest_operand, imm_operand)
-_FORMAT_DATA: dict[tuple[INSTRUCTIONS, tuple[MODES, ...]], tuple[int | None, int | None, int | None]] = {
-
-    (INSTRUCTIONS.HALT, ()):                                (None, None, None),
-
-    (INSTRUCTIONS.GET, (MODES.REG, MODES.REG_POINTER)):    (1,    0,    None),
-    # (INSTRUCTIONS.GET, (MODES.REG, MODES.REL_POINTER)):  (None, 0,    1   ),
-    # (INSTRUCTIONS.GET, (MODES.REG, MODES.OFF_POINTER)):  (1,    0,    1   ),
-
-    (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.REG)):    (1,    0,    None),
-    # imm: dddd=dest ptr reg  imm=value to store
-    (INSTRUCTIONS.PUT, (MODES.REG_POINTER, MODES.IMM)):    (None, 0,    1   ),
-    # (INSTRUCTIONS.PUT, (MODES.OFF_POINTER, MODES.REG)):  (1,    0,    0   ),
-    # (INSTRUCTIONS.PUT, (MODES.REL_POINTER, MODES.REG)):  (1,    None, 0   ),
-
-    (INSTRUCTIONS.MOV, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.MOV, (MODES.REG, MODES.IMM)):            (0,    None, 1   ),
-    # (INSTRUCTIONS.MOV, (MODES.REG, MODES.RELATIVE)):     (0,    None, 1   ),
-
-    (INSTRUCTIONS.PUSH, (MODES.REG,)):                     (0,    None, None),
-    (INSTRUCTIONS.PUSH, (MODES.IMM,)):                     (None, None, 0   ),
-
-    (INSTRUCTIONS.POP, (MODES.REG,)):                      (None, 0,    None),
-
-    (INSTRUCTIONS.ADD, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.ADD, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.ADC, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.ADC, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.SUB, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.SUB, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.SBC, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.SBC, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.MUL, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.MUL, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.MOD, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.MOD, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.DIV, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.DIV, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.INC, (MODES.REG,)):                      (None, 0,    None),
-    (INSTRUCTIONS.DEC, (MODES.REG,)):                      (None, 0,    None),
-    (INSTRUCTIONS.NOT, (MODES.REG,)):                      (None, 0,    None),
-
-    (INSTRUCTIONS.LSH, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.LSH, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.RSH, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.RSH, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.ASR, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.ASR, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.AND, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.AND, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.OR,  (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.OR,  (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.XOR, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.XOR, (MODES.REG, MODES.IMM)):            (None, 0,    1   ),
-
-    (INSTRUCTIONS.STC, ()):                                (None, None, None),
-    (INSTRUCTIONS.CLC, ()):                                (None, None, None),
-
-    (INSTRUCTIONS.CMP, (MODES.REG, MODES.REG)):            (1,    0,    None),
-    (INSTRUCTIONS.CMP, (MODES.REG, MODES.IMM)):            (0,    None, 1   ),
-
-    (INSTRUCTIONS.JMP, (MODES.REG,)):                      (0,    None, None),
-    (INSTRUCTIONS.JMP, (MODES.IMM,)):                      (None, None, 0   ),
-    # (INSTRUCTIONS.JMP, (MODES.RELATIVE,)):               (None, None, 0   ),
-    # (INSTRUCTIONS.JMP, (MODES.OFF_POINTER,)):            (0,    None, 0   ),
-
-    (INSTRUCTIONS.JZ,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JNZ, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JC,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JNC, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JA,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JAE, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JB,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JBE, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JG,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JGE, (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JL,  (MODES.RELATIVE,)):                 (None, None, 0   ),
-    (INSTRUCTIONS.JLE, (MODES.RELATIVE,)):                 (None, None, 0   ),
-
-    (INSTRUCTIONS.CALL, (MODES.REG,)):                     (0,    None, None),
-    (INSTRUCTIONS.CALL, (MODES.IMM,)):                     (None, None, 0   ),
-    # (INSTRUCTIONS.CALL, (MODES.RELATIVE,)):              (None, None, 0   ),
-    # (INSTRUCTIONS.CALL, (MODES.OFF_POINTER,)):           (0,    None, 0   ),
-
-    (INSTRUCTIONS.RET,  ()):                               (None, None, None),
-    (INSTRUCTIONS.NOP,  ()):                               (None, None, None),
-
-    (INSTRUCTIONS.SWP, (MODES.REG, MODES.REG)):           (0,    1,    None),
-
-    (INSTRUCTIONS.BCP, (MODES.REG, MODES.REG, MODES.IMM)): (1, 0, 2),
-    (INSTRUCTIONS.SYSCALL, ()):                            (None, None, None),
-    (INSTRUCTIONS.TRANSFER, ()):                           (None, None, None),
-    (INSTRUCTIONS.WAIT, ()):                               (None, None, None),
-}
-
-
-OPCODE_FORMATS: dict[int, InstructionFormat] = {
-    opcode: InstructionFormat(
-        mnemonic       = instr,
-        modes          = modes,
-        src_operand    = _FORMAT_DATA[(instr, modes)][0],
-        dest_operand   = _FORMAT_DATA[(instr, modes)][1],
-        imm_operand    = _FORMAT_DATA[(instr, modes)][2],
-    )
-    for (instr, modes), opcode in OPCODE_MAP.items()
-}
-
-
-def generate_opcode_string(opcode: int) -> str | None:
-    """ Generate a string representation of the opcode and operands. """
-
-    mode_string: dict[MODES, str] = {
-        MODES.REG:         "reg",
-        MODES.IMM:         "imm",
-        MODES.RELATIVE:    "imm",
-        MODES.REG_POINTER: "[reg]",
-        MODES.OFF_POINTER: "[imm + reg]",
-        MODES.REL_POINTER: "[pc + simm]",
-    }
-
-    fmt = OPCODE_FORMATS.get(opcode)
-    if fmt is None:
-        return None
-
-    operand_str = ", ".join(mode_string[m] for m in fmt.modes)
-    return f"{fmt.mnemonic.name} {operand_str}".strip()
-
-
-def generate_opcode_encoding_string(opcode: int) -> str:
-    """ 
-    Generate a string representation of the instruction encoding for the given opcode.
-
-    String representation format is:
-
-    mnemonic [operand] [operand] oooooooo ssss dddd xxxxxxxx xxxxxxxx 
+    oooooooo is the opcode. bit 0 of the opcode is set exactly when an immediate word follows.
+    aaaa and bbbb are the registers of the first and second REG/PTR operands, in operand order.
     """
 
-    mode_syntax_string_map: dict[MODES, str] = {
-        MODES.REG:         "a",
-        MODES.IMM:         "0xff",
-        MODES.RELATIVE:    "label",
-        MODES.REG_POINTER: "[a]",
-        MODES.OFF_POINTER: "[label + a]",
-        MODES.REL_POINTER: "[label]",
-    }
+    opcode: int
+    mnemonic: str
+    modes: tuple[Mode, ...] = ()
 
-    mode_name_map: dict[MODES, str] = {
-        MODES.REG:         "reg",
-        MODES.IMM:         "imm",
-        MODES.RELATIVE:    "imm",
-        MODES.REG_POINTER: "[reg]",
-        MODES.OFF_POINTER: "[imm + reg]",
-        MODES.REL_POINTER: "[imm]",
-    }
+    @property
+    def has_imm(self) -> bool:
+        return IMM in self.modes
 
-    fmt = OPCODE_FORMATS.get(opcode)
-    if not fmt:
-        return f"no opcode found for {opcode:#04x}"
+    @property
+    def size(self) -> int:
+        """size in words"""
+        return 2 if self.has_imm else 1
 
-    mnemonic: str = fmt.mnemonic.name.lower()
-    operand_1_mode = mode_name_map[fmt.modes[0]] if len(fmt.modes) > 0 else ""
-    operand_2_mode = mode_name_map[fmt.modes[1]] if len(fmt.modes) > 1 else ""
+    @property
+    def signature(self) -> str:
+        """looks like 'mov reg, imm'"""
+        return f"{self.mnemonic} {', '.join(mode.value for mode in self.modes)}".strip()
 
-    operand_1_syntax: str = mode_syntax_string_map[fmt.modes[0]] if len(fmt.modes) > 0 else ""
-    operand_2_syntax: str = mode_syntax_string_map[fmt.modes[1]] if len(fmt.modes) > 1 else ""
-    full_syntax: str = f"{mnemonic} {operand_1_syntax}{', ' if operand_1_syntax and operand_2_syntax else ''}{operand_2_syntax}"
+    def encode(self, operands: Sequence[int]) -> list[int]:
+        """Encode operand values (register numbers and immediates, in operand order) into words."""
+        registers = [value for mode, value in zip(self.modes, operands, strict=True) if mode is not IMM]
+        immediates = [value for mode, value in zip(self.modes, operands, strict=True) if mode is IMM]
+        word = self.opcode << 8 | sum(register << (4 * field) for field, register in enumerate(registers))
+        return [word, *immediates]
 
-    # this is checking "is the source register used?"
-    opcode_binary: str = "oooooooo"
-    source_reg_binary: str = "ssss" if fmt.src_operand is not None else "----"
-    dest_reg_binary: str = "dddd" if fmt.dest_operand is not None else "----"
-    immediate_binary: str = "xxxxxxxxxxxxxxxx" if fmt.imm_operand is not None else ""
-
-    return (
-        f"{full_syntax:<14}   "
-        + f"{operand_1_mode:<7}{operand_2_mode:<7}   "
-        + f"{opcode_binary} {source_reg_binary} {dest_reg_binary} {immediate_binary}"
-    )
+    def format(self, a: int, b: int, imm: int) -> str:
+        """Render decoded fields back into jasm syntax, e.g. 'put [x], 0x0005'."""
+        fields = iter((a, b))
+        operands: list[str] = []
+        for mode in self.modes:
+            if mode is IMM:
+                operands.append(f"0x{imm:04x}")
+                continue
+            field = next(fields)
+            name = REGISTERS(field).name.lower() if field < len(REGISTERS) else f"r{field}?"
+            operands.append(name if mode is REG else f"[{name}]")
+        return f"{self.mnemonic} {', '.join(operands)}".strip()
 
 
-class InstructionArguments(Tap):
-    """argparser for generating spec docs"""
+# the instruction set. one row per opcode: (opcode, mnemonic, *operand modes).
+# opcodes are grouped by category in the high nibble. odd opcodes take an immediate word.
+_SPEC: list[tuple] = [
 
-    opcode_map: bool = False
-    full_spec: bool = False
+    # 0x0_: system
+    (0x00, "halt"),  # zeroed memory halts, which catches runaway execution
+    (0x02, "nop"),
+    (0x04, "wait"),
+    (0x06, "syscall"),
+    (0x08, "transfer"),
+    (0x0A, "stc"),
+    (0x0C, "clc"),
+
+    # 0x1_: registers and the stack
+    (0x10, "mov",  REG, REG),
+    (0x11, "mov",  REG, IMM),
+    (0x12, "swp",  REG, REG),
+    (0x14, "push", REG),
+    (0x15, "push", IMM),
+    (0x16, "pop",  REG),
+
+    # 0x2_: memory
+    (0x20, "get",  REG, PTR),
+    (0x22, "put",  PTR, REG),
+    (0x23, "put",  PTR, IMM),
+    (0x25, "bcp",  REG, REG, IMM),
+
+    # 0x3_, 0x4_: arithmetic
+    (0x30, "add",  REG, REG),
+    (0x31, "add",  REG, IMM),
+    (0x32, "adc",  REG, REG),
+    (0x33, "adc",  REG, IMM),
+    (0x34, "sub",  REG, REG),
+    (0x35, "sub",  REG, IMM),
+    (0x36, "sbc",  REG, REG),
+    (0x37, "sbc",  REG, IMM),
+    (0x38, "mul",  REG, REG),
+    (0x39, "mul",  REG, IMM),
+    (0x3A, "div",  REG, REG),
+    (0x3B, "div",  REG, IMM),
+    (0x3C, "mod",  REG, REG),
+    (0x3D, "mod",  REG, IMM),
+    (0x40, "inc",  REG),
+    (0x42, "dec",  REG),
+    (0x44, "cmp",  REG, REG),
+    (0x45, "cmp",  REG, IMM),
+
+    # 0x5_: logic and shifts
+    (0x50, "and",  REG, REG),
+    (0x51, "and",  REG, IMM),
+    (0x52, "or",   REG, REG),
+    (0x53, "or",   REG, IMM),
+    (0x54, "xor",  REG, REG),
+    (0x55, "xor",  REG, IMM),
+    (0x56, "not",  REG),
+    (0x58, "lsh",  REG, REG),
+    (0x59, "lsh",  REG, IMM),
+    (0x5A, "rsh",  REG, REG),
+    (0x5B, "rsh",  REG, IMM),
+    (0x5C, "asr",  REG, REG),
+    (0x5D, "asr",  REG, IMM),
+
+    # 0x6_: jumps and calls
+    (0x60, "jmp",  REG),
+    (0x61, "jmp",  IMM),
+    (0x62, "call", REG),
+    (0x63, "call", IMM),
+    (0x64, "ret"),
+
+    # 0x7_, 0x8_: conditional branches
+    (0x71, "jz",   IMM),
+    (0x73, "jnz",  IMM),
+    (0x75, "jc",   IMM),
+    (0x77, "jnc",  IMM),
+    (0x79, "ja",   IMM),
+    (0x7B, "jae",  IMM),
+    (0x7D, "jb",   IMM),
+    (0x7F, "jbe",  IMM),
+    (0x81, "jg",   IMM),
+    (0x83, "jge",  IMM),
+    (0x85, "jl",   IMM),
+    (0x87, "jle",  IMM),
+]
+
+ISA: tuple[Op, ...] = tuple(Op(opcode, mnemonic, tuple(modes)) for opcode, mnemonic, *modes in _SPEC)
+
+# lookups derived from the spec
+BY_OPCODE: list[Op | None] = [None] * 256                                           # used to decode
+BY_SIGNATURE: dict[tuple[str, tuple[Mode, ...]], Op] = {}                           # used to encode
+MNEMONICS: tuple[str, ...] = tuple(dict.fromkeys(op.mnemonic for op in ISA))        # in spec order
+
+for _op in ISA:
+    assert BY_OPCODE[_op.opcode] is None, f"opcode {_op.opcode:#04x} is defined twice"
+    assert (_op.mnemonic, _op.modes) not in BY_SIGNATURE, f"'{_op.signature}' is defined twice"
+    assert _op.has_imm == bool(_op.opcode & 1), f"'{_op.signature}': odd opcodes (and only odd opcodes) take an immediate"
+    assert _op.modes.count(IMM) <= 1 and len(_op.modes) - _op.modes.count(IMM) <= 2, f"'{_op.signature}' does not fit the encoding"
+    BY_OPCODE[_op.opcode] = _op
+    BY_SIGNATURE[_op.mnemonic, _op.modes] = _op
+
+
+def disassemble(word: int, imm: int) -> str:
+    """Disassemble an instruction word (and the word following it, used only if the opcode takes one)."""
+    op = BY_OPCODE[word >> 8]
+    if op is None:
+        return f"??? (unknown opcode 0x{word >> 8:02x})"
+    return op.format(word & 0xF, (word >> 4) & 0xF, imm)
 
 
 if __name__ == "__main__":
-
-    args = InstructionArguments(underscores_to_dashes=True).parse_args()
-
-    if args.full_spec:
-        print("JASM SPECIFICATION\nVERSION 0.5\n")
-        print("instruction      src    dest      word 1            word 2")
-        print("-------------    -----  -----     ----------------- -----------------\n")
-
-
-    for mnemonic in INSTRUCTIONS:
-        for (instr, modes), opcode in OPCODE_MAP.items():
-
-            if instr == mnemonic and args.opcode_map:
-                print(f"{opcode:#04x}\t{generate_opcode_string(opcode)}")
-
-            if instr == mnemonic and args.full_spec:
-                print(f"{generate_opcode_encoding_string(opcode)}")
-
-        print()
-    print(f"generated data for {len(INSTRUCTIONS)} instructions.")
-
-    if not args.opcode_map and not args.full_spec:
-        print("no arguments provided.")
+    # print the opcode map
+    print("opcode  instruction      encoding")
+    print("------  ---------------  -----------------------------------")
+    for op in ISA:
+        registers = len(op.modes) - op.has_imm
+        fields = f"{'bbbb' if registers > 1 else '----'} {'aaaa' if registers > 0 else '----'}"
+        print(f"0x{op.opcode:02x}    {op.signature:<15}  {op.opcode:08b} {fields}{' iiiiiiii iiiiiiii' if op.has_imm else ''}")
+    print(f"\n{len(ISA)} opcodes, {len(MNEMONICS)} instructions.")

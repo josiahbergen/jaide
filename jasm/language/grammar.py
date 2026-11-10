@@ -2,6 +2,8 @@
 # grammar definition for the JASM language.
 # josiah bergen, december 2025
 
+from common.isa import MNEMONICS
+
 GRAMMAR = r"""
     start: (_NL | statement)*
     
@@ -49,8 +51,6 @@ GRAMMAR = r"""
     # Operands & Expressions 
     ?generic_operand: operand
                | pointer_operand
-               | offset_pointer_operand
-               | relative_pointer_operand
                | macro_arg
                | expression
 
@@ -58,11 +58,8 @@ GRAMMAR = r"""
             | NUMBER
             | IDENTIFIER
 
-    # memory operands can be in any of these forms:
-    # [reg] + [label + reg] + [label]
+    # memory operand: [reg]
     pointer_operand: "[" REGISTER "]"
-    offset_pointer_operand: "[" IDENTIFIER "+" REGISTER "]"
-    relative_pointer_operand: "[" IDENTIFIER "]"
 
     macro_arg: "%" IDENTIFIER
 
@@ -81,9 +78,9 @@ GRAMMAR = r"""
     # Operators
     OPERATOR: "+" | "-" | "*" | "/" | "%" | "<<" | ">>" | "&" | "|" | "^" | "~"
 
-    # Mnemonics
+    # Mnemonics (filled in from the isa below)
     # Priority 100 ensures these are matched before generic IDENTIFIERs
-    MNEMONIC.100: /(GET|PUT|MOV|PUSH|POP|ADD|ADC|SUB|SBC|MUL|MOD|DIV|INC|DEC|LSH|RSH|ASR|AND|OR|NOT|XOR|SWP|STC|CLC|CMP|JMP|JZ|JNZ|JC|JNC|JA|JAE|JB|JBE|JG|JGE|JL|JLE|CALL|RET|HALT|NOP|BCP|SYSCALL|TRANSFER|WAIT)\b/i
+    MNEMONIC.100: /(__MNEMONICS__)\b/i
 
     # Directives (priority 95 ensures these are matched before IDENTIFIER)
     DATA.95: /DATA\b/i
@@ -126,4 +123,4 @@ GRAMMAR = r"""
 
     %ignore WS_INLINE
     %ignore COMMENT
-"""
+""".replace("__MNEMONICS__", "|".join(MNEMONICS))

@@ -4,34 +4,38 @@
 
 import os
 
-from ...language.isa import MODES, REGISTERS
+from common.isa import IMM, PTR, REG, REGISTERS
+
 from ...util.logger import logger
 from .base import ExpressionNode, Operand
 from .terminals import IdentifierTerminal, NumberTerminal, RegisterTerminal
 
 
 class RegisterOperand(Operand):
+    mode = REG
+
     def __init__(self, line: int, filename: str, register: RegisterTerminal):
-        super().__init__(line, filename, MODES.REG)
-        # adds a reference to the numeric register value
+        super().__init__(line, filename)
         self.register: REGISTERS = REGISTERS[register.value]
 
     def __str__(self) -> str:
-        return f"{self.register}"
+        return self.register.name.lower()
 
     def get_value(self) -> int:
         return self.register
 
 
 class ImmediateOperand(Operand):
+    mode = IMM
+
     def __init__(self, line: int, filename: str, number: NumberTerminal, label_name: str | None = None):
-        super().__init__(line, filename, MODES.IMM)
+        super().__init__(line, filename)
         self.string: str = number.value  # string representation
         self.value: int = int(self.string, 0)
         self.label_name: str | None = label_name # optional, used to keep track of the label name for source mapping
-        
+
     def __str__(self) -> str:
-        return self.label_name if self.label_name else self.string
+        return (self.label_name or self.string).lower()
 
     def get_value(self) -> int:
         if self.value > 0xFFFF:
@@ -42,11 +46,15 @@ class ImmediateOperand(Operand):
 
 
 class LabelOperand(Operand):
+    # a label is an immediate whose value is not known yet.
+    # labels.py swaps it for an ImmediateOperand once every label has an address.
+    mode = IMM
+
     def __init__(self, line: int, filename: str, identifier: IdentifierTerminal):
-        super().__init__(line, filename, MODES.RELATIVE)
+        super().__init__(line, filename)
 
         name = identifier.value.upper().strip() # normalize
-        already_mangled = "__" in name and "_" not in name.split("__")[0]  
+        already_mangled = "__" in name and "_" not in name.split("__")[0]
         filename = os.path.basename(filename).split(".")[0].upper() # the actual name, no path or extension
 
         self.name: str = f"{filename}__{name}" if not already_mangled else name # mangle with filename
@@ -55,39 +63,18 @@ class LabelOperand(Operand):
         logger.verbose(f"label: {self.short_name} -> {self.name} (in {filename}, {"not " if not already_mangled else ""}already mangled)")
 
     def __str__(self) -> str:
-        return f"{self.name}"
+        return self.short_name.lower()
 
 
 class PointerOperand(Operand):
+    mode = PTR
+
     def __init__(self, line: int, filename: str, register: RegisterTerminal):
-        super().__init__(line, filename, MODES.REG_POINTER)
+        super().__init__(line, filename)
         self.register: REGISTERS = REGISTERS[register.value]
 
     def __str__(self) -> str:
-        return f"[{self.register}]"
-
-    def get_value(self) -> int:
-        return self.register
-
-
-class RelativePointerOperand(Operand):
-    def __init__(self, line: int, filename: str, label: IdentifierTerminal):
-        super().__init__(line, filename, MODES.REL_POINTER)
-        self.label: str = label.value.upper().strip() # normalize
-
-    def __str__(self) -> str:
-        return f"[{self.label}]"
-
-
-class OffsetPointerOperand(Operand):
-    def __init__(self, line: int, filename: str, label: IdentifierTerminal, register: RegisterTerminal):
-        super().__init__(line, filename, MODES.OFF_POINTER)
-        # we add two new values! wow!
-        self.label: str = label.value.upper().strip() # normalize
-        self.register: REGISTERS = REGISTERS[register.value]
-
-    def __str__(self) -> str:
-        return f"[{self.label} + {self.register}]"
+        return f"[{self.register.name.lower()}]"
 
     def get_value(self) -> int:
         return self.register
@@ -95,7 +82,7 @@ class OffsetPointerOperand(Operand):
 
 class MacroArgumentOperand(Operand):
     def __init__(self, line: int, filename: str, argument: IdentifierTerminal):
-        super().__init__(line, filename, MODES.NULL)
+        super().__init__(line, filename)
         # only valid inside macro body; refers to a provided argument by name.
         self.placeholder: str = argument.value
 
@@ -106,7 +93,7 @@ class MacroArgumentOperand(Operand):
 class ExpressionOperand(Operand):
     """Future: an expression operand. Not yet supported."""
     def __init__(self, line: int, filename: str, expression: ExpressionNode):
-        super().__init__(line, filename, MODES.NULL)
+        super().__init__(line, filename)
         self.expression: str = expression.expression
 
     def __str__(self) -> str:

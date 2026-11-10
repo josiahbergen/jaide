@@ -7,9 +7,8 @@ import sys
 import time
 import traceback
 from collections import deque
-from typing import Callable
 
-from common.isa import INSTRUCTIONS, OPCODE_FORMATS
+from common.isa import disassemble
 from common.map import SourceMap
 
 from .bus import MemoryBus
@@ -34,10 +33,10 @@ from .devices.graphics import Graphics
 from .devices.keyboard import Keyboard
 from .devices.pit import PIT
 from .devices.rtc import RTC
+from .handlers import Handler, build_dispatch
 from .exceptions import EmulatorException, ProtectionFault, InvalidInstructionFault, DivisionByZeroFault, BreakpointException
 from .register import Register
 from .ui import EmulatorUI
-from .util.disasm import disassemble
 from .util.logger import logger
 
 
@@ -57,6 +56,7 @@ class Emulator:
         self.stopped: bool = False  # hardware halt
         self.source_map: SourceMap = SourceMap()
         self.call_stack: list[tuple[int, str]] = []  # tuples of (caller address, label name)
+        self.instruction_address: int = 0  # address of the instruction being executed
         self._wait_time: float = 0.0
         self._last_print: float = 0.0
 
@@ -98,9 +98,8 @@ class Emulator:
             self.devices.append(Keyboard(_key_queue))
         self.ui = EmulatorUI(self.bus, graphics, memory_view, self.shutdown) if graphics is not None or memory_view else None
 
-        # handlers keyed by mnemonic; dispatch via OPCODE_FORMATS[opcode].mnemonic
-        from .handlers import handler_map
-        self.handlers: dict[INSTRUCTIONS, Callable[[Emulator, tuple[int, ...]], None]] = handler_map
+        # one handler per opcode, indexed by opcode
+        self.dispatch: list[Handler] = build_dispatch()
 
     # memory
     def load_binary(self, file: str, addr: int = 0):
@@ -254,30 +253,13 @@ class Emulator:
             self.ui.close()
         sys.exit(0)
 
-    # main fetch/decode
+    # main fetch
 
     def fetch(self) -> int:
         # fetch word and increment program counter
         value = self.bus.read16(self.pc.value)
         self.pc.set(self.pc.value + 1)
         return value
-
-
-    def decode(self) -> tuple[int, ...]:
-        word = self.fetch()
-        regs, instr = word & 0xFF, (word >> 8) & 0xFF
-
-        opcode = instr  # flat 8-bit opcode
-        reg_a = (regs >> 4) & 0xF  # ssss/high nibble
-        reg_b = regs & 0xF  # dddd/low nibble
-
-        if opcode not in OPCODE_FORMATS:
-            raise InvalidInstructionFault(f"invalid opcode 0x{opcode:02x} at 0x{self.pc.value:04x}.")
-
-        fmt = OPCODE_FORMATS[opcode]
-        imm16 = self.fetch() if fmt.imm_operand is not None else 0
-
-        return opcode, reg_a, reg_b, imm16
 
     # main run loop
 
@@ -345,19 +327,16 @@ class Emulator:
 
         # finally, save the instruction address (for error reporting)
         # and proceed with normal fetch/decode/execute
-        instruction_address = self.pc.value
-        decoded = self.decode()
-        opcode = decoded[0]
+        instruction_address = self.instruction_address = self.pc.value
 
-        logger.verbose(
-            f"{disassemble(decoded):<13}"
-            f'{" ".join([f"{r}: {self.reg[r].value:0>4X} " if len(f"{self.reg[r].value:X}") >= 4 else f"{r}: {self.reg[r].value:X}{' ' * (4 - len(f'{self.reg[r].value:X}'))} " for r in self.reg if r != "F"])} '
-            f"{" ".join([f"{FLAG_STRINGS[i]}" if self.flag_get(i) else "-" for i in FLAG_STRINGS])}"
-        )
+        # instruction word: oooooooo bbbb aaaa. odd opcodes are followed by an immediate word.
+        word = self.fetch()
+        opcode = word >> 8
+        imm = self.fetch() if opcode & 1 else 0
 
         try:
             # run instruction handler
-            self.handlers[OPCODE_FORMATS[opcode].mnemonic](self, decoded)
+            self.dispatch[opcode](self, word & 0xF, (word >> 4) & 0xF, imm)
         except ProtectionFault as e:
             # catch various non-fatal cpu faults.
             # these run here because they are not actual emulation faults,
@@ -400,21 +379,18 @@ class Emulator:
 
 
     def _lsh_core(self, a: int, b: int) -> int:
-        full = a << b
-        result = mask16(full)
-        # Carry is the last bit shifted out; zero and oversized counts clear it.
+        result = mask16(a << b)
+        # carry is the last bit shifted out; zero and oversized counts clear it.
         carry = 1 if 1 <= b <= 16 and a & (1 << (16 - b)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        # overflow is set when the shift changed the sign bit.
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, (a ^ result) & 0x8000 != 0)
         return result
 
 
     def _rsh_core(self, a: int, b: int) -> int:
-        full = a >> b
-        result = mask16(full)
+        result = mask16(a >> b)
         carry = 1 if 1 <= b <= 16 and a & (1 << (b - 1)) else 0
-        overflow = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ result) & 0x80) != 0) else 0
-        self.set_all_flags(result == 0, carry, result < 0, overflow)
+        self.set_all_flags(result == 0, carry, result & 0x8000 != 0, (a ^ result) & 0x8000 != 0)
         return result
 
 

@@ -6,7 +6,7 @@ import copy
 import os
 from enum import IntEnum
 
-from ...language.isa import INSTRUCTIONS, MODES, OPCODE_MAP
+from common.isa import BY_SIGNATURE, ISA, Mode, Op
 from ...util.logger import logger
 
 
@@ -44,9 +44,10 @@ class IRNode:
 class Operand(IRNode):
     # base operand class. all operands inherit from this.
     # useful for type hinting.
-    def __init__(self, line: int, filename: str, mode: MODES):
-        super().__init__(line, filename)
-        self.mode: MODES = mode # the addressing mode of the operand
+
+    # the addressing mode of the operand.
+    # can be None for operands that cannot be encoded (e.g. unexpanded macro arguments).
+    mode: Mode | None = None
 
     def get_value(self) -> int:
         scope = "ir.py:Operand.get_value()"
@@ -58,30 +59,44 @@ class InstructionNode(IRNode):
 
     def __init__(self, line: int, filename: str, mnemonic: str, operands: list[Operand]):
         super().__init__(line, filename)
-        
-        self.mnemonic: INSTRUCTIONS = INSTRUCTIONS[mnemonic.upper()]
+
+        self.mnemonic: str = mnemonic.lower()
         self.operands: list[Operand] = operands
 
-        # these gotta wait until after macro expansion
-        self.opcode: int = 0
-        self.size: int = 0
- 
-    def __str__(self) -> str:
-        return f"{self.mnemonic.name}{' ' if self.operands else ''}{', '.join([str(op) for op in self.operands])}"
+        # the opcode this instruction assembles to.
+        # gotta wait until after macro expansion (see resolve())
+        self.op: Op | None = None
 
-    def get_opcode(self) -> int:
-        try:
-            # yeah bro readable code is a priorty trust me bro
-            return OPCODE_MAP[(self.mnemonic, tuple[MODES, ...](operand.mode for operand in self.operands))]
-        except KeyError:
-            key = (self.mnemonic, tuple[MODES, ...](operand.mode for operand in self.operands))
-            logger.fatal(f"invalid opcode for {self.mnemonic.name} with key {key} (line {self.line})", "ir.py:InstructionNode.get_opcode()")
-    
+    def __str__(self) -> str:
+        return f"{self.mnemonic}{' ' if self.operands else ''}{', '.join([str(op) for op in self.operands])}"
+
+    def resolve(self) -> Op:
+        """ Pick the opcode matching this instruction's mnemonic and operand modes. """
+        scope = "ir.py:InstructionNode.resolve()"
+
+        op = BY_SIGNATURE.get((self.mnemonic, tuple(operand.mode for operand in self.operands)))
+        if op is None:
+            valid = ", ".join(f"'{op.signature}'" for op in ISA if op.mnemonic == self.mnemonic)
+            logger.fatal(f"invalid operands for '{self}' ({os.path.basename(self.filename)}, line {self.line}). valid forms: {valid}", scope)
+
+        self.op = op
+        return op
+
     def get_size(self) -> int:
         # size in words!
-        if any((operand.mode in [MODES.IMM, MODES.RELATIVE, MODES.OFF_POINTER, MODES.REL_POINTER] for operand in self.operands)):
-            return 2
-        return 1 # also catches instructions with no operands
+        if self.op is None:
+            logger.fatal(f"premature get_size() call on '{self}' (line {self.line})", "ir.py:InstructionNode.get_size()")
+        return self.op.size
+
+    def encode(self) -> bytearray:
+        if self.op is None:
+            logger.fatal(f"premature encode() call on '{self}' (line {self.line})", "ir.py:InstructionNode.encode()")
+
+        binary = bytearray()
+        for word in self.op.encode([operand.get_value() for operand in self.operands]):
+            binary.append(word & 0xFF)
+            binary.append((word >> 8) & 0xFF)
+        return binary
 
 
 class LabelNode(IRNode):

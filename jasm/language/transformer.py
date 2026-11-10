@@ -25,10 +25,8 @@ from .ir.operands import (
     ImmediateOperand,
     LabelOperand,
     MacroArgumentOperand,
-    OffsetPointerOperand,
     PointerOperand,
     RegisterOperand,
-    RelativePointerOperand,
 )
 from .ir.terminals import (
     IdentifierTerminal,
@@ -86,14 +84,6 @@ class IRTransformer(Transformer):
     def pointer_operand(self, register: RegisterTerminal):
         # "[" REGISTER "]"
         return PointerOperand(line(register), self.filename, register)
-
-    def offset_pointer_operand(self, identifier: IdentifierTerminal, register: RegisterTerminal):
-        # "[" IDENTIFIER "+" REGISTER "]"
-        return OffsetPointerOperand(line(identifier), self.filename, identifier, register)
-
-    def relative_pointer_operand(self, identifier: IdentifierTerminal):
-        # "[" IDENTIFIER "]"
-        return RelativePointerOperand(line(identifier), self.filename, identifier)
 
     def macro_arg(self, identifier: IdentifierTerminal):
         # "%" IDENTIFIER

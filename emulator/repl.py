@@ -5,12 +5,11 @@ from threading import Event, Thread
 
 from colorama import Fore as f
 
-from common.isa import OPCODE_FORMATS
+from common.isa import disassemble
 from emulator.constants import FLAG_C, FLAG_N, FLAG_O, FLAG_Z, REGISTERS
 from emulator.emulator import Emulator
 from emulator.exceptions import EmulatorException
 from emulator.ui import FRAME_INTERVAL
-from emulator.util.disasm import disassemble
 from emulator.util.logger import logger
 
 
@@ -58,11 +57,7 @@ def parse_line(line: str) -> CommandRequest | None:
 
 
 def disasm_at(emulator: Emulator, addr: int) -> str:
-    word = emulator.bus.peek16(addr)
-    regs, opcode = word & 0xFF, word >> 8
-    fmt = OPCODE_FORMATS.get(opcode)
-    imm16 = emulator.bus.peek16(addr + 1) if fmt and fmt.imm_operand is not None else 0
-    return disassemble((opcode, regs >> 4, regs & 0xF, imm16))
+    return disassemble(emulator.bus.peek16(addr), emulator.bus.peek16(addr + 1))
 
 
 def display_memory(emulator: Emulator, addr: int, length: int) -> None:

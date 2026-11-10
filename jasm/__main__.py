@@ -16,7 +16,6 @@ class JasmArgumentParser(Tap):
     nowarn: bool = False  # suppress warnings
     nowrite: bool = False  # suppress writing to ouput file
     nosource: bool = False  # suppress writing to source map file
-    nolink: bool = False  # enable low-level capabilities, makes binary unlinkable
     verbosity: int = logger.log_level.INFO  # verbosity level (0-3)
 
     def configure(self):
@@ -59,7 +58,6 @@ def main():
     logger.nl()
 
     options: dict[str, bool] = {
-        "linkable": not args.nolink,
         "write": not args.nowrite,
         "write_source": not args.nosource,
     }

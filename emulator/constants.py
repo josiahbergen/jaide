@@ -2,7 +2,7 @@
 # emulator-specific constants for the jaide project.
 # josiah bergen, january 2026
 
-from common.isa import OPCODE_FORMATS, REGISTERS
+from common import isa
 from common.isa import ZeroIndexedEnum
 
 MEMORY_SIZE = 0x10000 * 2  # 128KiB total (64K word addresses × 2 bytes)
@@ -23,8 +23,8 @@ MMIO_BASE = 0xFF00
 MMIO_END  = 0xFFFF
 MMIO_SYSTEM = 0xFFFF
 
-# Register names in index order (matches REGISTERS enum in common.isa)
-REGISTERS = ["A", "B", "C", "D", "E", "X", "Y", "Z", "F", "MB", "SP", "PC", "MDE"]
+# Register names in index order
+REGISTERS = [register.name for register in isa.REGISTERS]
 
 FLAG_C = 0  # carry
 FLAG_Z = 1  # zero
@@ -49,9 +49,3 @@ class EVENT(ZeroIndexedEnum):
 FAULT_INSTRUCTION   = 0
 FAULT_PROTECTION    = 1
 FAULT_ZERO_DIVISION = 2
-
-# Human-readable mnemonic strings (for logging / disassembly)
-MNEMONICS: dict[int, str] = {
-    opcode: fmt.mnemonic.name
-    for opcode, fmt in OPCODE_FORMATS.items()
-}

@@ -65,13 +65,13 @@ a single 16-bit instruction word is defined as follows (most significant bit fir
 
 `OOOOOOOO` `BBBB` `AAAA`, optionally followed by `IIIIIIII IIIIIIII`
 
-`OOOOOOOO` is the opcode (bits 8-15). the opcode alone identifies both the mnemonic and the addressing mode of every operand.
+`OOOOOOOO` is the opcode (bits 8-15). the opcode alone identifies both the mnemonic and the addressing mode of every operand. the low bit of the opcode (bit 8) is set exactly when an immediate word follows.
 
 `AAAA` is the register of the first register operand (bits 0-3).
 
 `BBBB` is the register of the second register operand (bits 4-7).
 
-`IIIIIIII IIIIIIII` is an immediate word defining an immediate, address, or offset.
+`IIIIIIII IIIIIIII` is an immediate word defining an immediate value or an absolute address.
 
 register fields are filled left to right in operand order. `add a, b` puts `a` in `AAAA` and `b` in `BBBB`; `put [x], 5` puts `x` in `AAAA` and `5` in the immediate word.
 
@@ -79,7 +79,21 @@ _all 16-bit values are little-endian: `LLLLLLLL` `HHHHHHHH` when represented as 
 
 ### instruction set
 
-see the [instruction set](../software/inst.txt) for instruction semantics. the opcode map is generated from [common/isa.py](../../common/isa.py) with `python -m common.isa`.
+the instruction set is defined in [common/isa.py](../../common/isa.py), one row per opcode. print the opcode map with `python -m common.isa`.
+
+opcodes are grouped by category in their high nibble:
+
+| opcodes         | category                 |
+| --------------- | ------------------------ |
+| `0x00...0x0F`   | system                   |
+| `0x10...0x1F`   | registers and the stack  |
+| `0x20...0x2F`   | memory                   |
+| `0x30...0x4F`   | arithmetic               |
+| `0x50...0x5F`   | logic and shifts         |
+| `0x60...0x6F`   | jumps and calls          |
+| `0x70...0x8F`   | conditional branches     |
+
+opcode `0x00` is `halt`, so execution that runs into zeroed memory stops. unassigned opcodes raise an invalid-instruction fault.
 
 ## memory
 

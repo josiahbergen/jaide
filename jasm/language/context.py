@@ -23,7 +23,6 @@ class AssemblyContext:
 
         # optional behavior changes (more to co me, hopefully)
         self.write_source: bool = options.get("write_source", True) if options else True  # source mapping toggle
-        self.linkable: bool = options.get("linkable", True) if options else True  # linkable mode
         self.write: bool = options.get("write", True) if options else True  # write mode
 
         # source mapping toggle and handler

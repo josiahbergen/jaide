@@ -33,7 +33,7 @@ equal:
 
 the jasm assembler supports the following flags:
 
-`python -m jasm source [--output OUTPUT] [--nowarn] [--nowrite] [--nolink] [--verbosity VERBOSITY] [-h]`
+`python -m jasm source [--output OUTPUT] [--nowarn] [--nowrite] [--verbosity VERBOSITY] [-h]`
 
 | flag      | effect                                                       |
 | --------- | ------------------------------------------------------------ |
@@ -41,12 +41,9 @@ the jasm assembler supports the following flags:
 | output    | the output file path (defaults to a.bin)                     |
 | nowarn    | suppress warnings                                            |
 | nowrite   | suppress writing to output files                             |
-| nolink    | resolve labels as absolute addresses (makes code unlinkable) |
 | verbosity | set verbosity (accepts values from 0-3)                      |
 
-`--nolink` should be used for any code that will be loaded at a fixed, known address (bootloader, kernel, interrupt handlers). labels resolve to their absolute address as computed from the `org` directive. the assembled binary is only correct when loaded at that address.
-
-_note: linkable (position-independent) code is not yet implemented. `--nolink` is currently the only supported mode._
+labels resolve to their absolute address as computed from the `org` directive, so the assembled binary is only correct when loaded at that address.
 
 ### source mapping and breakpoints
 
@@ -119,9 +116,7 @@ jmp my_label        ; jumps to the absolute address of my_label
 put [d], my_label   ; stores the absolute address of my_label into memory at [d]
 ```
 
-conditional branch instructions (`jz`, `jnz`, `jc`, etc.) use a pc-relative offset internally, but you write them the same way. the assembler computes the offset for you.
-
-_note: PIC (position-independent) addressing modes (`[label]`, `[label + reg]`) are reserved for a future linker design and are currently undefined behaviour. exciting!_
+conditional branch instructions (`jz`, `jnz`, `jc`, etc.) work the same way: they take the absolute address of their target.
 
 ## devices
 
@@ -147,8 +142,6 @@ hello:
 ptr:
     data other_label
 ```
-
-future PIC/linking may resolve these to relative words or relocs instead (`DataDirectiveNode.resolve_words` in `jasm/language/ir/base.py`).
 
 ### import
 
