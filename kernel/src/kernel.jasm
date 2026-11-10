@@ -157,7 +157,3 @@ sc_jump_table:
     ; system
     data system__sc_shutdown     ; 0x50
     data system__sc_reset        ; 0x51
-
-align 0x7000
-
-import "kernel/programs/graphics.jasm"

@@ -80,3 +80,5 @@ define disk_command_read            0x0
 define disk_command_write           0x1
 
 define fs_magic                     0x333a   ; expected magic word in boot sector
+define fs_root_entry_size           0x10     ; words per root directory entry
+define fs_root_cache_end            0x6200   ; end of the two root sectors held in cache slots 0 and 1

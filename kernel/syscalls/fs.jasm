@@ -7,7 +7,7 @@
 ;    | name     | args                               | Returns                               | Notes                                                                 |
 ;    | -------- | ---------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
 ;    | fs_mount | -                                  | a = status                            | read boot sector, validate magic, cache header values.                |
-;    | fs_list  | b = buff, c = max entries          | a = count                             | copy root directory entries into buffer.                              |
+;    | fs_list  | -                                  | a = status                            | print the name of every file in the root directory.                   |
 ;    | fs_open  | b = filename                       | a = fd                                | walk root dir, return index into kernel FD table. Error if not found. |
 ;    | fs_read  | b = fd, c = dest addr, D = n_words | a = words read                        | read words from current file position, following fat chain.           |
 ;    | fs_write | b = fd, c = src addr, D = n_words  | a = status                            | write words at current file position. allocates new blocks as needed. |
@@ -63,65 +63,38 @@ sc_mount_error:
     ret
 
 sc_list:
-    mov b, 0x0a ; newline
-    mov a, 0x11 ; write_char
-    call kernel__dispatch_syscall
-
-
-    dereference_into a, kvar_root_start ; absolute block index of the start of the root sectors
-    mov b, 0 ; cache index 0, start of scratch
+    ; load both root directory sectors into cache slots 0 and 1
+    dereference_into a, kvar_root_start
+    mov b, 0
+    call load_to_cache
+    inc a
+    inc b
     call load_to_cache
 
-    inc a ; now, put the second root sector
-    inc b ; into cache index 1
-    call load_to_cache
-
-    ; so now, the root entries are in the cache! yay!
-    ; we can print out the filenames now
-    mov x, fs_cache_base ; index of first file
+    mov c, fs_cache_base ; c points to the current root entry
 
 sc_list__loop:
-    ; x points to the start of a root entry
-    add x, 6 ; check for empty block index
-    get b, [x]
+    ; an entry is free when the first word of its name is zero
+    get b, [c]
     cmp b, 0
-    jz sc_list__done
+    jz sc_list__next
 
-    sub x, 6 ; back to the start of the entry so we can print the filename
-   
-sc_list__print_filename:
-    mov d, 0
-sc_list__print_filename_loop:
-    get b, [x]
-    mov c, b
-    and b, 0x00FF  ; 2nd char of word
-
-    mov a, 0x11 ; write_char
-    call kernel__dispatch_syscall
-
-    rsh c, 8  ; 1st char of word
+    ; the name field is a null-terminated string, so it prints as-is
+    push c
     mov b, c
-    mov a, 0x11 ; write_char
-    call kernel__dispatch_syscall
-
-    cmp d, 5
-    jz sc_list__print_filename_done
-    inc d
-    inc x
-    jmp sc_list__print_filename_loop
-
-sc_list__print_filename_done:
+    call tty__write
     mov b, 0x0a ; newline
-    mov a, 0x11 ; write_char
-    call kernel__dispatch_syscall
+    call tty__putc
+    pop c
 
-    add x, 3 ; move to index 0 of the next entry
-    jmp sc_list__loop
+sc_list__next:
+    add c, fs_root_entry_size
+    cmp c, fs_root_cache_end
+    jnz sc_list__loop
 
-sc_list__done:
     mov a, 0x00
     ret
-    
+
 
 sc_open:
 sc_read:

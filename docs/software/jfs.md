@@ -1,69 +1,101 @@
 # jfs (jaide file system)
 
-jfs is a fat-style filesystem. it uses a block size of 256 words.
+jfs is a fat-style filesystem with a single flat directory. this document is the format's specification; the `jfs` tool ([jfs/image.py](../../jfs/image.py)) and the kernel both implement it.
 
-the general structure of the filesystem is as follows:
+## units
 
-| name             | size (blocks) |
-| ---------------- | ------------- |
-| boot             | 1             |
-| allocation table | n             |
-| root blocks      | m             |
-| data blocks      | ...           |
+everything in jfs is measured in 16-bit words. there are no bytes anywhere in the format: sizes, offsets, and file contents are all words.
 
-## boot section
+- a **block** is 256 words. block `n` starts at word `n * 256` of the volume.
+- a **volume** is a whole number of blocks. block indices are absolute: block 0 is the first block of the volume.
+- a **file** is a sequence of words. text is stored one character per word, exactly as strings are held in memory, so a text file can be printed and a program can be executed straight from its blocks with no unpacking.
 
-the boot section is exactly one block in length. it contains 7 values, each one word in size. all indices are word indices.
+a disk image is the volume's words in order, each stored as two bytes, low byte first.
 
-| word index | name         | description                                   |
-| ---------- | ------------ | --------------------------------------------- |
-| 0          | magic        | must be 0x3A33                                |
-| 1          | blocks       | total number of blocks on the disk            |
-| 2          | table start  | block index of the first element in the table |
-| 3          | table blocks | number of blocks in the allocation table      |
-| 4          | root start   | block index of the first root block           |
-| 5          | root blocks  | number of blocks in the root directory        |
-| 6          | data start   | block index of the first data block           |
-| 7          | padding      | 249 words                                     |
+## layout
+
+| region           | size (blocks)  | contents                         |
+| ---------------- | -------------- | -------------------------------- |
+| boot             | 1              | the volume header                |
+| allocation table | `table blocks` | one word per block of the volume |
+| root directory   | `root blocks`  | file entries                     |
+| data             | the rest       | file contents                    |
+
+the regions appear in this order with no gaps: `table start` is 1, `root start` is `table start + table blocks`, and `data start` is `root start + root blocks`.
+
+## boot block
+
+block 0 holds the volume header. the header is authoritative: readers take the volume's geometry from it and assume nothing else.
+
+| word | name         | description                                                    |
+| ---- | ------------ | -------------------------------------------------------------- |
+| 0    | magic        | `0x333A` (the bytes `3A 33` on disk, which read `:3`)          |
+| 1    | blocks       | total number of blocks in the volume, at most `0xFFFE`         |
+| 2    | table start  | block index of the first allocation table block                |
+| 3    | table blocks | number of allocation table blocks: `blocks / 256`, rounded up  |
+| 4    | root start   | block index of the first root directory block                  |
+| 5    | root blocks  | number of root directory blocks                                |
+| 6    | data start   | block index of the first data block                            |
+
+words 7 to 255 are zero.
 
 ## allocation table
 
-each entry in the allocation table is one word (16 bits) in size.
+the allocation table has one word for every block in the volume, indexed by absolute block index: the entry for block `n` is word `n` of the table. table words past the last block are zero.
 
-with a few exceptions, the value of the entry is simply the index of the next block.
+| value               | meaning                                              |
+| ------------------- | ---------------------------------------------------- |
+| `0x0000`            | free                                                 |
+| `0xFFFE`            | reserved: a boot, allocation table, or root block    |
+| `0xFFFF`            | in use, and the last block of its file               |
+| any other value     | in use; the value is the index of the file's next block |
 
-special values:
+a block is free exactly when its entry is `0x0000`, so an allocator needs no knowledge of the layout. a next-block value always names a data block.
 
-| value    | meaning      |
-| -------- | ------------ |
-| `0x0000` | unallocated  |
-| `0xffff` | end of chain |
+## root directory
 
-indexing: table entry indexing uses absolute block numbers.
+the root directory is an array of 16-word entries, 16 to a block, so a volume holds up to `root blocks * 16` files.
 
-## root directory table
+| word | size (words) | name        | description                                         |
+| ---- | ------------ | ----------- | --------------------------------------------------- |
+| 0    | 14           | name        | the file name, one character per word, zero-filled  |
+| 14   | 1            | start block | index of the file's first block                     |
+| 15   | 1            | size        | length of the file in words                         |
 
-the root directory table is 2 blocks in size. each entry is 8 words long. all indices are word indices.
+an entry is free exactly when the first word of its name is zero. free and used entries may appear in any order, so a reader must examine every entry.
 
-the root directory can contain up to 64 files.
+### names
 
-| word index | size (words) | name        | description                                      |     |
-| ---------- | ------------ | ----------- | ------------------------------------------------ | --- |
-| 0          | 4            | filename    | 8-character name, null-padded (2 chars per word) |     |
-| 4          | 2            | extension   | 4-character extension, null-padded               |     |
-| 6          | 1            | start block | first block index of the file                    |     |
-| 7          | 1            | size        | size of the file in words                        |     |
+a name is 1 to 13 characters. the unused words of the name field are zero, so the field always holds a null-terminated string and can be compared with an ordinary string comparison.
 
-### future plan: ebnlf (executable-but-not-linkable format)
+characters are printable ascii other than space (`0x21` to `0x7E`). names are case-sensitive and unique within the volume. a dot has no special meaning: `demo.bin` is simply an eight-character name.
 
-we have executable and data files
+## files
 
-we want position-independent code. all jumps and memory references must be relative.
+a file's blocks form a chain. the chain begins at the entry's start block; each block's allocation table entry names the next, and the last block's entry is `0xFFFF`.
 
-relative jumps is probably simple. the issue is references.
-we need a basic OS that can initialize and handle interrupts for reading/writing.
+a file of `size` words occupies exactly `size / 256` blocks, rounded up. the words of the last block past the end of the file are zero.
 
-we can use the stack for local variables, and that is solved
+an empty file has size 0 and start block `0xFFFF`. it owns no blocks.
 
-.data at the beginning, contains constants and global variables (just initialize to 0x0000)
-.code segment to hold executable code
+because size is one word, a file is at most 65,535 words.
+
+## the jfs tool
+
+`python -m jfs` builds and inspects disk images.
+
+| command                                                  | action                                    |
+| -------------------------------------------------------- | ----------------------------------------- |
+| `jfs create IMAGE [--binary FILE ...] [--text FILE ...]` | write a new image holding the given files |
+| `jfs add IMAGE [--binary FILE ...] [--text FILE ...]`    | add files to an existing image            |
+| `jfs info IMAGE`                                         | print the volume's geometry and its files |
+| `jfs read IMAGE NAME [--text]`                           | write a file's contents to stdout         |
+
+a host file is a stream of bytes, so the tool must be told how to turn it into words:
+
+- `--binary` files already hold words, two bytes each, low byte first. this is what the assembler writes. the file must have an even number of bytes.
+- `--text` files become one word per byte.
+
+`read` reverses the same conversions: it writes two bytes per word, or with `--text`, one byte per word.
+
+a file is stored under its host file name, which must be a valid jfs name. new volumes are 2048 blocks (1 MiB) with a 2-block root directory (32 files).

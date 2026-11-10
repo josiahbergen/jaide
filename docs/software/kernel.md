@@ -64,7 +64,7 @@ the terminal output syscalls in `kernel/syscalls/output.jasm` are thin wrappers 
 | #      | name       | args                               | returns                               | notes                                                                 |
 | ------ | ---------- | ---------------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
 | `0x30` | `fs_mount` | -                                  | a = status                            | read boot sector, validate magic, cache header values.                |
-| `0x31` | `fs_list`  | b = buff, c = max entries          | a = count                             | copy root directory entries into buffer.                              |
+| `0x31` | `fs_list`  | -                                  | a = status                            | print the name of every file in the root directory.                   |
 | `0x32` | `fs_open`  | b = filename                       | a = fd                                | walk root dir, return index into kernel fd table. error if not found. |
 | `0x33` | `fs_read`  | b = fd, c = dest addr, d = n_words | a = words read                        | read words from current file position, following fat chain.           |
 | `0x34` | `fs_write` | b = fd, c = src addr, d = n_words  | a = status                            | write words at current file position. allocates new blocks as needed. |
